@@ -50,6 +50,8 @@ Artist Info gets its biographies from Last.fm, and Last.fm asks every program fo
 
 Aulumic is a hobby project of a retired developer, shared as it is. There's no support, and no promise of fixes or new features. That's also why the issue tracker of this repository is switched off.
 
+Remarks and experiences are welcome under **Discussions**. They're read, but may go unanswered.
+
 The help inside the program (F1) explains every window and setting, and has a chapter on solving problems. And you're free to change the program yourself: that's what the licence is for.
 
 ## Building from source
