@@ -8,6 +8,14 @@ Coming in the next version
 (Nothing yet.)
 
 
+Version 1.0.0.9 (18 November 2026)
+-------------------------------------------------------------------------------
+
+- Nothing changes in how Aulumic works. The source code was tidied for
+  publication: one header for every unit, comments that describe the code as
+  it is, and names that no longer refer to libraries Aulumic doesn't use.
+
+
 Version 1.0.0.8 - the first public version (18 November 2026)
 -------------------------------------------------------------------------------
 

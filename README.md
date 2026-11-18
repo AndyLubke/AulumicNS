@@ -88,7 +88,7 @@ All windows are built in code; there are no `.lfm` form files.
 
 ## How it was made
 
-Aulumic is the work of André Lubke: built on his earlier, hand-written player of the same name, and expanded further with the help of Claude Code (Anthropic's AI coding assistant).
+Aulumic is the work of André Lubke: built on his earlier, hand-written player of the same name, and developed further with the help of Claude Code (Anthropic's AI coding assistant).
 
 ## Licence
 
