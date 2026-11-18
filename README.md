@@ -1,0 +1,90 @@
+# Aulumic
+
+**A bit-perfect music player for Windows.** Aulumic sends your music straight to your DAC, over WASAPI exclusive mode or your DAC's ASIO driver. Out of the box nothing is touched: resampling is off, DSD goes out as DSD, and the only thing in the way is the volume control.
+
+![The main window of Aulumic](help/shots/02-dark-playing.png)
+
+Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It needs no installation and no extra DLLs: the FLAC decoder, the resampler, the loudness meter and the whole user interface are part of the program.
+
+## What it does
+
+**Playback**
+- WASAPI exclusive mode and ASIO, with a badge and a Signal Path window that show whether the output is bit-perfect, and every stage between the file and the DAC when it isn't.
+- FLAC, WAV, DSF and DFF. DSD as native DSD over ASIO, as DoP, or converted to PCM.
+- Gapless playback.
+- A resampler you can leave off, or set up in detail (quality, phase, bandwidth, anti-aliasing).
+- ReplayGain (EBU R128) with a built-in scanner, and automatic headroom against clipping.
+- A five-band tone control that shows its curve.
+
+**Library and playlists**
+- A library of your music folders with a tree (folders, artists, albums, genres), search and virtual folders. Local folders are watched for changes.
+- Playlists and auto-playlists with a query builder, M3U import and export, ratings and favourites.
+- A tag editor, a cover viewer, a booklet viewer for PDF booklets and artist information.
+
+**Look and feel**
+- Dark and light theme (or follow Windows), six accent colours, sharp at every Windows scaling, touch scrolling.
+- A complete help inside the program (F1).
+
+## Download
+
+Take `AulumicNS-<version>-win64.zip` from the **Releases** page of this repository, unpack it into a folder of your choice and start `AulumicNS.exe`.
+
+- Windows 10 or 11, 64 bit.
+- The program isn't signed, so Windows SmartScreen may warn the first time: choose "More info", then "Run anyway".
+- Aulumic is portable: it keeps its settings and library in the folders `Data` and `Cache` next to the program file. If it can't write there, it uses `%APPDATA%\AulumicNS`.
+- To remove it, delete the folder.
+
+## First steps
+
+1. **Add your music:** Main menu > Preferences > Library > Add folder.
+2. **Choose the output:** click the device name at the bottom right of the main window and pick your DAC. WASAPI devices and ASIO drivers share one list.
+3. **Play:** double-click an album or a track.
+
+Press F1 for the help.
+
+### Artist biographies
+
+Artist Info gets its biographies from Last.fm, and Last.fm asks every program for an API key. Aulumic has none built in. A key is free: create an API account at [last.fm/api](https://www.last.fm/api) and paste the key into Preferences > System > Artist information.
+
+## Building from source
+
+You need [Lazarus](https://www.lazarus-ide.org/) 4.8 with Free Pascal 3.2.2, 64 bit. The only package used is the LCL, which comes with Lazarus.
+
+```
+lazbuild --build-mode=Release AulumicNS.lpi
+```
+
+The program is written to `bin\Release\AulumicNS.exe`. Use `--build-mode=Debug` for a build with range checks and a memory leak report (`heaptrc.log`). You can also open `AulumicNS.lpi` in Lazarus and press F9.
+
+The tests (FPCUnit, nothing is played on a device):
+
+```
+lazbuild Tests\AulumicNSTests.lpi
+Tests\lib\x86_64-win64\AulumicNSTests.exe --all --format=plain
+```
+
+## What is where
+
+| Folder | Content |
+|---|---|
+| `src\gui` | The user interface library: controls, lists, menus, theme and vector icons, drawn with Direct2D and DirectWrite |
+| `src\app` | The program: main window, dialogs, settings |
+| `src\audio` | The engine: decoders, resampler, WASAPI and ASIO output, DSD, loudness |
+| `src\library` | The music library: database, scanner, queries, folder watching |
+| `src\tags` | AulumicTag: reading and writing tags (a fork of OvoTag) |
+| `help` | The help text (Markdown) and its screenshots, built into the program |
+| `Tests` | The test program |
+| `Tools` | Development tools: an audio simulator, a library benchmark, check scripts |
+
+All windows are built in code; there are no `.lfm` form files.
+
+## Licence
+
+Copyright © 2026 André Lubke.
+
+Aulumic is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License, version 3**, as published by the Free Software Foundation. It is distributed in the hope that it will be useful, but **without any warranty**; without even the implied warranty of merchantability or fitness for a particular purpose. See [LICENSE](LICENSE) for the full text.
+
+Parts by others, and their licences, are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). In short:
+
+- **AulumicTag** (`src\tags`) is a fork of OvoTag, Copyright © 2011 Marco Caselli, under a modified LGPL.
+- **ASIO** is a trademark and software of Steinberg Media Technologies GmbH.

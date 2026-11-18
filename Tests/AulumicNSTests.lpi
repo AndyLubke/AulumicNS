@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="12"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+        <MainUnitHasScaledStatement Value="False"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <Title Value="AulumicNSTests"/>
+      <UseAppBundle Value="False"/>
+      <ResourceType Value="res"/>
+    </General>
+    <BuildModes>
+      <Item Name="Default" Default="True"/>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+      <UseFileFilters Value="True"/>
+    </PublishOptions>
+    <RunParams>
+      <FormatVersion Value="2"/>
+    </RunParams>
+    <RequiredPackages>
+      <Item>
+        <PackageName Value="FCL"/>
+      </Item>
+      <Item>
+        <PackageName Value="LCL"/>
+      </Item>
+    </RequiredPackages>
+    <Units>
+      <Unit>
+        <Filename Value="AulumicNSTests.lpr"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestMetadataCustodian.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestReplayGainScan.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestReplayGainThread.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDemoLibrary.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestOutputRing.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDsdToPcm.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHangWatch.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestVolumePopup.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestLongPaths.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestToneControl.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestImageLimit.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestImageFormats.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHeadroom.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestTextTags.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaylistPane.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestHelpers.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestHelpers"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestMemoryOutput.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestMemoryOutput"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlayback.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlayback"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaybackQueue.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlaybackQueue"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestAudioRules.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestAudioRules"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDriveWake.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestDriveWake"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestCrashTracer.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestCrashTracer"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestResampler.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestResampler"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestLibraryDatabase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestLibraryDatabase"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestLibraryLogic.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestLibraryLogic"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestLibraryScanner.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestLibraryScanner"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaylistRows.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlaylistRows"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestAutoPlaylist.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestAutoPlaylist"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaylistImport.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlaylistImport"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaylistStore.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlaylistStore"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestInputBlock.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestInputBlock"/>
+      </Unit>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="lib\$(TargetCPU)-$(TargetOS)\AulumicNSTests"/>
+    </Target>
+    <SearchPaths>
+      <IncludeFiles Value="$(ProjOutDir);..\src;..\src\gui;..\src\app;..\src\audio;..\src\library;..\src\tags"/>
+      <OtherUnitFiles Value="..\src;..\src\gui;..\src\app;..\src\audio;..\src\library;..\src\tags"/>
+      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <IncludeAssertionCode Value="True"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <Checks>
+        <IOChecks Value="True"/>
+        <RangeChecks Value="True"/>
+        <OverflowChecks Value="True"/>
+        <StackChecks Value="True"/>
+      </Checks>
+      <TargetOS Value="win64"/>
+      <Optimizations>
+        <OptimizationLevel Value="0"/>
+      </Optimizations>
+    </CodeGeneration>
+    <Linking>
+      <Debugging>
+        <DebugInfoType Value="dsDwarf3"/>
+        <UseHeaptrc Value="True"/>
+      </Debugging>
+    </Linking>
+    <Other>
+      <CompilerMessages>
+        <IgnoredMessages idx5024="True"/>
+      </CompilerMessages>
+      <CustomOptions Value="-gl -dDEBUG"/>
+    </Other>
+  </CompilerOptions>
+</CONFIG>

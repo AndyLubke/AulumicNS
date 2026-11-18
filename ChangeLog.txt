@@ -1,0 +1,693 @@
+===============================================================================
+                           Aulumic - Change Log
+===============================================================================
+
+Coming in the next version (1.0.0.0, in development)
+-------------------------------------------------------------------------------
+
+NEW & IMPROVED
+
+- Aulumic is now open source, under the GNU General Public License,
+  version 3. The About window and the help say so, and name ASIO as a
+  trademark of Steinberg.
+- Artist Info needs a Last.fm API key of your own for the biographies:
+  Aulumic no longer has one built in. A key is free (last.fm/api); enter it
+  in Preferences > System > Artist information. Biographies you already have
+  are still shown without one.
+- The title of every window is now in the middle of its title bar instead
+  of at the left. A title too long for that is cut off with dots, as before.
+- The hourglass can't get stuck. Every place that shows it also takes it
+  away when something goes wrong, and should one ever be left behind all the
+  same, Aulumic notices within a second and puts the normal pointer back.
+- Cursor follows playback: when a track starts, the selection moves to it,
+  and it scrolls to the middle of the list if it was out of sight - as in the
+  Original Aulumic. Only in the playlist that is playing; another playlist
+  you're looking at stays as it is. It's on by default; you can switch it off
+  in Preferences > Playlists.
+- Changing the grouping or a format of a playlist, or switching to another
+  playlist, shows the hourglass while the list is built, and clicks or keys
+  made meanwhile are ignored (they used to run afterwards, on a list that had
+  changed under the pointer).
+- The same now goes for everything else that can take a moment with a very
+  large playlist: dropping tracks from the library onto a playlist, moving
+  tracks inside it, Play / Add to / Send to current playlist, Add to
+  playlist, Remove from playlist, Clear the playlist, starting a track,
+  rating a selection, Expand all / Collapse all, Refresh (F5) and the M3U
+  export. With ordinary playlists you won't notice anything: they're done
+  before the hourglass shows.
+- Dropping a folder from Explorer, or Add folder: the hourglass is there from
+  the start, also while the folder is searched for music files.
+- View > Album header format is greyed out unless the playlist is grouped by
+  album, where it has no effect - as in the Original Aulumic.
+- Waiting for a drive is quiet now. While Aulumic checks that a drive is
+  awake (before a cover opens from a playlist header, for Open folder and
+  for Remove dead items), you only see the busy pointer: the window keeps
+  painting and the time of the track runs on, but clicks and keys are
+  ignored for that moment. The "Waiting for drive..." window with its Cancel
+  button comes only when the wait lasts longer than five seconds - a disk
+  that really has to spin up. Esc stops the wait at any time.
+- "Waiting for drive..." shows up far less often. Before a cover is opened
+  from a playlist header, Aulumic checks that the drive is awake; for a NAS
+  that means finding the server on the network, which takes a second or more
+  on some networks - every time. Now a drive that has just answered isn't
+  checked again: the drive of the track that is playing, and any drive you
+  used in the last 20 seconds. The same goes for Properties and Open folder.
+  When the window does appear, the log says what the wait was spent on.
+- The window that reads the tags for Properties no longer says "Waiting for
+  drive..." for an instant every time it opens.
+- The Tone Control has five bands instead of three: Bass, Low mid, Mid, High
+  mid and Treble. Bass and Treble are as they were; the three middle bands
+  cover 220 Hz to 8 kHz between them and never cross. Your present setting is kept and sounds the same: a Mid setting at
+  220 or 500 Hz is now the Low mid band, one at 3 kHz the High mid band.
+- The Tone Control tells you when a boost costs level. With Headroom set to
+  Automatic, a line under the curve says "Level lowered by 1.4 dB to avoid
+  clipping" while that is the case.
+- The Signal Path lists only the tone bands you've set.
+- The Tone Control now shows a curve: a graph above the bands of what
+  they do together, from 20 Hz to 20 kHz. It's worked out from the filters
+  that are really used at the sample rate being played, so what you see is
+  what you hear. Grey means the tone control is off.
+- Changes in the Tone Control glide in. A new gain or frequency, Flat, and
+  switching the tone control on or off used to arrive in a single step, which
+  could give a faint tick on loud music. Now each change takes a twenty-fifth
+  of a second. With the tone control off, or all bands at 0 dB, playback is
+  bit-perfect as before.
+- The volume icon, the rate line and the Tone Control now always agree with
+  what is really played. Going from a PCM track to DSD sent as DSD (or back)
+  the volume icon could show the wrong state - not fixed for DSD, or fixed
+  for PCM - mostly over WASAPI. After a change in Preferences that restarts
+  the track (Play DSD natively, Lock volume to 100 %, the output), they
+  follow within a quarter of a second.
+- The Tone Control shows when it cannot work: while DSD is sent to the DAC
+  as DSD (DoP or native), its title says "disabled for DSD", the switch, the
+  sliders and the frequencies are greyed out, and the button in the
+  transport bar is not lit. Your settings are kept and apply again with the
+  next PCM track. Before, the window stayed usable although nothing in it
+  had an effect.
+- Photos in an album folder are shown the right way up. A photo taken with a
+  camera or phone held sideways carries a note on how to turn it; Aulumic
+  now follows it, as Windows Explorer does. This goes for the Cover Art
+  Viewer, the banner, the thumbnails and embedded covers.
+- "Waiting for drive..." appears only when a drive takes longer than about a
+  second (was a third of a second), so it no longer flashes up at a click on
+  the cover.
+- ASIO: when you switch by hand to a track with another sample rate, or
+  press Stop, the sound now fades out over a few milliseconds before the
+  device is closed. Before, it was cut in the middle of the wave, which
+  could be heard as a faint tick. PCM only; normal playback and bit-perfect
+  output are not touched.
+- Saving tags no longer stops the music when the change takes the playing
+  track out of the auto-playlist it plays from (for example a genre that no
+  longer fits). The track plays on and the list continues after it; the
+  selection stays where it was.
+- The library loads a little faster at the start (about a fifth).
+- Downloaded artist pictures are reduced with the picture decoder of Windows
+  as well; the old picture code is gone from the program.
+- Repairing the library is about three times as fast and needs far less
+  memory while it runs (45,000 tracks on the test PC: 46 seconds instead of
+  137, and at most 300 MB instead of 540 MB). The cover thumbnails are now
+  made with the picture decoder of Windows. They look the same; a few covers
+  that came out with wrong colours before are right now.
+- Less memory for the library: texts that repeat from track to track (folder,
+  artist, album, genre) and their search forms are kept once. With 45,000
+  tracks that saves about 20 MB from the start.
+- After a library scan with changes or a repair, the memory use goes back to
+  what it is after a start. Before, a repair left the program some 80 MB (on
+  the test PC) larger until it was restarted.
+
+- Combo boxes and text boxes stand out better: a clearer outline in both
+  themes and, in the dark theme, a slightly lighter fill. On a card in
+  Preferences a combo box was hard to tell from the card behind it.
+
+- One way of writing labels: only the first word of a menu item, button,
+  window title, option or help heading has a capital letter ("Remove from
+  playlist", "Save all", "Keyboard shortcuts"), as Windows 11 does it. Names
+  keep their capitals - Aulumic, ReplayGain, WASAPI - and so do the names of
+  windows and tools: Playlist Manager, Properties, Tone Control, Signal Path
+  and the others. Before, menus and the help used capitals for every word
+  and Preferences did not.
+- The help and the descriptions under the settings are written in a more
+  informal way: they talk to you, in shorter sentences. Nothing about how
+  the program works changed with it. Two passages of the help were also
+  corrected: the playlist selector no longer creates or deletes playlists
+  (that is the Playlist Manager), and the borders between the panes follow
+  the pointer while you drag.
+- The playlist selector lists only your playlists and auto-playlists. New,
+  edit, rename and delete are in the Playlist Manager, which you open with
+  the pencil beside the selector, with Alt+P, or - new - from the
+  right-click menu of the playlist.
+- The program is called Aulumic. Its program file keeps the name
+  AulumicNS.exe; the NS stands for Native Sound (the audio reaches your DAC
+  as it is in the file). The settings file (AulumicNS.ini), the log files
+  and the data folder keep their names too, so nothing has to be converted.
+  The earlier program of the same name is called the Original Aulumic in
+  this text and in the help.
+- Preferences are regrouped: nine pages instead of twelve, each about one
+  subject (Library, Appearance, Playlists, Output, DSD, Resampler, Volume,
+  System, Shortcuts). Settings that are set once and then left alone are in
+  cards at the bottom of a page: one row with a title and a line that sums
+  up its settings; a click opens it in place. With the cards closed every
+  page fits the window; the cards you had open are open again next time.
+  * "Main Window" is now a card of Appearance, as is the text size of the
+    panes.
+  * "Resampler Filter" is the card "Quality and filter" of Resampler.
+  * "Advanced" is gone: the ReplayGain scan setting is a card of Volume;
+    Animations and "Use the graphics card" are on System, where the audio
+    thread settings and the log setting are cards.
+  * Output and DSD end with "Related settings" buttons that lead to the
+    neighbouring subject (from Output to DSD and to the audio thread).
+- The whole interface is now drawn with Direct2D and DirectWrite, the modern
+  drawing and text engines of Windows (it was GDI+). What you notice:
+  * Text is set in Segoe UI Variable, the Windows 11 font, with its own cuts
+    for small, normal and large text (Segoe UI on Windows 10). Letters are
+    spaced more evenly, and colour emoji in tags are shown in colour. Text
+    smoothing follows your Windows settings (ClearType or greyscale).
+  * The graphics card draws the lists and other large areas. A full repaint
+    of the playlist on a 4K screen takes about 3 ms instead of about 30, so
+    scrolling stays smooth; while music plays the program uses a little less
+    processor time than before. It needs more memory for this: about 160 MB
+    on a 4K screen instead of about 30 MB.
+  * Preferences > Advanced > "Use the graphics card" switches this off, in
+    case a graphics driver shows black or flickering areas. The processor
+    then draws everything (works everywhere, slower with large windows).
+- Animations (Preferences > Advanced > Animations, on by default): the
+  highlight under the pointer fades in and out, on buttons and from row to
+  row in the lists and menus; switches slide; lists, pages and the help glide
+  when you turn the mouse wheel; menus, popups and dialogs fade in; a
+  Preferences page fades in when you choose it; the banner fades over to the
+  next track; a change of theme fades over. All of them are short (0.1 to
+  0.25 s) and are only shown while "Animation effects" is on in the Windows
+  settings.
+- The cover art viewer and the Artist Info window come down from above as
+  they open (with the animations on).
+- The splitters (between library and playlist, under the banner) resize the
+  panes while you drag again: with the graphics card drawing, the panes keep
+  up with the pointer. With "Use the graphics card" off, only a line moves
+  and the panes are resized when you let go, as before.
+- Automatic headroom (Preferences > Volume > Headroom: "Automatic", the
+  default; the fixed values 0 to -6 dB of the former "Preamp / headroom" are
+  the other choices of the same list, so there is one headroom setting). A
+  settings file from before is set to Automatic once. A loud master
+  can come out up to about 2.5 dB above full scale after upsampling, because
+  the wave between its samples peaks higher than the samples themselves; DSD
+  converted to PCM with a DSD gain does the same. Until now those peaks were
+  clipped unless the preamp was set to -3 dB for everything. Now Aulumic
+  measures the peaks while it plays and lowers the level of an album just as
+  far as its highest peak needs - nothing is clipped or limited, and quiet
+  masters are not lowered at all. The level is the same for all tracks of an
+  album. The first time an album plays, the level can come down a little a
+  few times during its loudest tracks (gliding, within 10 ms); the album's
+  peak is remembered, so from then on it starts at the right level. Bit-
+  perfect playback is never touched, and nothing is written to the music
+  files. The signal path shows what is taken off ("Headroom -0.8 dB").
+  A boost of the tone control is counted in: Aulumic looks at the sound
+  behind the tone control, so a boost is lowered before it can clip (also
+  without resampling) and a cut costs no level. A fixed value is only for
+  those who want every album lowered by the same amount.
+- The main menu button (three lines) is now at the left of the title bar,
+  next to the program icon, where a program's menu is usually looked for.
+  The Preferences gear stays at the right. A click on the icon itself still
+  opens the window menu of Windows (Restore, Move, Size ...).
+- About (Main menu > About...) is a window of its own: the logo, the version
+  and build time of the program file you are running, what it was made
+  with, where the Data folder is, and the credits. "Copy Info" copies those
+  facts for a problem report. It always showed "1.0.0.0" before, whatever
+  the version of the program was. The log's first line names the version
+  and build time too.
+- Help revised: new topics "Getting Started" (add music, choose the output,
+  play), "WASAPI or ASIO?" and "Coming from the Original Aulumic"; the automatic headroom
+  is explained in short points; claims that promised too much are toned
+  down (digital volume, dropouts, upsampling); the licence of the tag
+  library is stated correctly (modified LGPL).
+- Dragging the border between the library and the playlist, or below the
+  banner, now moves only a thin line; the panes take their new size when
+  you let go. Before, both panes were laid out and painted again at every
+  mouse move, and on a slower PC the border lagged behind the hand.
+- Tracks without an album tag are no longer treated as one album per folder.
+  The ReplayGain scanner measures each of them on its own and gives it a
+  track gain only, no album gain; the results list and the log say so, and a
+  file that cannot be read no longer holds the others back. Automatic
+  headroom gives each such track its own level, so one loud loose track no
+  longer lowers the others in its folder.
+- Starting a track is a little quicker with large embedded covers: the
+  player reads the text tags only (ReplayGain values, album) and leaves the
+  cover in the file.
+- Aulumic is a new edition of the Original Aulumic: the same window layout and functions,
+  with a new look and no extra files. Everything is in one program file - no
+  DLLs, no separate PDF viewer.
+- Dark and light mode switch instantly, without a restart: choose Main menu >
+  Theme or Preferences > Appearance. "Follow Windows"
+  changes along with the Windows app theme. Six accent colours to choose from.
+- All icons are drawn as vector graphics, so they are sharp at every screen
+  scaling, also when the window moves to a monitor with another scaling.
+- New program icon: the Original Aulumic "A" redrawn as a vector graphic, a little
+  wider than the Original Aulumic's (it looked squeezed).
+- The peak meter looks and moves like the Original Aulumic's: a thin frame, fine blocks
+  of equal height, green at the bottom turning amber and then red towards
+  the top, a 60 dB scale, the Original Aulumic's smooth rise and fall, and a red top
+  block when a sample was clipped. It follows the music at the pace of real
+  time, as in the Original Aulumic (it jumped with every buffer of audio before), and its
+  bars are narrower.
+- The source column of the top banner grows with its text, so "DSD to PCM:
+  705.6 kHz" and the like are no longer cut off at the larger text sizes.
+- Tone control: the arrow keys, the mouse wheel and Page Up / Down land on
+  0.5 dB steps (as in the Original Aulumic), so 0 dB can always be reached; dragging with
+  the mouse also moves in 0.5 dB steps and catches 0 dB easily. Hold Ctrl
+  for 0.1 dB steps.
+- Preferences: Appearance is now right under Main Window.
+- The help window has no minimize button any more.
+- The ReplayGain scanner can measure several tracks of an album at the same
+  time (Preferences > Advanced > ReplayGain scan: 1, 2, 3, 4 or 8 tracks).
+  With 4 tracks an album is scanned about 3.5 times as fast, with 8 about 5
+  times; the measured values are exactly the same. The default is 1 track,
+  which keeps the processor coolest.
+- Preferences has a new page, Advanced, with that setting and "Always save
+  the log": the log file (AulumicNSLog.txt in the Data folder) is then
+  written every time Aulumic closes, not only after an error.
+- The resampler is much faster: 3 to 5 times at the default settings
+  (44.1 kHz to 705.6 kHz now as fast as the Original Aulumic's libsoxr, high-resolution
+  sources about two thirds of it) and up to 37 times at Ultra High quality
+  with Fast roll-off, which now also plays DSD256 converted to PCM at
+  705.6 kHz without dropouts on a small PC (before: too slow for real time).
+  Long filters are now computed with the FFT, as libsoxr does; the filters
+  themselves are the same, so the sound is the same (the 32-bit output
+  differs by at most 1 in its last bit in a few samples per million). It
+  uses the vector instructions of the processor (AVX where available, else
+  SSE2, which every 64-bit processor has); the log names the one in use.
+- Much less CPU while playing: the screen of a playing track (peak meter,
+  position bar, time) now takes about a quarter of what it took on a 4K
+  screen. Every repaint of a small part of the window cost time in
+  proportion to the whole window; it now costs only what the part needs.
+  The peak meter is also redrawn only when it changes, and the position bar
+  only when it moves by a whole pixel.
+- Dragging the dividers of the main window no longer leaves stale lines in
+  the library, the playlist or the banner while the mouse moves.
+- Preferences has eleven short pages instead of seven long ones, so no page
+  needs scrolling on a 1920 x 1080 screen at 150 %: the library tree and
+  what the main window shows, the playlist defaults, DSD and the resampler's
+  filter have pages of their own.
+- Preferences > Library: Scan Now and Repair are available as soon as the
+  list has a folder (they always work on all folders); they were greyed out
+  until a folder was selected.
+- Preferences > Resampler Filter says at the top when its settings are used;
+  with resampling off it explains why the page is greyed out, and the
+  Resampler page button leads to the switch. The help shows both resampler
+  pages with resampling on.
+- The bandwidth "Slow Roll-off" no longer names SoX (the old resampler
+  library).
+- Properties can be resized and maximized: the file list, the fields, the
+  Comment box (in width and height) and the Inspector grow with the window,
+  and it opens at the size it had last time. On a small screen (1920 x 1080
+  at 175 %) it now fits: the Tags page scrolls. It has no minimize button
+  (a minimized dialog could not be found again).
+- The cover viewer and Artist Info no longer open a little higher every
+  time.
+- New accent colours: Blue, Mint, Yellow, Peach, Rose and Lilac - pastel in
+  dark mode, deeper in light mode. They stay clearly apart for people with
+  colour blindness too (before, Blue and Violet looked the same with
+  red-green colour blindness, and Teal and Green were close for everyone).
+  Text on an accent button is dark or white, whichever reads better.
+- An own title bar in the colours of the theme, with the main menu and
+  Preferences buttons and the minimize, maximize and close buttons.
+  Everything Windows offers still works: dragging, double click to maximize,
+  snapping to the screen edges, the snap layouts on the maximize button
+  (Windows 11) and the window menu (right click or Alt+Space).
+- The top banner shows a "Bit-perfect" badge next to the booklet and the heart.
+- Every list and tree has a three dots button on the row under the mouse, so
+  all menus also work on touch screens.
+- Plays DFF (DSDIFF) files as well as FLAC, WAV and DSF.
+- ASIO output besides WASAPI exclusive mode: the device button lists the
+  WASAPI devices and the ASIO drivers. Over ASIO, DSD is sent as native DSD
+  when the driver supports it.
+- The FLAC decoder and the resampler are built in (no DLLs). The resampler
+  keeps all of the Original Aulumic's settings: quality, linear, intermediate or minimum
+  phase (separately for up- and downsampling), bandwidth and anti-aliasing.
+- The top banner shows a "Processed" badge when the sound is changed on its way
+  (resampling, volume, tone control, ReplayGain), else "Bit-perfect".
+- Files dropped from Explorer are added to the playlist; with Ctrl held down
+  they replace it and start playing.
+- The library folders are watched: new and changed music files appear in the
+  library by themselves a few seconds later. Network folders are not watched
+  (some NAS would never go to sleep); Refresh (F5) or Rescan (Ctrl+F5) checks
+  them. Switch it off in Main menu > Library > Library Folders...
+- The library and the play statistics (ratings, favourites, play counts) are
+  saved at once after every change, so a crash or a power cut loses nothing.
+  A damaged library file is kept as a backup and never overwritten.
+- DFF files show their tags, format and length (they were played without them).
+- All playlists are kept in one place and saved at once after every change.
+  Export a playlist as M3U8 (Main menu > File > Export Playlist...) to use it
+  in another player or as a copy.
+
+FIXED
+
+- The library pane keeps its width. When the window became narrow for a
+  moment (the screen switched off and on, a smaller window), the pane was
+  squeezed and stayed narrow afterwards, and that width was even saved. It
+  now goes back to the width you set with the splitter as soon as there is
+  room again.
+- More robust when the graphics card gets into trouble (a driver restart,
+  a screen that is switched off, the PC waking up): a part of the window
+  that could not be drawn by the graphics card is drawn by the processor
+  instead, and the graphics card is tried again 15 seconds later. Before,
+  that part stayed with the processor until the next start.
+- Moving through a scrolled page with the Tab key (Preferences with open
+  cards, the Playlist Editor, Properties) left the page where it was, so the
+  control with the focus could be out of sight. The page now follows the
+  focus.
+- A long context menu (for example on an album header of the playlist)
+  opened in the middle of the screen was cut short and got a scroll bar,
+  although the screen had room for all of it: it fitted neither wholly below
+  nor wholly above the pointer. Such a menu is now moved up as far as needed
+  and shown in full. A menu only scrolls when it is higher than the screen.
+- Changing the volume, muting and unmuting no longer change the level in one
+  step: the sound glides to the new level within 10 ms, so there is no click
+  when the change falls in the middle of a wave. While the volume stays where
+  it is, the sound is exactly as before. The same glide is used when the
+  next track has another ReplayGain value.
+- A picture of more than 67 megapixels (8192 x 8192) - a huge scan used as
+  cover, folder picture or artist picture - is no longer opened: decoding it
+  could take more than a gigabyte of memory and freeze the window for
+  seconds. The cover viewer and Properties say that the picture is too large
+  and show its size. Loading a cover in Properties also no longer decodes the
+  picture at full size just to show the small preview.
+- The hang report (written when the main window stops answering) sometimes
+  missed its last line, "the main window answered again": the line was lost
+  when another program (a virus scanner, for example) had the new report
+  open at that moment. It is now written as soon as the file is free.
+- Help: the picture of the main window shows the position bar where the
+  banner says the track is (it stood at 00:00).
+- With many playlists the list of the playlist selector ran off the screen
+  and its lower entries could not be reached. A menu that is too long for
+  the screen is now as high as fits and scrolls: with the mouse wheel, its
+  scroll bar, a swipe, the arrow keys, Home / End and Page Up / Down. This
+  holds for every menu (also "Add to" with its list of playlists, and the
+  device list).
+- Files in very deep folders or with very long names (a full path of about
+  255 characters or more) were not found: they were missing from the library
+  and could not be played, tagged or scanned for ReplayGain. They are now
+  handled like any other file. (9 such tracks in the test library.)
+- Because of such files every library scan "found changes", although nothing
+  had changed: a few seconds after each start the whole library was loaded
+  again, written to disk again (15 MB for 46,000 tracks) and the library
+  tree was rebuilt. A scan without changes now leaves everything as it is.
+- Opening Artists, Albums or Genres in the library the first time (and again
+  after every change of the library) froze the window for 0.7 s with 46,000
+  tracks, more on a small PC. Now 0.05 s.
+- A search with very many hits (for example "the") paused typing for a
+  quarter to half a second. It is now two to three times faster.
+- A library scan that finds nothing new takes half the time: the folders
+  were read twice (once only to count the files for the progress bar).
+- Booklets (PDF) and cover pictures in very deep folders (a path of 260
+  characters or more) open as well now.
+- Windows shutdown, restart or log-off while Aulumic is open: the settings,
+  the playlists (also an edit of the last second), the library and the play
+  statistics are saved, and the program closes cleanly. Before, the settings
+  of that session could be lost.
+- Remove dead items (playlist menu) no longer makes the window wait when the
+  playlist has tracks on a drive that is asleep or on a NAS that does not
+  answer: the drives are checked in the background, with a "Waiting for
+  drive..." window and Cancel when it takes a moment. Tracks on any drive
+  that is not connected are kept (before, only the library's folders were
+  known to be offline), and the message says how many were kept.
+- Very large playlists (tens of thousands of tracks): removing, moving or
+  rating a track is about twice as fast.
+- The tone control needs about a third less processor time (it was little).
+
+- ReplayGain with Preamp / Headroom: a quiet track with a high ReplayGain
+  gain and a high peak was raised until its loudest sample reached full
+  scale, which used up the headroom of the preamp; after upsampling, the
+  waveform between its samples could then clip by a few samples. The
+  loudest sample now stays as far below full scale as the preamp says
+  (-3 dBFS with -3 dB). Album mode keeps it for the loudest track of the
+  album, so such albums may play a little quieter than before.
+- DSD converted to PCM could clip in loud passages with DSD Gain +6 dB
+  (measured on an SACD of Le Sacre du printemps: 11 of 14 tracks). The gain
+  was applied when converting, before the resampler and the preamp. It is
+  now applied at the end, together with the volume, so Preamp / Headroom
+  (-3 dB recommended) keeps such passages clean; the same recording now
+  peaks at about -1 dB there, without a single clipped sample.
+- Clicking the volume button could show "An unexpected error has occurred"
+  (the music played on): after the volume popup had been closed, the next
+  click could use the old, already removed popup.
+- The main menu and Preferences buttons are now in the title bar, next to the
+  minimize button. The sun / moon theme button is gone: dark and light mode
+  are in Main menu > Theme and in Preferences > Appearance.
+- Touch screens: swiping now scrolls the library, the playlist, the help, the
+  log, the pages of Preferences and the other lists (it did nothing). In the
+  booklet viewer a swipe turns one page, or moves a zoomed-in page. A
+  sideways drag in the library stays a drag (onto the playlist). The mouse
+  wheel and the scroll bars work as before.
+- A narrower main window no longer squeezes the playlist away: the library
+  pane gets narrower first, and the playlist keeps at least 400 pixels (as in
+  the Original Aulumic). The divider between them cannot be dragged past that either.
+- At the first start (maximized window) the library pane takes a quarter of
+  the screen, as intended; at high display scaling it took up to 900 pixels.
+- Help: the picture of the library search shows search results; the
+  pictures of the main window show the peak meter.
+- The help (with its pictures) is less than half its size; the program file
+  is about 1.4 MB smaller.
+- The Preamp setting says that it also works with ReplayGain off; the signal
+  path notes a preamp that is not applied because the volume is locked.
+- A few texts still named the Original Aulumic (a log line, the file lock message).
+- New: Ctrl+1 ... Ctrl+5 rate the selected playlist tracks (on an album
+  header: the whole album), Ctrl+0 clears the rating.
+- The signal path shows the preamp (Preferences > Volume) as a step of its
+  own; the ReplayGain step shows only the ReplayGain gain (the preamp was
+  hidden in it, and invisible with ReplayGain off).
+- Properties > Inspector is a text box like the Comment field: text can be
+  selected and copied, long lines wrap.
+- The cover viewer and Artist Info open larger and remember their size.
+- Every window now fits on smaller screens and at larger scalings, e.g.
+  1920 x 1080 at 150 % or 1366 x 768: Preferences, the auto-playlist editor
+  (its content scrolls), Help, Log and the other sizable windows open at most
+  as large as the screen; Properties is a little lower; the signal path
+  moves its steps closer together when they would not fit.
+- "Show Now Playing" (Ctrl+J) stopped the music when the track played from an
+  auto-playlist that was not on screen.
+- After saving tags (Properties) or ReplayGain results, the status bar kept
+  "Finalizing updates..." and a nearly full progress bar.
+- With "Watch the library folders" on, every tag or ReplayGain save started a
+  library scan afterwards (the program saw its own changes to the files).
+- "Open folder..." waits for a sleeping drive with the "Waiting for drive..."
+  window (with Cancel) instead of freezing the window, and says so when a
+  network drive does not answer.
+- The busy cursor (arrow with hourglass) could stay after an error.
+- An unexpected error is now written to the log with the place in the program
+  where it happened, the log is saved at once, and a message in the program's
+  own style is shown (it showed a bare "Access violation").
+- Booklets: zooming in far and then "Fit to window" could make the viewer
+  unresponsive or close it (it used too much memory). Pages are now rendered
+  at most at a size that keeps the memory low; the neighbouring pages at the
+  normal size.
+- Closing Aulumic while tags are being written, ReplayGain is calculated or
+  the library is scanned now asks first.
+- An empty auto-playlist no longer asks you to drag music into it; it says
+  that no track matches its rules.
+- A right click in the library opened the menu and at once ran its bottom item
+  (e.g. "Open folder") when the menu opened under the mouse. A menu item now
+  runs only when it was clicked inside the menu.
+- The program froze for minutes ("Not responding") when the device button
+  was clicked, or the Output page of Preferences listed the devices, while
+  no WASAPI playback device was active. That happens during native DSD over
+  ASIO when the DAC is the only playback device of the PC: the DAC's WASAPI
+  device is gone while it plays DSD over ASIO (seen with a Topping DX9).
+  An empty device list is now simply empty.
+- During native DSD over ASIO the device button's list showed no WASAPI
+  device (Windows hides the DAC's WASAPI device then), so there was no way
+  back to WASAPI. The chosen WASAPI device is now always listed, as in
+  Preferences; picking it switches back once the DAC has let go of DSD.
+- Booklets: a PDF without pages no longer makes the viewer loop.
+- The ASIO driver now gets a hidden window of its own instead of the main
+  window, and the program keeps answering the driver while it waits for the
+  output to close. If closing the output takes long, the log says so
+  ("Closing the output took ... ms"). If a driver makes windows tied to the
+  main window, the log says that too.
+- New: if the window stops responding for 5 seconds, a hang report
+  (HangReport_<date>.txt next to the program) says what each part of the
+  program was doing at that moment. See Help > Log Files & Troubleshooting.
+- Typing in the playlist now jumps to the first row that starts with the
+  typed letters (a track or a group header), as in the library tree.
+- Switching from ASIO to WASAPI while a DSD track plays gave an error, and so
+  did DSD converted to PCM over WASAPI right after native DSD over ASIO,
+  though both worked after a stop. After native DSD over ASIO, a FiiO K11's
+  WASAPI device is gone for about 0.7 s, and the new stream opened at once.
+  Now the first stream after one that has just closed waits up to three
+  seconds for the device (and asks again for a format it refused). A normal
+  start still reports a switched-off DAC at once.
+- WASAPI: when a driver refuses a buffer as long as the buffer size asks for,
+  Aulumic tries a shorter one (down to 50 ms) and notes it in the log.
+- The log names native DSD over ASIO as such (it read "via DoP").
+- ShutdownTraceLog.txt (see Help > Log Files & Troubleshooting) is written
+  again when an error occurs while Aulumic closes: the trace was never
+  started. When one step of closing fails, the next ones still run.
+- Internal clean-up: about 1,100 lines of code and texts left over from
+  the Original Aulumic that nothing used any more were removed (nothing changes in use).
+- DSD converted to PCM now uses the PCM buffer size. The DSD buffer size is
+  only used when DSD goes to the DAC as DSD (DoP, or native over ASIO),
+  where a dropout is a pop. Buffers of 1000 ms work (checked on a FiiO K11
+  over WASAPI and ASIO).
+- The rate line in the top banner showed wrong values for DSD (for example
+  "DSD Direct: DSD32"), above all after changing the output, "Play DSD
+  natively" or resampling while a track played. It now shows what the
+  player really does (the same as the signal path) and follows such
+  changes. DSD of the 48 kHz family is named correctly (DSD64, not DSD69),
+  also in the signal path and the cover viewer.
+- ASIO: short dropouts when the player was held up for a moment. The buffer
+  between the player and the ASIO driver held only three driver periods:
+  about 35 ms with a FiiO driver, but only a few milliseconds with drivers
+  that keep a small period at 352.8 / 384 kHz and DSD256 / DSD512. It now
+  holds the time set as the buffer size (250 ms for PCM, 500 ms for DSD), as
+  WASAPI does: the PCM / DSD buffer size in Preferences > Output now applies
+  to ASIO too. On a FiiO K11 R2R a 40 ms delay was a dropout before; now even
+  150 ms are not.
+- ASIO starts with about 40 ms of music already buffered instead of a single
+  driver period.
+- The log (Main menu > Tools > Show Log..., Ctrl+L) reports every dropout of the output as it
+  happens, with about where in the track it was. When a stream ends, it shows
+  how many dropouts there were, how much music was buffered ahead at the
+  least, and how long the slowest buffer took to prepare. If you hear a
+  hiccup and the log shows no dropout, the cause is outside Aulumic (the
+  driver, USB or the DAC).
+- Faster DSD to PCM conversion, for small PCs such as a NUC: about 1.5 times
+  less work at every DSD rate. With the DSD low-pass on, DSD512 converted to
+  PCM at 352.8 or 176.4 kHz (for a DAC without DSD512) goes there in one
+  step instead of two: about 4 times faster than before. Resampling PCM is
+  about 8 % faster. The sound is the same: the differences lie below
+  -165 dBFS, far under what any DAC can reproduce.
+- The last fraction of a second of the last track (and of a track before a
+  change of sample rate) was cut off: the device was closed while it was still
+  playing. It now plays to the end first (WASAPI and ASIO).
+
+MILESTONE 6 (preview)
+
+- Booklet viewer built in: when the playing album has a PDF booklet (in its
+  folder, in a Scans or Artwork folder, or next to the CD1 / Disc 2 folders),
+  click the booklet icon in the banner. Single pages or two facing pages like
+  an open booklet, zoom with Ctrl + mouse wheel, + and -, or a double click,
+  turn the pages with the arrow keys or the mouse wheel. It uses the PDF
+  engine of Windows; no extra viewer is needed (the Original Aulumic used SumatraPDF).
+- Signal path: click the Bit-perfect / Processed badge in the banner to see
+  every stage between the file and the DAC - the source, the decoder or the
+  DSD transport (DoP, native DSD, DSD to PCM), ReplayGain, the tone control,
+  the resampler, the volume, dither and the output format - green when it
+  leaves the signal untouched, amber when it changes it. It follows the
+  playback while it is open.
+- Help (F1, or Main menu > Help...): the whole manual with screenshots, built
+  into the program. F1 in a dialog opens the help of that dialog. Search the
+  help with Ctrl+F, change its text size with Ctrl + mouse wheel.
+- The Import from the Original Aulumic menu item is gone (Aulumic starts fresh).
+
+MILESTONE 5 (preview)
+
+- All dialogs have the new look with the own title bar, and every setting has
+  a short description under its name.
+- Windows and menus open without a white flash in dark mode: they appear
+  only once they are completely drawn.
+- The coloured frame around the text box with the cursor is thinner and
+  sharp at every screen scaling.
+- Preferences (Main menu > Preferences..., Ctrl+P, or the gear in the title bar):
+  all of the Original Aulumic's settings on eleven short pages that need no scrolling -
+  Library, Main Window, Playlists, Output, DSD, Resampler, Resampler Filter,
+  Volume, Appearance, System and Shortcuts. The library folders are now the
+  first page (Main menu > Library > Library Folders... opens it there); Scan
+  and Repair start at once and show their progress on the page. Theme and
+  accent change while you choose them; Cancel puts them back. Changed
+  settings are written to the log.
+- Playlist Manager (Alt+P, Main menu > Playlist, or the playlist button): all
+  playlists and auto-playlists in one list with New Playlist, New
+  Auto-playlist, Edit (F2), Remove (Del), Import (M3U / M3U8) and Export
+  (M3U8). Double click or Enter shows the playlist.
+- Playlist Editor: the name, the grouping and the header / track formats of a
+  playlist; for an auto-playlist also its rules, from a ready-made template
+  or made with the query builder (tag, operator, value).
+- Properties (Alt+Enter, Main menu > Tools, the library and playlist menus):
+  edit the tags of one or many files - title, artists, album, genre, year,
+  track and disc numbers, composer, performer, comment - and the cover (load
+  a file, search the web, remove, paste with Ctrl+V or drop an image). The
+  Inspector tab shows the format, the file, the play statistics and every
+  tag. The tags are written in the background; DFF files can now be tagged
+  too.
+- ReplayGain (Main menu > Tools > Calculate ReplayGain for the whole library,
+  or from the library and playlist menus): measures the loudness with the
+  built-in EBU R128 meter, shows every track with its gains and peaks, and
+  saves them with Save All. Hide keeps it running in the background (the
+  status line shows the progress).
+- Virtual Folder editor (library menu > Create / Edit Virtual Folder...):
+  choose the folders by hand or let Auto-Find collect every library folder
+  whose tracks match a name (artist, composer, album, genre or folder name).
+- Log window (Ctrl+L) with Copy, Save to File and Clear, and the Debug Queue
+  (Ctrl+D) that shows what the player is doing.
+- Cover Art: click the cover or the album name in the banner, or a cover in
+  a playlist album header. Click, right click, the mouse wheel or the arrow
+  keys show the other images of the album folder (back cover, booklet scans).
+  A sleeping drive is woken first ("Waiting for drive..." with Cancel).
+- Artist Info: click an artist in the banner. Shows the biography and a
+  picture (from Last.fm, Wikipedia or TheAudioDB, kept for the next time) and
+  how many albums and tracks of the artist are in your library. Edit the
+  biography (F2), choose your own picture (Ctrl+O, drop or paste one), remove
+  it (Del) or reload everything (F5); your own text and picture are kept by
+  a reload.
+
+MILESTONE 4 (preview)
+
+- Playlists: the playlist button above the list switches between the Default
+  playlist, your playlists and the auto-playlists (with a funnel). It also
+  makes a new playlist or auto-playlist and renames or deletes the one shown.
+  Each playlist keeps its own view (View: grouping by album, by folder or a
+  flat list; the album header and track formats), its closed albums and the
+  track that was selected.
+- Auto-playlists show the library tracks that match their query (for example
+  %genre% IS jazz; %rating% >= 4; %added% IN LAST 30d), newest first for
+  "added" and "last played"; they cannot be edited by hand.
+- Drag library folders, albums, artists or tracks onto the playlist to insert
+  them where you drop them; drag tracks inside the playlist to reorder them;
+  files dropped from Explorer go where you drop them too.
+- Right click (or the three dots) on the playlist: Play, Rating, Add to (any
+  playlist or a new one), Remove from Playlist, Remove dead items, Clear the
+  Playlist, Expand all / Collapse All, Show Now Playing, Refresh, Open folder.
+  The library menu has Add to playlist as well.
+- Click the stars of a track or of an album header to rate it; the same star
+  again removes the rating.
+- Import Playlist... reads M3U / M3U8 files into a new playlist.
+- The play list of the previous preview becomes the Default playlist.
+- Still to come: the Playlist Manager and the Playlist Editor with the query
+  builder (milestone 5).
+
+MILESTONE 3 (preview)
+
+- The library works: add your music folders in Main menu > Library > Library
+  Folders... Aulumic scans them (progress in the status line) and shows
+  them in the library tree: Folders (with virtual folders), Artists, Albums
+  and Genres. Opening a node never touches the disk, so sleeping drives stay
+  asleep and a folder on a drive that is not connected is shown dimmed with
+  "(not available)".
+- Search: type at least two letters in the search box (Ctrl+F); the tree
+  shows the matching folders, artists, albums, genres and tracks.
+- Double click or Enter on a library node plays it; the menu (right click or
+  the three dots) has Play, Add to current Playlist, Send to current Playlist,
+  expand / collapse, Refresh and Open folder.
+- The album headers of the playlist show the cover thumbnails made by the
+  scan; the stars show the ratings; the heart in the banner marks the playing
+  album as a favourite. A track counts as played after 30 seconds or half its
+  length.
+- Still to come: your playlists (milestone 4), Properties, ReplayGain and the
+  Virtual Folder editor (milestone 5).
+
+MILESTONE 2 (preview)
+
+- Playback works: add files or a folder (File menu, Ctrl+O), drop files from
+  Explorer, or open them with Aulumic from Explorer. The play list is kept
+  until the next start (the real playlists follow in milestone 4).
+- The banner shows the playing track with its cover (the background takes on
+  the cover's colour), the format, the output rate (click it to choose another
+  rate) and the badge; the peak meter follows the music.
+- The volume popup, the Tone Control window (Ctrl+T), the device menu, media
+  keys, shuffle and repeat work. When the DAC refuses a sample rate, Aulumic
+  offers to resample.
+- The library tree still shows demo content (milestone 3). The Preferences
+  dialog follows in milestone 5; until then the defaults of the Original Aulumic apply.
+
+MILESTONE 1 (preview)
+
+- The main window with demo content: banner, library tree, playlist, transport
+  buttons and status line.

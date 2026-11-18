@@ -1,0 +1,21 @@
+# build output
+bin/
+lib/
+*.exe
+*.dbg
+*.o
+*.ppu
+*.compiled
+*.or
+
+# Lazarus session and generated resources
+*.lps
+*.res
+backup/
+
+# what the program and the debug build write
+Data/
+Cache/
+heaptrc.log
+*.log
+HangReport_*.txt
