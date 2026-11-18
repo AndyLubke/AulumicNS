@@ -46,6 +46,12 @@ Press F1 for the help.
 
 Artist Info gets its biographies from Last.fm, and Last.fm asks every program for an API key. Aulumic has none built in. A key is free: create an API account at [last.fm/api](https://www.last.fm/api) and paste the key into Preferences > System > Artist information.
 
+## Support
+
+Aulumic is a hobby project of a retired developer, shared as it is. There's no support, and no promise of fixes or new features. That's also why the issue tracker of this repository is switched off.
+
+The help inside the program (F1) explains every window and setting, and has a chapter on solving problems. And you're free to change the program yourself: that's what the licence is for.
+
 ## Building from source
 
 You need [Lazarus](https://www.lazarus-ide.org/) 4.8 with Free Pascal 3.2.2, 64 bit. The only package used is the LCL, which comes with Lazarus.
