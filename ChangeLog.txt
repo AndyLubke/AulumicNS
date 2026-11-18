@@ -2,8 +2,16 @@
                            Aulumic - Change Log
 ===============================================================================
 
-Coming in the next version (1.0.0.0, in development)
+Coming in the next version
 -------------------------------------------------------------------------------
+
+(Nothing yet.)
+
+
+Version 1.0.0.8 - the first public version (18 November 2026)
+-------------------------------------------------------------------------------
+
+Everything below was made during development, before Aulumic was published.
 
 NEW & IMPROVED
 
