@@ -86,6 +86,10 @@ Tests\lib\x86_64-win64\AulumicNSTests.exe --all --format=plain
 
 All windows are built in code; there are no `.lfm` form files.
 
+## How it was made
+
+Aulumic is the work of André Lubke: built on his earlier, hand-written player of the same name, and expanded further with the help of Claude Code (Anthropic's AI coding assistant).
+
 ## Licence
 
 Copyright © 2026 André Lubke.
