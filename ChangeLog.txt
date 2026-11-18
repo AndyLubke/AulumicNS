@@ -8,6 +8,16 @@ Coming in the next version
 (Nothing yet.)
 
 
+Version 1.0.0.10 (18 November 2026)
+-------------------------------------------------------------------------------
+
+FIXED
+
+- A menu could appear empty for a moment before its items showed, mostly
+  right after Aulumic was started. Menus and popups now always appear
+  complete.
+
+
 Version 1.0.0.9 (18 November 2026)
 -------------------------------------------------------------------------------
 

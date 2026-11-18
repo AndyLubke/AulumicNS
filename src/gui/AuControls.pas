@@ -1336,8 +1336,13 @@ begin
     2400 x 1600 px: 3 ms; through the buffer below 29 ms, nearly all of it
     copying). Small controls take the buffer: a target each would cost memory
     for nothing. }
+  { Not in a popup (a menu, the volume or Signal Path popup): it is painted
+    once while still invisible and then revealed, and the first picture of a
+    new target can be lost or late - the popup would appear empty and fill a
+    moment later. Through the buffer the picture is there before it shows. }
   G := nil;
-  if GpuPaintAllowed and HandleAllocated and (FGpuPaint or (Int64(W) * H >= GPU_PAINT_MIN_PIXELS)) then
+  if GpuPaintAllowed and HandleAllocated and (FGpuPaint or (Int64(W) * H >= GPU_PAINT_MIN_PIXELS)) and
+    not (GetParentForm(Self) is TAuPopup) then
   begin
     if FWinTarget = nil then FWinTarget := TGfxWindowTarget.Create;
     G := FWinTarget.BeginPaint(Handle, W, H);
