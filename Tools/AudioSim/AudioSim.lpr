@@ -34,6 +34,17 @@ program AudioSim;
                            pass is checked for discontinuities (TSineCheck).
                            rt with sine=HZ checks what the play thread hands
                            to the device the same way.
+  Further modes (their options are at the place in the code that runs them):
+    rgcheck <album folder>   the stored ReplayGain tags against a fresh
+                             measurement (read only); rgtags <file> prints
+                             the stored fields; rgscreen <root> out=<csv>
+                             screens a whole library by its tags; rgbench
+                             <album folder> times the scan per thread count
+    spectrum <file>          what a decimation without a filter would fold
+                             into 0..20 kHz (fold=<rate>)
+    tonebench <rate>         the tone control inlined against one call per
+                             filter
+    waitdevice               shows when a WASAPI endpoint is listed (device=)
 
   Options (--name=value):
     secs=20          bench: audio seconds (0 = the whole file); rt: run time

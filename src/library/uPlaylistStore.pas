@@ -8,7 +8,7 @@ unit uPlaylistStore;
   All playlists and auto-playlists of AulumicNS in the Aulos format
   (uDbStore, as the library): Data\Playlists\playlists.adb (snapshot) and
   playlists.jnl (journal). Aulumic kept one file per playlist (.pdb, .apq);
-  their readers are kept for the tests only (AulumicNS has no import).
+  AulumicNS does not read those (it has no import).
 
   One record per playlist (TStoredPlaylist): the name, the kind (normal /
   auto), Aulumic's per-playlist view (grouping, header and track format, the

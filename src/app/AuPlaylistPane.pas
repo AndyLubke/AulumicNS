@@ -29,6 +29,8 @@ unit AuPlaylistPane;
   rows from them (Rebuild); the main window stores them (uPlaylistStore)
   when OnChange says the content changed. Tracks of the library come from
   its records (AddTracks; OnLookup for added files), never from the files.
+  FollowEntry moves the selection to the track that starts playing ("Cursor
+  follows playback") and brings it into view.
   =============================================================================}
 
 {$mode objfpc}{$H+}

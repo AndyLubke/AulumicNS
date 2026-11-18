@@ -10,11 +10,12 @@ program SoxrCmp;
 
   Build (from the project folder; nothing is written into src):
     C:\Lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe -MObjFPC -O3 -dRELEASE
-      -FuD:\LazarusProjects\@Aulu_NS\src\audio -FU<out>\units -FE<out>
+      -Fusrc\audio -FU<out>\units -FE<out>
       Tools\ResampleCheck\SoxrCmp.lpr
-  and copy libsoxr.dll next to the exe (read only from Aulumic:
-  D:\LazarusProjects\@Aulumic\PluginDLLs\libsoxr (signed)\libsoxr.dll).
-  Keep <out> out of %TEMP%: Bitdefender quarantines scripts there that start it.
+  and copy libsoxr.dll (64 bit, from the SoX Resampler project; not part of
+  this repository) next to the exe.
+  Keep <out> out of %TEMP%: security software may quarantine scripts there
+  that start it.
 
   Modes (--mode=):
     all / speed / quality  17 cases: speed (x real time, stereo, 250 ms chunks,

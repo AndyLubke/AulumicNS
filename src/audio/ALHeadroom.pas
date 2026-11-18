@@ -20,7 +20,8 @@ unit ALHeadroom;
   at the right level the next time: the level is the same for all its tracks.
 
   The key of an entry is the album (folder, album artist, album: the rule of
-  the ReplayGain scan) and the chain that made the peak (rates, resampler
+  the ReplayGain scan; a track without an album tag is keyed by its file,
+  HeadroomAlbumKey) and the chain that made the peak (rates, resampler
   settings, DSD filter): another filter gives other peaks and learns its own
   value. The peak is the one before the gain (of full scale), so it holds for
   every volume, preamp and ReplayGain setting.

@@ -10,8 +10,8 @@ unit AuMainForm;
   title bar):
 
     +------------------------------------------------------------------+
-    | title bar                                                         |
-    | Now Playing banner (menu, cover, texts, source info, peak meter)  |
+    | title bar (main menu, caption, Preferences)                       |
+    | Now Playing banner (cover, texts, source info, peak meter)        |
     +------------------------- splitter -------------------------------+
     | search  [rescan] | playlist selector  [View] [Edit]               |
     | library tree     | playlist (grouped by album)                    |
@@ -24,12 +24,14 @@ unit AuMainForm;
   the theme and the keys; AuMainForm_playback.inc drives the engine (the UI
   timer, the banner, the transport, device / rate / volume / tone);
   AuMainForm_files.inc adds files and keeps the play list in sync with the
-  play queue.
+  play queue; AuMainForm_library.inc is the library's side (scans, the
+  tree's actions, the folder watcher, play counts); AuMainForm_playlist.inc
+  the playlists (the selector, the View menu, drag and drop, M3U);
+  AuMainForm_dialogs.inc Properties, the tag writer and the ReplayGain scan.
 
-  Milestone 2: playback (Aulumic's engine with the built-in decoders and
-  resampler, WASAPI and ASIO). Milestone 3: the library (Aulumic's library
-  manager, stored in the Aulos format; AuMainForm_library.inc). The playlist
-  is one play list (real playlists: milestone 4).
+  The engine is Aulumic's with the built-in decoders and resampler, over
+  WASAPI and ASIO; the library is Aulumic's library manager, stored in the
+  Aulos format; the playlists are in uPlaylistStore.
   =============================================================================}
 
 {$mode objfpc}{$H+}

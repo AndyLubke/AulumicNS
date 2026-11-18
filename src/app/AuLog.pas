@@ -8,9 +8,10 @@ unit AuLog;
   The application log of AulumicNS - Aulumic's log (uFormAppLog) without its
   window: the same lines ("hh:nn:ss - [INFO]  ..."), the separate error
   history, the purge of old lines (the startup block stays), the engine's
-  log events (WM_AUDIO_ENGINE_LOG) and AulumicNSLog.txt, written at exit only
-  when errors were logged. The log window (milestone 5) shows Lines and
-  listens to OnChanged. All calls on the UI thread.
+  log events (WM_AUDIO_ENGINE_LOG) and the saved log: at exit
+  AulumicNSLog_<date>.txt when errors were logged, or AulumicNSLog.txt every
+  time when "Always save the log" is on. The Log window (AuLogForm) shows
+  Lines and listens to OnChanged. All calls on the UI thread.
   =============================================================================}
 
 {$mode ObjFPC}{$H+}

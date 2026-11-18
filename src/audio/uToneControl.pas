@@ -7,12 +7,13 @@ unit uToneControl;
 // Copyright (C) 2026 André Lubke
 // Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
-// Implements a 3 shelve hybrid 'Baxandall/semi parametric EQ' tone control
-// with adjustable mid frequencies.
-// ---> AulumicNS: five bands since 2026-11-14 - bass (low shelf), low mid, mid,
-// high mid (peaking), treble (high shelf), in series in this order, all with
-// Q = 1 / sqrt 2. A band at 0 dB is skipped, so the three bands of before
-// (bass, one of the mids, treble) give the samples they always gave.
+// The tone control: a hybrid 'Baxandall / semi parametric EQ' of five bands,
+// each with an adjustable frequency - bass (low shelf), low mid, mid, high mid
+// (peaking), treble (high shelf), in series in this order, all with
+// Q = 1 / sqrt 2. (Three bands - bass, mid, treble - until 2026-11-14.) A band
+// at 0 dB is skipped, so the three bands of before (bass, one of the mids,
+// treble) give the samples they always gave. ToneResponseDB gives the curve
+// the Tone Control window draws, from the same coefficients.
 // Strictly accepts Integers for thread-safe UI transport, converting to
 // 64-bit Doubles internally for DSP math.
 //

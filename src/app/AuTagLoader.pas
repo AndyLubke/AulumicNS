@@ -7,8 +7,11 @@ unit AuTagLoader;
 
   Reads the tags for the Properties dialog (Aulumic's uTagLoader): a small
   progress window with Cancel (Esc) while the files are read on the UI
-  thread. The drives are woken first on a worker thread (WakeDrives), so a
-  sleeping drive shows "Waiting for drive..." instead of a frozen window; a
+  thread. The drives are woken first on a worker thread (WakeDrives, also
+  for other callers: WakeDrivesWithWindow). During that wait the program
+  takes no input but stays alive (uInputBlock, the busy pointer); when it
+  lasts longer than DRIVE_WAIT_SHOW_DELAY_MS the "Waiting for drive..."
+  window appears, and Escape or its Cancel stops the wait. A
   network drive that does not answer and a missing file stop the loading
   (a missing file offers a rescan of the library, as Aulumic).
   The records (TTagEditNodeData) are the editor's working copies: Original

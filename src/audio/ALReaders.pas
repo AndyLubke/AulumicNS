@@ -7,7 +7,9 @@ unit ALReaders;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Used by the AudioEngine to read FLAC, WAV and DSF files.
+  Used by the AudioEngine to read FLAC, WAV, DSF and DFF files: the audio
+  sources of the play thread, among them DSD as DoP (TDsfSource) and DSD
+  converted to PCM (TDsdToPcmSource).
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic (file
   names are UTF-8).
 ==============================================================================}

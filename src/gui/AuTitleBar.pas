@@ -6,8 +6,10 @@ unit AuTitleBar;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   A title bar drawn by the program instead of Windows: the icon, the window
-  caption and the minimize / maximize / close buttons in the colours of the
-  current theme, switching live with it.
+  caption (in the middle of the window) and the minimize / maximize / close
+  buttons in the colours of the current theme, switching live with it. The
+  program can add up to four buttons of its own (AddButton: the main menu
+  and Preferences of the main window), at the left or before minimize.
 
   How it works (Win32, below the LCL):
   - The form keeps its normal window styles (resize frame, caption, system

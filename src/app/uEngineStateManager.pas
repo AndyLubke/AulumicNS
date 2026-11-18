@@ -8,7 +8,8 @@ unit uEngineStateManager;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Centralized 'Thread Police' to ensure threads don't interfere with each other,
-  and application-wide event bus decoupling external units from uFormPlayMain.
+  and application-wide event bus decoupling external units from the main
+  window (AuMainForm).
 ==============================================================================}
 
 interface

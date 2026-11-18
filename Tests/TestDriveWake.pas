@@ -26,6 +26,8 @@ unit TestDriveWake;
   reserved address 192.0.2.1 that never answers, a name that does not exist.
   A share that does not answer (simulated with DriveAnswerProc) is reported
   and never touched. All other tests switch the network check off.
+  ---> AulumicNS: a drive that answered a moment ago is not woken again
+  (NoteDriveAnswered); SetUp forgets the answers (ForgetAnsweredDrives).
   =============================================================================}
 
 interface

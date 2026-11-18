@@ -12,7 +12,7 @@ unit AuAnim;
   60 times a second and has the owner repaint (or calls its step routine).
 
   Animations run only when AnimActive: the program's setting (AnimationsOn,
-  Preferences > Appearance) and Windows' own "Animation effects" setting, and
+  Preferences > System) and Windows' own "Animation effects" setting, and
   not in a remote session. When they do not run, AnimTo sets the end value at
   once - so the code that uses a TAuAnim needs no second path. The debug tool
   modes (--shots, --touch-probe, --ui-bench) leave AnimationsOn off.

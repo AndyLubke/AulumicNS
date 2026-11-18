@@ -5,11 +5,13 @@ unit uLastFmScraper;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Scrapes Artist info from the LastFM site and
-  album info from TheaudioDB, LastFM and Wikipedia (in that order)
+  Fetches the artist information of Artist Info on one worker thread: the
+  biography from the Last.fm API (with the user's own API key from the
+  settings), the picture from Wikipedia (checked with Wikidata) and, when
+  that finds none, from TheAudioDB.
 
-  ---> AulumicNS: copied from Aulumic; only the user agent changed. WinHTTP
-  is part of Windows, so no DLL ships with the program.
+  ---> AulumicNS: copied from Aulumic; the user agent changed, and no API key
+  is built in. WinHTTP is part of Windows, so no DLL ships with the program.
   =============================================================================}
 
 {$mode ObjFPC}{$H+}

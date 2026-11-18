@@ -9,7 +9,9 @@ unit TestInputBlock;
 
   uInputBlock: while the block is on, the input messages posted to the windows
   of this thread are dropped and everything else arrives; one allowed window
-  (with its children) takes input all the same; Escape is noticed.
+  (with its children) takes input all the same; Escape is noticed; blocks
+  nest. DiscardPendingInput takes the presses out of the queue and leaves
+  the releases.
   The messages are posted (PostMessage), as Windows posts real input.
   =============================================================================}
 

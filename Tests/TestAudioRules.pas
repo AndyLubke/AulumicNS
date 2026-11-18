@@ -25,8 +25,8 @@ unit TestAudioRules;
                        the fade-in lasts DSD_FADE_IN_MS at every rate
   ---> CHANGED (ObjFPC switch, step 2): ALSourceFactory is ObjFPC now; file
   names are passed as they are (UTF-8), as uPlaybackIOWorker does. Resampling is
-  not tested (it needs libsoxr); the DSD gain correction neither (it needs a
-  tagged DSF file).
+  tested in TestResampler; the DSD gain correction is not tested here (it
+  needs a tagged DSF file).
   =============================================================================}
 
 interface

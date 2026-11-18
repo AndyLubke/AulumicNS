@@ -13,9 +13,11 @@ unit AuGfx;
   2026-11-13 and kept its calls, so the controls did not change.
 
   How it paints: one Direct2D render target (a "DC render target") is shared
-  by all controls. TGfx.Create binds it to the DC a control paints into and
-  begins drawing; freeing the TGfx ends drawing, which puts the picture into
-  that DC. Pictures drawn off screen (TGfx.CreateBitmap: icon, toast, meter
+  by the small controls. TGfx.Create binds it to the DC a control paints into
+  and begins drawing; freeing the TGfx ends drawing, which puts the picture
+  into that DC. A large control (the lists), or one that repaints often, has
+  a render target of its own on the graphics card (TGfxWindowTarget) and
+  falls back to the shared one when that target cannot be made or is lost. Pictures drawn off screen (TGfx.CreateBitmap: icon, toast, meter
   column, screenshots) get a target of their own with an alpha channel.
   Everything here is in pixels: the targets run at 96 dpi, the callers scale
   (AuTheme.S). Only the UI thread draws; picture files may be decoded on any

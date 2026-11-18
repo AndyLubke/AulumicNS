@@ -7,7 +7,8 @@ unit AuArtistInfo;
 
   Artist Info (Aulumic's uPanelArtistInfo in its popup; a click on an artist
   in the banner): the biography and picture from Last.fm / Wikipedia /
-  TheAudioDB (uLastFmScraper, one worker thread), saved in Data\MusicInfo,
+  TheAudioDB (uLastFmScraper, one worker thread; the biography needs the
+  user's own Last.fm API key from Preferences), saved in Data\MusicInfo,
   and how much of the artist the library holds. The biography can be edited
   (F2) and the picture replaced (Ctrl+O, a dropped file, Ctrl+V) or removed
   (Del); the user's own biography and picture are kept by Refresh (F5).

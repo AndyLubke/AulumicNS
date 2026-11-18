@@ -10,7 +10,7 @@
     RemoveSelected, FormDropFiles, CheckIncoming, JumpToNowPlaying,
     MnAddFiles, MnAddFolder, MnPlaySelected, MnRemoveSelected, MnClearList,
     MnShowInExplorer
-  Milestone 4: files go into the playlist on screen (an auto-playlist on
+  Files go into the playlist on screen (an auto-playlist on
   screen: the Default playlist, as Aulumic); an Explorer drop over the
   playlist is inserted there; the play queue is made from the shown
   playlist and stays with it (FPlayingPl).

@@ -7,12 +7,17 @@ unit TestToneControl;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The tone control (uToneControl): three biquad filters in series per channel
-  (low shelf, peaking, high shelf; RBJ's formulas, Q = 1 / sqrt 2, Direct Form
-  II Transposed with the anti-denormal offset). The play thread inlines
-  ProcessSampleL / R; these tests hold the output, bit for bit, against the
-  same filters written out here, so a change of how the code is compiled or
-  arranged (inlining, block processing) cannot change the sound unnoticed.
+  The tone control (uToneControl): up to five biquad filters in series per
+  channel (low shelf, three peaking, high shelf; RBJ's formulas,
+  Q = 1 / sqrt 2, Direct Form II Transposed with the anti-denormal offset).
+  The play thread inlines ProcessSampleL / R; these tests hold the output,
+  bit for bit, against the same filters written out here, so a change of how
+  the code is compiled or arranged (inlining, block processing) cannot change
+  the sound unnoticed. The three bands of before come out as they always
+  did; settings with three bands move their mid to the right new band.
+  TTestToneGlide: a setting changed while music plays glides in without a
+  jump, also through 0 dB and into "off"; the curve (ToneResponseDB) is the
+  level a sine really gets.
   =============================================================================}
 
 interface

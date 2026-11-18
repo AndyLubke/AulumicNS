@@ -19,6 +19,9 @@ unit uReplayGainThread;
   (AuLoudness, from Aulos) instead of libebur128: one TAuLoudnessMeter per
   track, the album loudness over the blocks of all its tracks (as
   ebur128_loudness_global_multiple). No DLL is needed any more.
+  The tracks of an album are measured on ThreadCount workers (TRGTrackWorker)
+  at the same time; a worker never calls Synchronize or the log, the scan
+  thread reports for them.
   =============================================================================}
 
 interface

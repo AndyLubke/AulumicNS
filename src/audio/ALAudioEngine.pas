@@ -7,9 +7,10 @@ unit ALAudioEngine;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The core audio engine. Is programmed in FPC natively.
-  Plays wav, flac and dsf files.
-  libFlac is used for flac decoding.
+  The core audio engine, all in Free Pascal: it owns the play thread, lists
+  the output devices (WASAPI endpoints and ASIO drivers) and takes the
+  settings. Plays WAV, FLAC, DSF and DFF files; FLAC is decoded by the
+  built-in decoder (AuDecFlac), no DLL is used.
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic: file
   names, device ids and names, error texts are UTF-8; the device ids and
   names Windows returns (UTF-16) are converted where they are read.

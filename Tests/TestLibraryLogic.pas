@@ -20,7 +20,7 @@ unit TestLibraryLogic;
     TTestDatabaseLines: the Library.db field encoding and track line format
                         (uLibraryDatabase)
     TTestTagReaders   : ALMetadata links a real AulumicTag reader for every
-                        format Aulumic supports (FILE_VALID_EXTS); without
+                        format AulumicNS plays (FILE_VALID_EXTS); without
                         one, files silently read as untagged
     TTestTrackList    : TTrackList stores and disposes copies (heaptrc must
                         report no leak)

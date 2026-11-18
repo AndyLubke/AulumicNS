@@ -7,7 +7,7 @@ unit ALMetadata;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Reads metadata (using AulumicTags package) from tracks.
+  Reads metadata from tracks, with the AulumicTag units (src\tags).
 ==============================================================================}
 
 interface

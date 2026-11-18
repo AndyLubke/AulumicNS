@@ -10,8 +10,9 @@ unit ALAudioOutput;
   The output device as the play thread sees it (TPlayThread.RunOutput): an
   open stream that asks for whole buffers. The play thread fills them (read,
   track switch, DSP); the output only hands them to the device. Kept free of
-  any device API, so other outputs (ASIO, ALSA) and a test output can be
-  added beside TWasapiOutput (ALOutputWasapi).
+  any device API: the outputs are TWasapiOutput (ALOutputWasapi),
+  TAsioOutput (ALOutputAsio), the memory output of the tests and the
+  simulated devices of Tools\AudioSim.
 
   ---> CHANGED (step 2b): Open finds the device, chooses the format and
   starts the stream; it reports a failure by kind (TOutputOpenResult). The

@@ -7,9 +7,13 @@ unit ALAudioThread;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Manages time-critical WASAPI Exclusive mode playback. Handles bit-perfect
-  audio delivery, libSoxR PCM resampling, native DSD/DoP packaging, and
-  lock-free volume/peak calculations.
+  The play thread (TPlayThread): the time-critical part of playback. It reads
+  the audio source of the track (decoder, the built-in resampler, DSD as DoP
+  or converted to PCM), runs the gain stage (volume, ReplayGain, automatic
+  headroom, tone control; none of it when the output is bit-perfect) and
+  hands whole buffers to the output - WASAPI exclusive mode or ASIO
+  (ALAudioOutput). Gapless track changes, seeking, the peak levels for the
+  meter and the diagnostics of the output are here too.
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic: file
   name, device id and error texts are UTF-8; UTF-16 only at the Windows W
   calls (module name of a code address, the MMCSS task name).

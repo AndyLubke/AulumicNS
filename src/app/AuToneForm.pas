@@ -10,8 +10,9 @@ unit AuToneForm;
   frequency and a vertical slider (-10 .. +10 dB in 0.1 dB steps); Aulumic's
   "semi Baxandall" tone control with two bands more. Changes apply at
   once (OnChange); Enabled off, or all bands at 0 dB, keeps the playback
-  bit-perfect. Above the bands: the curve of the three filters together
-  (TAuToneCurve), from the coefficients the engine uses.
+  bit-perfect. Above the bands: the curve of all bands together
+  (TAuToneCurve), from the coefficients the engine uses, and a line that
+  says how much the automatic headroom lowered the level (SetHeadroom).
   ---> AulumicNS: from Aulos, for Aulumic's engine: the values are a
   TToneState (ALAudioTypes; DirectMode = disabled, gains in tenths of a dB).
 

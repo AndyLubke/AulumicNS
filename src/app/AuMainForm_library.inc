@@ -4,7 +4,7 @@
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  AuMainForm_library.inc - TMainForm: the library (milestone 3):
+  AuMainForm_library.inc - TMainForm: the library:
     InitLibrary, FreeLibrary, LibLookup, RequestLibraryScan,
     LibraryScanProgress, LibraryScanDone, StateStatus, StateClearThumbs,
     RestartWatcher, CheckWatcher, LibPlay, LibAdd, TreeActivate,

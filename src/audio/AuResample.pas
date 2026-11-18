@@ -30,9 +30,15 @@ unit AuResample;
   converters with the same parameters - a seek or the next track of an
   album does not design again.
 
+  A stage runs in direct form or, where that is cheaper, in FFT form
+  (overlap-save, blocks at fixed stream positions; SetResampleFft). The inner
+  loops are also written in SSE2 and AVX assembler with the same result bit
+  for bit (SetResampleSimd).
+
   TAuStreamResampler has the streaming interface the engine used with
   libsoxr: Process takes input frames, returns how many it used and how many
-  output frames it wrote (interleaved doubles).
+  output frames it wrote (interleaved doubles). Call Flush once at the end
+  of the input, or the last block of an FFT stage never comes out.
   =============================================================================}
 
 {$mode objfpc}{$H+}

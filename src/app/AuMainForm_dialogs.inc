@@ -4,10 +4,12 @@
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  AuMainForm_dialogs.inc - TMainForm: the tools of milestone 5 that work on
-  files: the metadata custodian (tag writing on a background thread, as
-  Aulumic) and Properties (the tag editor) from the library, the playlist or
-  the main menu.
+  AuMainForm_dialogs.inc - TMainForm: the tools that work on files: the
+  metadata custodian (tag writing on a background thread, as Aulumic),
+  Properties (the tag editor) from the library, the playlist or the main
+  menu, the cover of a playlist group, and the ReplayGain scan with its
+  notice in the status line. Debug build: the self-test of the drive wait
+  (--test-drive-wait).
   =============================================================================}
 
 { ---- the metadata custodian ---- }

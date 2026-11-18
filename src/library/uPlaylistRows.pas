@@ -24,14 +24,14 @@ unit uPlaylistRows;
     Offset, NextRating        "the same star again clears the rating"
     FitTextWithEllipsis /     a group header's text in one or two lines of a
     SplitHeaderIntoTwoLines   given width (measured by a width function)
+    RowFileState /            Remove dead items: present, missing, or on a
+    IsOnOfflineDrive          drive that is not connected (the row is kept)
   Covered by Tests\TestPlaylistRows.pas.
 
   ---> AulumicNS: removed on 2026-11-12, with their tests (nothing used
   them; they are in the backups): FillRowFromTrack, TrackFromRow and
   EntryFromRow (copies for the rows of Aulumic's playlist tree; the pane of
   AulumicNS keeps TPlEntry records).
-    RowFileState /            Remove dead items: present, missing, or on a
-    IsOnOfflineDrive          drive that is not connected (the row is kept)
   =============================================================================}
 
 interface

@@ -14,14 +14,16 @@ program AulumicNSTests;
 
   Build and run (from the project folder):
     C:\Lazarus\lazbuild.exe Tests\AulumicNSTests.lpi
-    Tests\lib\x86_64-win64\AulumicNSTests.exe
+    Tests\lib\x86_64-win64\AulumicNSTests.exe --all --format=plain
   Exit code 0 = all tests passed (1 = failures, 2 = errors, 3 = both).
   Options: --suite=TTestResamplerSignals runs one test class, -h lists all.
   The heaptrc report at the end (stderr) must say "0 unfreed memory blocks".
 
-  Milestone 2: the engine (playback into memory, the play queue, the source
-  rules, drive wake, crash tracer) and the built-in resampler. The library
-  and playlist tests of Aulumic follow with milestones 3 and 4.
+  Covered: the engine (playback into memory, the play queue, the source
+  rules, the gain stage with the automatic headroom, the tone control, the
+  ASIO ring), the built-in resampler, the library (records, storage, scan),
+  the playlists, the ReplayGain scan, tag writing, pictures, long paths, the
+  drive wake, the input block, the hang watch and the crash tracer.
 
   Add a test: a new unit with a TTestCase class (published procedures are the
   tests) and RegisterTest in its initialization; add the unit to the uses

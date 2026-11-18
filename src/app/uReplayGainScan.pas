@@ -19,7 +19,7 @@ unit uReplayGainScan;
                                      tracks all have ReplayGain
     RGAlbumKey                       folder + album artist + album
     GainFromLoudness                 the gain of a measured loudness
-  uFormReplayGain asks what to scan and shows the results; uReplayGainThread
+  AuReplayGainForm asks what to scan and shows the results; uReplayGainThread
   measures the loudness. Covered by Tests\TestReplayGainScan.pas.
   =============================================================================}
 

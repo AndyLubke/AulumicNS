@@ -11,7 +11,7 @@ program LibBench;
   LibBench - times the library's operations on a real database.
 
     LibBench <folder with a COPY of library.adb / library.jnl> [--save=1] [--playlist=1]
-             [--scan=<folder with the thumbnails>]
+             [--scan=<folder with the thumbnails>] [--check=1]
 
   Loads the snapshot as the program does (TLibraryManager.LoadDatabase) and
   times what the library pane, the search, the auto-playlists and the

@@ -8,9 +8,10 @@ unit ALSourceFactory;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Building the audio source of a track from a snapshot of the play settings
-  (TPlayThreadConfig), without a TPlayThread: the decoder (WAV, FLAC, DSF /
-  DSD to PCM), the resampler, mono to stereo, the ReplayGain values and
-  factor, the negotiated bit depth. Used by the play thread (the current
+  (TPlayThreadConfig), without a TPlayThread: the decoder (WAV, FLAC, DSF and
+  DFF / DSD to PCM), the resampler, mono to stereo, the ReplayGain values and
+  factor, the negotiated bit depth, and the key of the chain for the
+  automatic headroom (HeadroomChainKey). Used by the play thread (the current
   track) and the playback I/O worker (PrepareNextSource: the next track).
   Moved unchanged from ALAudioThread (phase 7b). The rules without file
   access (CalcTargetRate, CalcRGFactor) and the tag reading are covered by

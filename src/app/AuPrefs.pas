@@ -27,7 +27,8 @@ unit AuPrefs;
                  the text size. Cards: Main window (the library tree's
                  double click and accordion; the groups and the peak meter
                  shown or not), Text size of the panes
-    Playlists    the default grouping and formats of the playlists
+    Playlists    the default grouping and formats of the playlists, cursor
+                 follows playback
     Output       WASAPI exclusive / ASIO, the device, the PCM buffer.
                  Related: DSD, Audio thread
     DSD          native DSD, low-pass, gain, the DSD buffer. Related:
@@ -37,7 +38,8 @@ unit AuPrefs;
     Volume       lock to 100 %, ReplayGain, headroom, soft clipping. Card:
                  ReplayGain scan (tracks at the same time)
     System       keeping the drives awake; animations, the graphics card.
-                 Cards: Audio thread (CPU affinity, MMCSS, the timer), Log
+                 Cards: Audio thread (CPU affinity, MMCSS, the timer), Log,
+                 Artist information (the user's Last.fm API key)
     Shortcuts    the keyboard shortcuts (AulumicNS: from Aulos)
 
   A new setting goes where its subject is: visible when people change it

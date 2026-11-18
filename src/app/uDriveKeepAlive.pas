@@ -8,7 +8,7 @@ unit uDriveKeepAlive;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Keeps the drives of the current and the next track awake during playback
-  (Preferences > System > Keep Music Drives Awake During Playback), so a
+  (Preferences > System > Keep music drives awake during playback), so a
   sleeping USB hard disk or NAS does not pause the music at a track change.
 
   How: every KEEPALIVE_INTERVAL_MS one small block (KEEPALIVE_BLOCK_SIZE) is
@@ -39,6 +39,10 @@ unit uDriveKeepAlive;
   NAS_ANSWER_TIMEOUT_MS by a short connection attempt (ServerAnswers) and is
   not touched: Windows would wait 20-60 s for every access to it. WakeDrives
   reports it, so the caller does not read its files either.
+  ---> AulumicNS: a drive that answered in the last DRIVE_ANSWER_MEMORY_MS is
+  not woken again (NoteDriveAnswered / DriveAnsweredRecently: the wake
+  worker, the keep-alive read and the main window note it). LastWakeReport
+  says what the last wake waited for (server check, first read), for the log.
   Covered by Tests\TestDriveWake.pas.
 
   Safety rules (as in uPlaybackIOWorker):

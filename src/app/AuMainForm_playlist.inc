@@ -4,13 +4,14 @@
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  AuMainForm_playlist.inc - TMainForm: the playlists (milestone 4):
+  AuMainForm_playlist.inc - TMainForm: the playlists:
     InitPlaylists, FreePlaylists, ShownPlaylist, ShowPlaylist, ApplyView,
     SaveShownPlaylist, PlChanged, PlCollapseChanged, CheckPlaylistSave,
     the playlist selector (PlaylistDrop, PlaylistPick, New / Rename /
     Delete), the View menu, the playlist context menu and its items,
     AddToPlaylistMenu / AddTracksToPlaylist, drag and drop (PlDragOver,
-    PlDragDrop, PlEndDrag), M3U import / export, Remove dead items.
+    PlDragDrop, PlEndDrag), M3U import / export, Remove dead items, and
+    BeginBusy / EndBusy (the hourglass around work on a large playlist).
   The playlists are in uPlaylistStore (playlists.adb + journal); the pane
   shows one of them (FShownPl). The play queue belongs to the playlist that
   was played from (FPlayingPl), as in Aulumic.

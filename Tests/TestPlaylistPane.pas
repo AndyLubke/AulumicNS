@@ -12,6 +12,8 @@ unit TestPlaylistPane;
   and then once per track (it was twice per track on every rebuild, used or
   not - the larger part of the time an edit of a very large playlist took).
   A format with %added% must still show the date.
+  FollowEntry ("Cursor follows playback"): the selection moves to the track
+  that starts, and the list scrolls to it only when it was out of sight.
   =============================================================================}
 
 interface

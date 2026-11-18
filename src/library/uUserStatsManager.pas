@@ -16,7 +16,7 @@ unit uUserStatsManager;
   journal at once, so a play or a rating survives a crash; SaveToFile writes
   a new snapshot and starts a new journal (also when the journal has grown
   past STATS_JOURNAL_COMPACT_BYTES). Aulumic's text file (UserStats.db) is
-  read by ImportAulumicFile (kept for the tests; AulumicNS has no import).
+  not read (AulumicNS has no import).
   =============================================================================}
 
 interface

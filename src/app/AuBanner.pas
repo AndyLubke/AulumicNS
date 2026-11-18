@@ -15,7 +15,7 @@ unit AuBanner;
   (TAuTitleBar.AddButton); the sun / moon theme button was removed (2026-11-11).
   Everything is painted by this one control (clickable parts are hot
   spots), so the banner never flickers; only the peak meter is an own
-  child control (it repaints up to 25 times a second).
+  child control (it repaints up to 20 times a second).
   When the banner is made lower (the splitter below it) the fonts shrink
   and the rows disappear one by one, like in Aulumic. The background is a
   vertical gradient tinted with the main colour of the cover.

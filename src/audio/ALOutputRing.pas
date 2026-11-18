@@ -16,6 +16,8 @@ unit ALOutputRing;
   The play thread waits for room for one period (WaitForSpace), fills a
   period and puts it in (Put); the device thread takes one period per call
   (Take) and counts an underrun when none is there. Whole periods only.
+  TPeriodFade fades the last periods out on the device thread when a stream
+  is closed in the middle of the music (a manual switch, Stop).
 
   RingPeriodsFor sizes the ring by time: the buffer of the settings (about
   BufferMs, at least 3 periods). Three periods alone were too few: ASIO
