@@ -5,9 +5,8 @@ unit AuLoudness;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  EBU R128 / ITU-R BS.1770-4 loudness measurement (from Aulos' AuLoudness;
-  the meter only - the scan thread is Aulumic's uReplayGainThread). It
-  replaces libebur128:
+  EBU R128 / ITU-R BS.1770-4 loudness measurement (the meter only - the
+  scan thread is uReplayGainThread):
     K-weighting (high shelf + high pass, coefficients for any sample rate),
     the mean square per channel with the BS.1770 channel weights, 400 ms
     blocks with 75 % overlap, absolute gate -70 LUFS, relative gate -10 LU;

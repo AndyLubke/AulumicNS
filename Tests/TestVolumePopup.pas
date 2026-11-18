@@ -9,9 +9,9 @@ unit TestVolumePopup;
 
   The volume popup frees itself when it closes (TAuPopup: caFree), after it
   has called OnClosed. The main window forgets its popup there
-  (TMainForm.VolumePopupClosed); before, it kept the freed one and the next
-  click on the volume button used it (an access violation on the NUC,
-  2026-11-11). Opened and closed a few times, as the button does.
+  (TMainForm.VolumePopupClosed); if it kept the freed one, the next
+  click on the volume button would use it (an access violation).
+  Opened and closed a few times, as the button does.
   =============================================================================}
 
 interface

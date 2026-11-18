@@ -8,9 +8,9 @@ unit ALReaderFLAC;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read FLAC files.
-  ---> AulumicNS: decodes with the built-in FLAC decoder of Aulos
-  (AuDecFlac.TAuFlacDecoder, Pascal) instead of libFLAC.dll. The interface and
-  the output are the same as in Aulumic: interleaved little endian PCM in a
+  Decodes with the built-in FLAC decoder
+  (AuDecFlac.TAuFlacDecoder, Pascal), no DLL.
+  The output is interleaved little endian PCM in a
   16, 24 or 32 bit container; streams of fewer bits are shifted up into it
   (e.g. 20 bit -> 24 bit container), so a 16 / 24 bit file reaches the DAC
   unchanged. The file name is UTF-8.
@@ -93,7 +93,7 @@ begin
   end;
 
   // Map all <= 16-bit FLAC streams (8, 12 bit ...) into a signed 16-bit
-  // container, 17 .. 24 into 24, more into 32 (as Aulumic did)
+  // container, 17 .. 24 into 24, more into 32
   if FSourceBitsPerSample <= 16 then
   begin
     FBitsPerSample := 16;
@@ -191,7 +191,7 @@ begin
     try
       Got := FDecoder.ReadPcm(@FPcm[0], WantFrames);
     except
-      // a damaged stream ends here (as libFLAC's error state did)
+      // a damaged stream ends here
       Got := 0;
     end;
     if Got <= 0 then Break;

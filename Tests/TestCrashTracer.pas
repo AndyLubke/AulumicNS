@@ -10,7 +10,7 @@ unit TestCrashTracer;
   Tests for uCrashTracer's DescribeCodeAddress / DescribeExceptionPlace: the
   place of an exception as 'module+$offset' with its callers, as the log
   shows it for unhandled exceptions (Tools\FindCodeAddress.ps1 looks it up).
-  ---> AulumicNS: the shutdown trace as TMainForm's close uses it: a clean
+  The shutdown trace as TMainForm's close uses it: a clean
   close writes nothing; a failing step (LogShutdownStepError) writes the
   steps so far and the error, and every later step directly.
   =============================================================================}

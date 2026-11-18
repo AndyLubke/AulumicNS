@@ -24,7 +24,7 @@ program LibBench;
     --scan=DIR    two refresh scans as at the program's start (reads the
                   library folders; DIR = Cache\Thumbs of a copy, so no
                   thumbnail is made) with the log lines: the second one must
-                  say "no changes"
+                  say "No changes detected"
     --check=1     the tree's name lists and the lists of six searches against
                   the plain way of building them; exit code = differences
   Always work on a copy: never point it at Data\Library of the program.

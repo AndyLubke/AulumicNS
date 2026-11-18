@@ -5,8 +5,8 @@ unit uDbStore;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The storage of the library and the user statistics, in the format family
-  of Aulos (library.adb + library.jnl):
+  The storage of the library and the user statistics (library.adb +
+  library.jnl, stats.adb + stats.jnl):
 
     <name>.adb   snapshot: header (magic, format version, generation, body
                  length), the body, CRC-32 over header and body. Written

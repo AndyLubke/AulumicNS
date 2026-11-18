@@ -13,11 +13,10 @@ unit ALSourceFactory;
   factor, the negotiated bit depth, and the key of the chain for the
   automatic headroom (HeadroomChainKey). Used by the play thread (the current
   track) and the playback I/O worker (PrepareNextSource: the next track).
-  Moved unchanged from ALAudioThread (phase 7b). The rules without file
+  The rules without file
   access (CalcTargetRate, CalcRGFactor) and the tag reading are covered by
   Tests\TestAudioRules.pas.
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic: file
-  names and tag names are UTF-8 and go to the metadata helpers unconverted.
+  File names and tag names are UTF-8 and go to the metadata helpers unconverted.
   ============================================================================}
 
 interface
@@ -26,7 +25,7 @@ uses
   ALReaders, ALAudioTypes;
 
 const
-  // ---> AUDIT FIX 2.4: Sane clamping bounds for ReplayGain tags (dB)
+  // Sane clamping bounds for ReplayGain tags (dB)
   RG_MIN_GAIN_DB = -60.0;
   RG_MAX_GAIN_DB = 24.0;
 
@@ -35,7 +34,7 @@ type
   TPlayThreadConfig = record
     FileName          : string;
     DeviceId          : string;
-    // ---> AulumicNS: 0 = WASAPI exclusive (DeviceId = endpoint id), 1 = ASIO
+    // 0 = WASAPI exclusive (DeviceId = endpoint id), 1 = ASIO
     // (DeviceId = driver CLSID); AsioNativeDsd: DSD as DSD over ASIO
     OutputApi         : integer;
     AsioNativeDsd     : boolean;
@@ -53,14 +52,14 @@ type
     DisableVolume     : boolean;
     PreampDB          : Double;  // e.g., 0.0, -2.0, -3.0
     EnableSoftClipping: Boolean;
-    // ---> AulumicNS: automatic headroom (ALHeadroom, TPlayThread.RunGain):
+    // Automatic headroom (ALHeadroom, TPlayThread.RunGain):
     // the gain never goes above what the album's highest peak allows
     AutoHeadroom      : Boolean;
 
     UpsamplePhase     : integer;
     DownsamplePhase   : integer;
 
-    // Advanced SoX DSP properties
+    // Advanced resampler properties
     ResampleBandWidth : double;
     ResampleAntiAlias : double;
 
@@ -71,9 +70,9 @@ type
     EnableMMCSS       : boolean;
     NotifyHandle      : THandle;
     StartVolume       : integer;
-    // ---> AulumicNS: > 0 = a stream on the engine closed just before (a
+    // > 0 = a stream on the engine closed just before (a
     // switch of the output or a setting during a track): the first open may
-    // wait this long for the device (a FiiO K11's WASAPI endpoint is gone
+    // wait this long for the device (the WASAPI endpoint of some DACs is gone
     // for about 0.7 s after native DSD over ASIO) and for a refused format.
     // 0 = a missing device or a refused format is reported at once.
     SettleMs          : integer;
@@ -93,7 +92,7 @@ type
     ToneTrebleHz      : integer;
   end;
 
-  // ---> ADDED: Everything needed to build the next track's source away from
+  // Everything needed to build the next track's source away from
   // the play thread (on the playback I/O worker), so the UI thread does no disk
   // access at a gapless change. A snapshot: TPlayThread.GetPrepareParams.
   TNextPrepareParams = record
@@ -104,7 +103,7 @@ type
     StreamId       : Integer;                 // set by TAudioEngine
   end;
 
-  // ---> ADDED: A next source built by PrepareNextSource. Whoever holds the
+  // A next source built by PrepareNextSource. Whoever holds the
   // record owns Source: hand it to TAudioEngine.SetPreparedNext or free it
   // with FreePreparedNext.
   TPreparedNext = record
@@ -117,7 +116,7 @@ type
     RGFactor  : Double;
     DsdGainDB : Integer;
     IsDSD     : Boolean;
-    HeadKey   : string;    // ---> AulumicNS: CalcHeadroomKey ('' = headroom off)
+    HeadKey   : string;    // CalcHeadroomKey ('' = headroom off)
   end;
 
 // The output sample rate of a track: its entry in RateMaps, else
@@ -134,7 +133,7 @@ function  CalcRGFactor(const ACfg: TPlayThreadConfig; GainDB, Peak: double): dou
 // ReplayGainMode = 0.
 procedure CalcReplayGainForFile(const ACfg: TPlayThreadConfig; ADsdGainDB: Integer;
   const AFileName: string; out OutGain, OutPeak: double);
-// ---> AulumicNS: the key of a file's peak in the headroom book (ALHeadroom):
+// The key of a file's peak in the headroom book (ALHeadroom):
 // its album (folder, album artist and album from its tags) and the chain
 // that makes the peak - HeadroomChainKey. '' when ACfg.AutoHeadroom is off.
 // Reads the tags of the file.
@@ -147,23 +146,22 @@ function  CalcHeadroomKey(const ACfg: TPlayThreadConfig; const AFileName: string
 function  HeadroomChainKey(const ACfg: TPlayThreadConfig; const AFileName: string;
   AInRate, AOutRate: Integer): string;
 // The source of a file: decoder, resampler when needed (its float DSP is
-// AFloatDSP), mono wrapped as stereo. ---> AulumicNS: DSD converted to PCM
-// comes at 0 dB; ADsdGainDB is not applied here any more (the play thread's
+// AFloatDSP), mono wrapped as stereo. DSD converted to PCM
+// comes at 0 dB; ADsdGainDB is not applied here (the play thread's
 // DSP does, after the resampler). nil for an unsupported file type;
-// raises EAudioEngineError for an invalid or multi-channel file or when the
-// resampler library is missing.
+// raises EAudioEngineError for an invalid or multi-channel file.
 function  CreateSourceFor(const ACfg: TPlayThreadConfig; ADsdGainDB: Integer;
   AFloatDSP: TResamplerFloatDSPProc; const Filename: string;
   out InRate, OutRate: integer): TAudioSource;
 
-// ---> ADDED: Builds the source of the next track from AParams: opens the file
+// Builds the source of the next track from AParams: opens the file
 // and its decoder (and resampler), reads its ReplayGain tags and matches the
 // negotiated bit depth. Any thread; touches no TPlayThread. Never raises.
 // False = an error occurred (the caller logs it); True with Source = nil = a
 // file type that cannot be played (nothing to queue).
 function  PrepareNextSource(const AParams: TNextPrepareParams; const AFileName: string;
   out APrep: TPreparedNext): Boolean;
-// ---> ADDED: Frees a prepared source that was not handed over (nil is fine)
+// Frees a prepared source that was not handed over (nil is fine)
 procedure FreePreparedNext(var APrep: TPreparedNext);
 
 implementation
@@ -172,8 +170,8 @@ uses
   SysUtils, Math, ALMetadata, ALHeadroom, uAppStrings, uAudioUtils, uMetaUtils;
 
 // =============================================================================
-// ---> CHANGED: Source building as plain functions of a config snapshot (they
-// were TPlayThread methods), so the next track can also be built on the
+// Source building as plain functions of a config snapshot (not
+// TPlayThread methods), so the next track can also be built on the
 // playback I/O worker (PrepareNextSource). The TPlayThread methods
 // CalculateRGFactor, CalculateReplayGainForFile and CreateSource call these.
 // =============================================================================
@@ -208,7 +206,7 @@ begin
   if ACfg.DisableVolume then
     Exit;
 
-  // ---> AUDIT FIX 2.4: Guard against NaN or Infinite inputs
+  // Guard against NaN or Infinite inputs
   if IsNan(GainDB) or IsInfinite(GainDB) then
     GainDB := 0.0
   else
@@ -228,11 +226,11 @@ begin
   begin
     Result := Power(10.0, CombinedGainDB / 20.0);
 
-    // ---> AulumicNS (2026-11-12): the peak protection keeps the preamp's
-    // headroom. It allowed the loudest sample up to full scale (1 / Peak),
-    // which used up the preamp: a quiet track with a high ReplayGain gain
-    // and a high peak then reached 0 dBFS, and its inter-sample peaks after
-    // resampling clipped although -3 dB were set. Now the peak may come up
+    // The peak protection keeps the preamp's
+    // headroom. Allowing the loudest sample up to full scale (1 / Peak)
+    // would use up the preamp: a quiet track with a high ReplayGain gain
+    // and a high peak would reach 0 dBFS, and its inter-sample peaks after
+    // resampling would clip although -3 dB were set. So the peak may come up
     // to the preamp's level at most (-3 dBFS with -3 dB).
     if (ACfg.ReplayGainMode > 0) and (Peak > 0.0) then
     begin
@@ -258,7 +256,7 @@ begin
 
   if ACfg.ReplayGainMode > 0 then
   begin
-    // ---> AulumicNS: text only: the embedded cover is not loaded for this
+    // Text only: the embedded cover is not loaded for this
     CachedTags := ReadTrackTextTags(AFileName).AllTags;
 
     if ACfg.ReplayGainMode = 2 then // Album Mode
@@ -278,7 +276,7 @@ begin
       OutPeak := ExtractReplayGain(CachedTags, ACfg.RGTrackPeakTags);
     end;
 
-    // ---> AUDIT FIX 2.4: Sanitize and clamp parsed ReplayGain values
+    // Sanitize and clamp parsed ReplayGain values
     if IsNan(OutGain) or IsInfinite(OutGain) then
       OutGain := 0.0
     else
@@ -366,14 +364,14 @@ begin
       Res := TDsfSource.Create(Filename)
     else
     begin
-      { ---> AulumicNS (2026-11-12): converted at 0 dB, always. The DSD gain
+      { Converted at 0 dB, always. The DSD gain
         (ADsdGainDB) is applied by the play thread's DSP together with the
         volume and the preamp (TPlayThread.FDsdGainLin), after the resampler:
         the converter clamps to 32 bits, and SACDs peak up to ~3 dB above
-        their 0 dB reference - at +6 dB here that clipped (the RCO "Sacre du
-        printemps": 11 of 14 tracks), and the preamp came too late to help. }
+        their 0 dB reference - at +6 dB here that would clip, and the preamp
+        would come too late to help. }
       Res := TDsdToPcmSource.Create(Filename, 0, ACfg.DsdLowPassFilter);
-      // ---> AulumicNS: a target that is the DSD rate / 64 .. / 256 comes
+      // A target that is the DSD rate / 64 .. / 256 comes
       // straight from the DSD filter when that alone keeps it alias-free
       // (SetOutputRate): the resampler below then sees nothing to do
       if ACfg.ResamplePCM then
@@ -401,8 +399,8 @@ begin
 
   // =========================================================================
   // THE 0 HZ, BIT-DEPTH & CHANNEL SANITY GATES
-  // ---> AUDIT FIX 2.3, 2.5 & 2.6: Validate sample rate, bit depth, and
-  // channel count (and wrap mono PCM) upfront in CreateSource!
+  // Validate sample rate, bit depth, and
+  // channel count (and wrap mono PCM) upfront in CreateSourceFor!
   // =========================================================================
   if (InRate <= 0) or (not (Res.GetBitsPerSample in [16, 24, 32])) or (Res.GetChannels < 1) then
   begin
@@ -426,7 +424,7 @@ begin
     // =========================================================================
     if (FinalRate > 0) and (FinalRate <> InRate) then
     begin
-      // ---> AulumicNS: the resampler is built in (AuResample): always there
+      // The resampler is built in (AuResample): always there
       SoxCfg := DefaultSoXConfig;
 
       SoxCfg.Quality         := ACfg.ResampleQuality;
@@ -435,7 +433,7 @@ begin
       SoxCfg.Bandwidth       := ACfg.ResampleBandWidth;
       SoxCfg.AntiAlias       := ACfg.ResampleAntiAlias;
 
-      // ---> AUDIT FIX 1.1: TResamplerSource.Create takes ownership of Res
+      // TResamplerSource.Create takes ownership of Res
       // immediately on entry (and frees Res via TResamplerSource.Destroy if
       // an exception occurs inside the constructor). Do not double-free Res!
       TempResampler := TResamplerSource.Create(Res, FinalRate, SoxCfg);
@@ -444,7 +442,7 @@ begin
     end;
   end;
 
-  // ---> AUDIT FIX 2.6 & 3.3: Wrap mono PCM in TMonoToStereoSource here so
+  // Wrap mono PCM in TMonoToStereoSource here so
   // mono-to-stereo allocation never happens inside FLock on the render thread.
   if Res.GetChannels = 1 then
     Res := TMonoToStereoSource.Create(Res);
@@ -480,13 +478,13 @@ begin
   if NewSource = nil then
     Exit(True);
 
-  // ---> AUDIT FIX 1.2: Protect NewSource against exceptions during ReplayGain parsing
+  // Protect NewSource against exceptions during ReplayGain parsing
   try
     CalcReplayGainForFile(AParams.Config, AParams.DsdGainDB, AFileName, TempGain, TempPeak);
     APrep.RGFactor := CalcRGFactor(AParams.Config, TempGain, TempPeak);
     APrep.HeadKey  := CalcHeadroomKey(AParams.Config, AFileName, TempIn, TempOut);
 
-    // ---> AUDIT FIX 3.3: Match the negotiated WASAPI bit depth here, outside
+    // Match the negotiated WASAPI bit depth here, outside
     // FLock, exactly as CommitSeamlessSwap would (it keeps its own check as a
     // fallback, e.g. if the depth changes after a rate switch)
     if AParams.NegotiatedBits > 0 then

@@ -7,10 +7,9 @@ unit AuGfx;
 
   The drawing layer of the GUI: TGfx (anti-aliased shapes, paths, gradients,
   clipping, bitmaps, text), fonts, bitmaps in memory and picture files.
-  ---> AulumicNS: Direct2D draws, DirectWrite sets the text, the Windows
+  Direct2D draws, DirectWrite sets the text, the Windows
   Imaging Component (WIC) reads and writes picture files. All three are part
-  of Windows (bindings: AuD2D); this unit replaced the GDI+ one (AuGdip) on
-  2026-11-13 and kept its calls, so the controls did not change.
+  of Windows (bindings: AuD2D).
 
   How it paints: one Direct2D render target (a "DC render target") is shared
   by the small controls. TGfx.Create binds it to the DC a control paints into
@@ -61,7 +60,7 @@ type
     property Bits: PByte read FBits;
   end;
 
-  { a path of lines, curves and arcs. Like the GDI+ path it replaced: what is
+  { a path of lines, curves and arcs. Like a GDI+ path: what is
     added to a figure is joined to its last point by a line. }
   TGfxPath = class
   private
@@ -105,7 +104,7 @@ const
   foText = 1;
   foDisplay = 2;
 
-  { ---> AulumicNS: a picture with more pixels is not decoded (8192 x 8192;
+  { a picture with more pixels is not decoded (8192 x 8192;
     256 MB as a 32 bit bitmap). The number of pixels, not the longer side: a
     booklet page may be a wide fold-out (AuBooklet keeps pages below 20 MP). }
   MAX_IMAGE_PIXELS = 8192 * 8192;
@@ -200,7 +199,7 @@ type
     property Opaque: Boolean read FOpaque;
   end;
 
-  { ---> AulumicNS: a render target of its own for one window (a control):
+  { a render target of its own for one window (a control):
     the graphics card draws and shows the picture without the copies a DC
     target needs (into Direct2D, back out, to the window). For the large
     controls that repaint often and in full: the lists while they scroll.
@@ -243,11 +242,11 @@ function BitmapSize(B: TGfxBitmap; out W, H: Integer): Boolean;
 function ImageFromBytes(const Data: TBytes; MaxSide: Integer): TGfxBitmap;
 function ImageFromFile(const FileName: string; MaxSide: Integer): TGfxBitmap;
 function ScaledCopy(Src: TGfxBitmap; MaxSide: Integer): TGfxBitmap;
-{ ---> AulumicNS: the size of a picture from its header, nothing is decoded;
+{ the size of a picture from its header, nothing is decoded;
   False when it is no picture }
 function ImageSizeFromBytes(const Data: TBytes; out W, H: Integer): Boolean;
 function ImageSizeFromFile(const FileName: string; out W, H: Integer): Boolean;
-{ ---> AulumicNS: False for a picture with more than MAX_IMAGE_PIXELS: the
+{ False for a picture with more than MAX_IMAGE_PIXELS: the
   loaders above return nil for it instead of decoding it }
 function ImagePixelsAllowed(W, H: Integer): Boolean;
 function CloneBitmap(B: TGfxBitmap): TGfxBitmap;
@@ -283,7 +282,7 @@ var
 implementation
 
 uses
-  Math, AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  Math, AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 const
   IID_ID2D1Factory: TGUID = '{06152247-6F50-465A-9245-118BFD3B6007}';
@@ -1380,7 +1379,7 @@ end;
 
 procedure TGfx.Translate(DX, DY: Single);
 begin
-  { before what is set already, as the GDI+ call did (only shifts are used) }
+  { before what is set already (only shifts are used) }
   FM.DX := FM.DX + DX * FM.M11 + DY * FM.M21;
   FM.DY := FM.DY + DX * FM.M12 + DY * FM.M22;
   if FDrawing then FRT.SetTransform(FM);
@@ -1624,7 +1623,7 @@ begin
   if (ASrc = nil) or (ASrc.GetSize(UW, UH) <> S_OK) then Exit;
   W := UW;
   H := UH;
-  { ---> AulumicNS: the size is known from the header; copying the pixels
+  { the size is known from the header; copying the pixels
     below is what decodes the picture (a 20000 x 20000 px scan: 1.6 GB) }
   if not ImagePixelsAllowed(W, H) then Exit;
   NW := W;
@@ -1660,7 +1659,7 @@ end;
 
 function PropVariantClear(var AValue: TWicPropVariant): HRESULT; stdcall; external 'ole32.dll';
 
-{ ---> AulumicNS: how a photo is to be turned to stand upright - the
+{ how a photo is to be turned to stand upright - the
   orientation a camera or phone wrote into the file (Exif tag 274): 1 = as
   stored, 2..8 = mirrored / turned. The decoder of Windows hands out the
   pixels as stored; Explorer and the photo viewer turn them, so do we. }
@@ -1775,7 +1774,7 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: the whole file (\\?\ form for a path of 260 characters and
+{ the whole file (\\?\ form for a path of 260 characters and
   more); nil when it cannot be read or is larger than AMaxBytes }
 function ReadLongPathFile(const FileName: string; AMaxBytes: Int64): TBytes;
 var
@@ -1970,9 +1969,9 @@ begin
   { the Direct2D factory is NOT released: it stays until the process ends.
     Direct2D shares its graphics device with other users in the process -
     the PDF engine of Windows (the booklet viewer) is one. With our factory
-    gone that engine made a new device in its exit handler, while its DLL
-    was being unloaded, and Windows raised an exception there (exit code
-    C0000005 after everything was done; found with --shots and a library). }
+    gone that engine would make a new device in its exit handler, while its
+    DLL is being unloaded, and Windows raises an exception there (exit code
+    C0000005 after everything is done; seen with --shots and a library). }
   Pointer(Factory) := nil;
 end;
 

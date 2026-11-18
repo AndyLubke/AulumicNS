@@ -28,7 +28,7 @@ type
     FTitleBar: TAuTitleBar;
     FBody: TAuPanel;
     FCloakPending: Boolean;     // shown cloaked, AUM_UNCLOAK posted
-    FFade: TAuWindowFade;       // ---> AulumicNS: fades in when it opens (not the main window)
+    FFade: TAuWindowFade;       // fades in when it opens (not the main window)
     FFadeIn: Boolean;
     FDropIn: Integer;
     FThemeShot: TGfxBitmap;     // how the window looked before the theme changed
@@ -61,14 +61,14 @@ type
     property Body: TWinControl read GetBody;
     { the client height below the title bar }
     function BodyHeight: Integer;
-    { ---> AulumicNS: the size to remember for a sizable window, in 96-DPI
+    { the size to remember for a sizable window, in 96-DPI
       units, so that CreateAu(.., W, H) brings it back as it is. The height
       is BodyHeight less the caption and frame Windows added when the handle
       was created (measured in CreateWnd; NewWindowCaptionExtra misses the
-      padded border of a sizable frame) - remembering BodyHeight itself made
-      the window about 30 px higher at every opening. }
+      padded border of a sizable frame) - remembering BodyHeight itself would
+      make the window about 30 px higher at every opening. }
     procedure SizeToRemember(out W, H: Integer);
-    { ---> AulumicNS: makes the window at most as large as the work area of the
+    { makes the window at most as large as the work area of the
       main window's monitor (less a margin). Only for a window whose content
       follows its size (a sizable one, scrolling pages): a small screen at a
       large scaling (1920 x 1080 at 150 % leaves 1280 x 688). }
@@ -200,7 +200,7 @@ begin
   if (FTitleBar <> nil) and FTitleBar.Visible then Dec(Result, FTitleBar.Height);
 end;
 
-{ ---> AulumicNS: the height a window grows by when its handle is created:
+{ the height a window grows by when its handle is created:
   until then Height is its client height; Windows puts a caption and a frame
   around it, and the own title bar (WM_NCCALCSIZE) turns them into client
   area. Measured: caption + fixed frame for a dialog, caption + resize frame
@@ -328,7 +328,7 @@ begin
     FTitleBar.ShowMinMax := (biMaximize in BorderIcons) and (BorderStyle in [bsSizeable, bsSingle]);
     FTitleBar.ShowMinimize := biMinimize in BorderIcons;
     InstallCustomFrame(Self, FTitleBar);
-    { ---> AulumicNS: what Windows added to the height (caption and frame,
+    { what Windows added to the height (caption and frame,
       now client area): SizeToRemember takes it off again }
     if not FCreateExtraKnown and Windows.GetClientRect(Handle, R) and (PixelsPerInch >= 48) then
     begin

@@ -9,16 +9,15 @@ unit ALOutputWasapi;
 
   TWasapiOutput: the TAudioOutput (ALAudioOutput) of a WASAPI exclusive-mode
   stream in event-driven mode.
-  ---> CHANGED (step 2b): Open does what TPlayThread.RunWasapi did before:
+  Open does it all:
   the device enumerator, the configured device (only when active), the
   format check (32/32, 32/24, 24/24, 16/16; never below 24 bits for DoP),
   Initialize with the retry for a buffer duration that is not aligned, then
-  the event, the buffer size and the render client. The same calls in the
-  same order; a failure is reported by kind (TOutputOpenResult), the play
+  the event, the buffer size and the render client.
+  A failure is reported by kind (TOutputOpenResult), the play
   thread does the waits and retries. Called on the play thread (COM is
   initialized there).
-  ---> CHANGED (ObjFPC switch, step 1): ObjFPC like the rest of Aulumic; the
-  UTF-8 device id becomes UTF-16 only for IMMDeviceEnumerator.GetDevice.
+  The UTF-8 device id becomes UTF-16 only for IMMDeviceEnumerator.GetDevice.
   ============================================================================}
 
 interface
@@ -35,7 +34,7 @@ type
     FEvent  : THandle;
     FFrames : UInt32;              // buffer size in frames (GetBufferSize)
     FFormat : TAudioOutputFormat;
-    // ---> AulumicNS: the diagnostics (DropoutCount / LeastBufferedMs). At an
+    // The diagnostics (DropoutCount / LeastBufferedMs). At an
     // event the device starts the buffer released last; the next one must be
     // released within one period (FPeriodUs) of the event.
     FPeriodUs : Int64;
@@ -57,7 +56,7 @@ type
     function GetBuffer(out AData: PByte; out AError: HRESULT): Boolean; override;
     procedure ReleaseBuffer(AFull: Boolean); override;
     procedure Close; override;
-    // ---> AulumicNS: the last buffer plays to its end (see TAudioOutput)
+    // The last buffer plays to its end (see TAudioOutput)
     function DrainTail: Boolean; override;
     procedure Drain(AStopEvent: THandle); override;
     function DropoutCount: Integer; override;
@@ -73,7 +72,7 @@ uses
 const
   SHAREMODE_EXCLUSIVE        = 1;          // AUDCLNT_SHAREMODE_EXCLUSIVE
   STREAMFLAGS_EVENTCALLBACK  = $00040000;  // AUDCLNT_STREAMFLAGS_EVENTCALLBACK
-  MIN_BUFFER_HNS             = 50 * 10000; // ---> AulumicNS: the shortest buffer Open falls back to (50 ms)
+  MIN_BUFFER_HNS             = 50 * 10000; // the shortest buffer Open falls back to (50 ms)
 
 { TWasapiOutput }
 
@@ -89,7 +88,7 @@ function TWasapiOutput.Open(const ADeviceId: string; ARate: Cardinal; AChannels:
 var
   EnumObj        : IMMDeviceEnumerator;
   Dev            : IMMDevice;
-  WideId         : UnicodeString;  // ---> ADDED (ObjFPC switch): for GetDevice
+  WideId         : UnicodeString;  // for GetDevice
   AC             : IAudioClient;
   WfxExt         : WAVEFORMATEXTENSIBLE;
   HR             : HRESULT;
@@ -101,8 +100,8 @@ var
   FormatAccepted : Boolean;
   BufferDuration : Int64;
 
-  { ---> AulumicNS: Initialize with ADuration as period and buffer (as
-    before, with the retry for a size the device wants aligned). AFresh: a
+  { Initialize with ADuration as period and buffer (with
+    the retry for a size the device wants aligned). AFresh: a
     new IAudioClient first (one that failed to initialize cannot be used again). }
   function InitStream(ADuration: Int64; AFresh: Boolean): HRESULT;
   var
@@ -145,7 +144,7 @@ begin
     Exit(oorEndpointFail);
   end;
 
-  // ---> Device availability: never fall back to another device when the
+  // Device availability: never fall back to another device when the
   // configured DAC is missing, and only use it when it is active (not
   // switched off / unplugged). The play thread waits for it during a recovery.
   Dev      := nil;
@@ -154,8 +153,7 @@ begin
 
   if ADeviceId <> '' then
   begin
-    // ---> CHANGED (ObjFPC switch): the UTF-8 id as UTF-16 (was a cast to
-    // WideString of the UTF-16 id)
+    // The UTF-8 id as UTF-16
     WideId := UTF8Decode(ADeviceId);
     HR     := EnumObj.GetDevice(PWideChar(WideId), Dev);
   end
@@ -181,9 +179,9 @@ begin
   FormatAccepted := False;
   ClosestMatch   := nil;
 
-  // ---> AUDIT FIX: Also offer 24 valid bits in a 32-bit container. Some
-  // interfaces accept only this layout and previously fell back to 24-bit
-  // packed or 16-bit. Order: 32/32, 32/24, 24/24, 16/16.
+  // Also offer 24 valid bits in a 32-bit container. Some
+  // interfaces accept only this layout and would otherwise fall back to
+  // 24-bit packed or 16-bit. Order: 32/32, 32/24, 24/24, 16/16.
   TestDepths[0]  := 32;  TestValid[0] := 32;
   TestDepths[1]  := 32;  TestValid[1] := 24;
   TestDepths[2]  := 24;  TestValid[2] := 24;
@@ -191,7 +189,7 @@ begin
 
   for DepthIndex := 0 to 3 do
   begin
-    // ---> AUDIT FIX (DoP 16-Bit Gate): Native DoP requires at least 24-bit
+    // DoP 16-bit gate: native DoP requires at least 24-bit
     // samples (8-bit DoP marker + 16-bit DSD payload). Never negotiate 16-bit DoP!
     if AIsDoP and (TestDepths[DepthIndex] < 24) then
       Continue;
@@ -241,12 +239,12 @@ begin
   BufferDuration := Int64(ABufferMs) * 10000;
   HR := InitStream(BufferDuration, False);
 
-  // ---> AulumicNS: a driver that refuses so long a period gets a shorter
+  // A driver that refuses so long a period gets a shorter
   // one, down to MIN_BUFFER_HNS. Event-driven exclusive streams have one
-  // period of the whole buffer, and drivers may cap it. A safety net: a
-  // FiiO K11 takes even 1000 ms at 384 kHz and for DoP DSD128 (measured);
-  // the user's failure there was the endpoint gone after native DSD over
-  // ASIO (TPlayThreadConfig.SettleMs).
+  // period of the whole buffer, and drivers may cap it. A safety net: some
+  // DACs take even 1000 ms at 384 kHz and for DoP DSD128. (An endpoint that
+  // is gone for a moment after native DSD over ASIO is another matter:
+  // TPlayThreadConfig.SettleMs.)
   // Not for a device in use or gone, nor for a format it does not take.
   while (HR <> 0) and (HR <> AUDCLNT_E_DEVICE_IN_USE) and (HR <> HRESULT_RESOURCE_IN_USE) and
         (HR <> AUDCLNT_E_DEVICE_INVALIDATED) and (HR <> AUDCLNT_E_RESOURCES_INVALIDATED) and
@@ -286,7 +284,7 @@ begin
   FFormat.BlockAlign := WfxExt.Format.nBlockAlign;
 
   // The event the device signals for each buffer, the buffer size, the
-  // render client (as RunWasapi did after Initialize)
+  // render client
   FFrames := 0;
   FEvent  := CreateEvent(nil, False, False, nil);
   FClient.SetEventHandle(FEvent);
@@ -364,7 +362,7 @@ begin
     FRender.ReleaseBuffer(FFrames, 0)
   else
     FRender.ReleaseBuffer(0, 0);
-  { ---> AulumicNS: the time to spare of a buffer that answers an event }
+  { The time to spare of a buffer that answers an event }
   if AFull and (FEventUs <> 0) and (FPeriodUs > 0) then
   begin
     Spare := FPeriodUs - (OutputNowUs - FEventUs);

@@ -7,21 +7,20 @@ unit uLibraryDatabase;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The line format of the library file (Library.db), UTF-8 text:
+  The text format the tests write a library in (UTF-8, line by line):
     ?FOLDER?<library folder>
     ?LINK?<link file>[TAB<target folder>]        (virtual folders)
     one line per track, 21 TAB-separated fields:
       FilePath FolderDir Title Artist Album Genre TrackNumber LastModified
       DurationStr AlbumArtist DiscNumber Year DateStr SampleRate BitDepth
       DateAdded HasReplayGain FileSize Comment Composer Performer
-  Older files have fewer fields (at least 7) and may use '|' instead of TAB.
+  A track line may have fewer fields (at least 7) and '|' instead of TAB.
   Text fields are encoded with EncodeDbField: TAB -> '<tab>', line break ->
   '<br>', '<' -> '<lt>' (so a literal '<br>' in a tag survives), other control
   characters are dropped.
 
-  ---> AulumicNS: a unit of the TEST program (it was in src\library until
-  2026-11-12). AulumicNS stores its library in its own format (uDbStore) and
-  has no import from Aulumic; the tests write a library by hand as this text
+  A unit of the test program only. AulumicNS stores its library in its own
+  format (uDbStore); the tests write a library by hand as this text
   and load it with ImportAulumicDatabase, which hands the records to
   TLibraryManager.ReplaceContent. Covered by Tests\TestLibraryLogic.pas.
   =============================================================================}
@@ -46,10 +45,10 @@ function ImportAulumicDatabase(ALib: TLibraryManager; const AFile: string): Inte
 function EncodeDbField(const S: string): string;
 function DecodeDbField(const S: string): string;
 
-// One track line in the current format (21 fields)
+// One track line with all 21 fields
 function FormatTrackLine(const ATrack: TTrackInfo): string;
 
-// Reads a track line of any version. False when it has fewer than 7 fields.
+// Reads a track line. False when it has fewer than 7 fields.
 // Fills the stored fields only; the search fields (Clean*, FileNameOnly) and
 // the fingerprints are left empty.
 function ParseTrackLine(const ALine: string; out ATrack: TTrackInfo): Boolean;
@@ -172,8 +171,8 @@ begin
           Result[DestIdx + 3] := '>';
           Inc(DestIdx, 4);
         end;
-      // ---> AUDIT FIX D4: Escape '<' so literal '<br>' / '<tab>' text is not
-      // mistaken for an encoded line break or tab when the database is reloaded
+      // Escape '<' so literal '<br>' / '<tab>' text is not
+      // mistaken for an encoded line break or tab when the text is read again
       '<':
         begin
           Result[DestIdx]     := '<';
@@ -194,20 +193,20 @@ begin
   SetLength(Result, DestIdx - 1);
 end;
 
-// ---> AUDIT FIX D4: Pass Result (not S) to the second StringReplace so
-// '<br>' line-break decoding is never discarded!
+// The second StringReplace gets Result (not S), so the
+// '<br>' line-break decoding is not discarded
 function DecodeDbField(const S: string): string;
 begin
   if S = '' then
     Exit('');
-  // ---> AUDIT FIX: Fast path. Every encoded token starts with '<', and almost
+  // Fast path. Every encoded token starts with '<', and almost
   // no field contains one, so skip the three StringReplace calls
   if Pos('<', S) = 0 then
     Exit(S);
   Result := StringReplace(S, '<br>', sLineBreak, [rfReplaceAll]);
   Result := StringReplace(Result, '<tab>', #9, [rfReplaceAll]);
-  // ---> AUDIT FIX D4: '<' is escaped as '<lt>' on save so literal '<br>' /
-  // '<tab>' text in tags survives a save/load cycle. Must be decoded LAST.
+  // '<' is escaped as '<lt>' so literal '<br>' /
+  // '<tab>' text in tags survives writing and reading. Must be decoded LAST.
   Result := StringReplace(Result, '<lt>', '<', [rfReplaceAll]);
 end;
 
@@ -270,7 +269,7 @@ begin
     Exit;
 
   ATrack.FilePath    := DecodeDbField(Parts[0]);
-  // ---> AUDIT FIX D3: Normalize FolderDir without trailing backslash
+  // FolderDir is kept without a trailing backslash
   ATrack.FolderDir   := ExcludeTrailingPathDelimiter(DecodeDbField(Parts[1]));
   if ATrack.FolderDir = '' then
     ATrack.FolderDir := ExcludeTrailingPathDelimiter(ExtractFileDir(ATrack.FilePath));
@@ -326,7 +325,7 @@ begin
   else
     ATrack.DateAdded := 0;
 
-  // Older files stored DateAdded as a file date: convert it to Unix time
+  // A small DateAdded is a file date, not Unix time: converted
   if (ATrack.DateAdded > 0) and (ATrack.DateAdded < 1000000000) then
   begin
     try

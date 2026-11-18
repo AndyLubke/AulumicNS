@@ -5,7 +5,7 @@ unit AuTransport;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The bottom of the main window (Aulumic layout):
+  The bottom of the main window:
   TTransportBar - position / seek bar with the times, the transport buttons
                   in the middle (shuffle, stop, previous, play / pause, next,
                   jump to now playing, repeat) and on the right the output

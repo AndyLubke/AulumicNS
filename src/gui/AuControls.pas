@@ -20,7 +20,7 @@ uses
   LMessages, LCLIntf, Clipbrd, AuGfx, AuTheme, AuIcons, AuAnim;
 
 const
-  { ---> AulumicNS: TAuControl.GesturePan }
+  { TAuControl.GesturePan }
   GESTURE_PAN_NONE = 0;
   GESTURE_PAN_V = 1;
   GESTURE_PAN_VH = 3;
@@ -44,7 +44,7 @@ type
   protected
     FHover: Boolean;
     FHoverA: TAuAnim;                    // 0 .. 1: the hover highlight fading in and out
-    { ---> AulumicNS: True for a large control that repaints in full and often
+    { True for a large control that repaints in full and often
       (a list that scrolls): it gets a render target of its own on the
       graphics card (AuGfx.TGfxWindowTarget) }
     FGpuPaint: Boolean;
@@ -63,7 +63,7 @@ type
     procedure EnabledChanged; override;
     function ShowFocus: Boolean;
     procedure DrawFocusRing(G: TGfx; X, Y, W, H, R: Single);
-    { ---> AulumicNS: how far the hover highlight has faded in (0 .. 1), and
+    { how far the hover highlight has faded in (0 .. 1), and
       a colour between the plain and the hovered one }
     function HoverT: Single;
     function HoverMix(ABase, AHot: TARGB): TARGB;
@@ -73,7 +73,7 @@ type
       const AXProportion, AYProportion: Double); override;
     { rescales pixel values the control keeps itself (row heights ...) }
     procedure ScaleCached(K: Double); virtual;
-    { ---> AulumicNS: touch. A pan gesture (a swiping finger) moved DX, DY
+    { touch. A pan gesture (a swiping finger) moved DX, DY
       pixels since the last call (0, 0 at its start); True = this control or
       an ancestor scrolled (or would). The default asks the parent: a field
       inside a scrolled page, a list that cannot scroll in a scroll box. }
@@ -96,7 +96,7 @@ type
     procedure RenderTo(G: TGfx);
     function EffBack: TARGB;
     function ParentBack: TARGB;
-    { ---> AulumicNS: the scroll position (pixels or rows; 0 = does not
+    { the scroll position (pixels or rows; 0 = does not
       scroll) - read by the touch probe of the debug build }
     function ScrollOffset: Integer; virtual;
     property BackRole: TAuRole read FBackRole write SetBackRole;
@@ -300,7 +300,7 @@ type
     FDrag: Boolean;
     FDragAt, FDragPos: Integer;
     FOnScroll: TNotifyEvent;
-    { ---> AulumicNS: gliding. FGlideA: the position on its way (WheelBy).
+    { gliding. FGlideA: the position on its way (WheelBy).
       FOffsA: for a list that scrolls by rows - the position jumps, the
       picture follows (WheelRows; the pixels it still lags behind). }
     FGlideA, FOffsA: TAuAnim;
@@ -311,7 +311,7 @@ type
     procedure GetThumb(out T, H: Integer);
     function TrackLen: Integer;
   protected
-    function GesturePan: Integer; override;   // ---> AulumicNS: a touch drag moves the thumb
+    function GesturePan: Integer; override;   // a touch drag moves the thumb
     procedure DoPaint(G: TGfx); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -357,7 +357,7 @@ type
     function ValueAt(X: Integer): Double;
     procedure UserSet(V: Double; Final: Boolean);
   protected
-    function GesturePan: Integer; override;   // ---> AulumicNS: a touch drag moves the knob
+    function GesturePan: Integer; override;   // a touch drag moves the knob
     procedure DoPaint(G: TGfx); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -486,7 +486,7 @@ type
     procedure ScrollToCaret;
     function ContentH: Integer;
   protected
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -509,7 +509,7 @@ type
     property Plain: Boolean read FPlain write SetPlain;
   end;
 
-  { ---> AulumicNS: a window that fades in when it opens (menus, popups,
+  { a window that fades in when it opens (menus, popups,
     dialogs), a popup also moving a few pixels into its place. The window is
     made a layered one for it (and stays one, fully opaque afterwards);
     without animations (AuAnim.AnimActive) Start only shows the window. }
@@ -567,7 +567,7 @@ type
     procedure ScrollChanged(Sender: TObject);
     function RowAt(Y: Integer): Integer;
   protected
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -683,7 +683,7 @@ type
     procedure ScrollChanged(Sender: TObject);
     procedure SetContentHeight(V: Integer);
   protected
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -700,11 +700,11 @@ type
   end;
 
   { TAuSplitter - drag handle that resizes a neighbouring control.
-    ---> AulumicNS (2026-11-12): while it is dragged only a line follows the
-    pointer (a small window of its own above the panes: nothing below it is
-    painted); the target gets its new size once, when the button or the
-    finger is let go. Resizing and repainting the panes at every mouse move
-    made the drag lag behind the hand on a slow PC. }
+    Without the graphics card (FLive) only a line follows the pointer while
+    it is dragged (a small window of its own above the panes: nothing below
+    it is painted); the target gets its new size once, when the button or the
+    finger is let go. Resizing and repainting the panes in software at every
+    mouse move would make the drag lag behind the hand on a slow PC. }
 
   TAuSplitter = class(TAuControl)
   private
@@ -713,7 +713,7 @@ type
     FStartX, FStartW: Integer;
     FNewW: Integer;                // the size the target gets at the end of the drag
     FGhost: HWND;                  // the line shown during the drag (0 = none)
-    { ---> AulumicNS: this drag resizes the panes while it moves (the graphics
+    { this drag resizes the panes while it moves (the graphics
       card draws: GpuPaintAllowed); else only the line moves until the end }
     FLive: Boolean;
     FMinSize, FMaxSize: Integer;
@@ -728,7 +728,7 @@ type
     procedure LMCaptureChanged(var Msg: TLMessage); message LM_CAPTURECHANGED;
     procedure CaptureLost(Data: PtrInt);
   protected
-    function GesturePan: Integer; override;   // ---> AulumicNS: a touch drag resizes
+    function GesturePan: Integer; override;   // a touch drag resizes
     procedure DoPaint(G: TGfx); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -788,7 +788,7 @@ type
 
   { TAuHintWindow - themed tool tips (replaces the native hint window) }
 
-  { ---> AulumicNS: lies over a container for a moment and fades from a picture
+  { lies over a container for a moment and fades from a picture
     of how it looked to a picture of how it looks now (a Preferences page,
     the banner at a new track, the theme). Made by CrossFadeFrom; it frees
     itself. The mouse goes through it. }
@@ -823,13 +823,13 @@ procedure DrawCheckBox(G: TGfx; X, Y, B: Single; Checked, Hot, Enabled: Boolean)
 var
   { the debug build's --ui-bench: paints per class and their time (nil = off) }
   PaintTally: TStringList = nil;
-  { ---> AulumicNS: controls may have a render target of their own on the
+  { controls may have a render target of their own on the
     graphics card (TAuControl.Paint). Off: everything through the paint
     buffer and Direct2D's software renderer (the setting "Use the graphics
     card", and --no-gpu-paint of the debug build). }
   GpuPaintAllowed: Boolean = True;
 
-{ ---> AulumicNS: a picture of AParent with its controls as they are drawn
+{ a picture of AParent with its controls as they are drawn
   now; nil when animations are off or AParent is not on screen (then no
   cross-fade happens and nothing is rendered for it) }
 function SnapshotControls(AParent: TWinControl): TGfxBitmap;
@@ -939,7 +939,7 @@ end;
 constructor TAuControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  { ---> AulumicNS: buffered by Paint itself, not by the LCL (see there) }
+  { buffered by Paint itself, not by the LCL (see there) }
   DoubleBuffered := False;
   ControlStyle := ControlStyle + [csOpaque] - [csSetCaption];
   FBackRole := crInherit;
@@ -972,14 +972,14 @@ begin
   else inherited;
 end;
 
-{ ---- touch: pan gestures (---> AulumicNS) ----
+{ ---- touch: pan gestures ----
   Windows turns a swiping finger into WM_GESTURE / GID_PAN for the window
   under it; unhandled, it scrolls only windows with standard scroll bars,
   and these controls draw their own.
   The LCL hands a control only the window messages it knows (and those from
   WM_USER on): WM_GESTURENOTIFY and WM_GESTURE never reach WndProc. So
   CreateWnd puts GestureProc in front of the LCL's window procedure (as
-  AuTitleBar does), and WM_NCDESTROY puts it back. Found with the touch
+  AuTitleBar does), and WM_NCDESTROY puts it back. Checked by the touch
   probe of the debug build (AuTouchProbe, Tools\ProbeTouch.ps1). }
 const
   WM_GESTURE_ = $0119;
@@ -1194,25 +1194,25 @@ begin
   { painted completely in Paint }
 end;
 
-{ ---> AulumicNS: a resized control paints all of itself again. Windows keeps
+{ a resized control paints all of itself again. Windows keeps
   the old pixels of a resized window and repaints only the new strip, so
   what depends on the size (right-aligned columns, the splitter's line,
-  centred content) left stale lines behind while a splitter was dragged. }
+  centred content) would leave stale lines behind while a splitter is dragged. }
 procedure TAuControl.Resize;
 begin
   inherited Resize;
   if HandleAllocated then Invalidate;
 end;
 
-{ ---> AulumicNS: the paint buffer. The LCL's DoubleBuffered keeps one bitmap
+{ the paint buffer. The LCL's DoubleBuffered keeps one bitmap
   for all windows, as large as the largest one painted (in the main window
   nearly the whole window), and fills ALL of it before every paint: at
   3840 x 2037 px about 30 MB, some 3.4 ms of kernel time for every repaint
   of the peak meter or the seek bar (measured with --ui-bench). Here each
   paint uses a 32 bit DIB of the control's own size (from a small cache):
   Direct2D draws into it (AuGfx), and the copy to the screen is
-  quick. (Tried and dropped: one large shared bitmap - the copy out of it
-  took 16 ms as a DIB and 30 ms as a bitmap compatible with the window,
+  quick. (Not one large shared bitmap: the copy out of it
+  takes 16 ms as a DIB and 30 ms as a bitmap compatible with the window,
   however small the part.) }
 { a 32 bit top-down DIB section and a memory DC with it }
 function NewPaintBitmap(W, H: Integer; out ADC: HDC; out AOld: HBITMAP): HBITMAP;
@@ -1331,7 +1331,7 @@ begin
   if (W <= 0) or (H <= 0) or GfxStopped then Exit;
   DC := Canvas.Handle;
   TallyStep(' step: canvas', QS);
-  { ---> AulumicNS: a large control, or one that repaints all the time, has a
+  { a large control, or one that repaints all the time, has a
     render target of its own: the graphics card draws and shows it (a list of
     2400 x 1600 px: 3 ms; through the buffer below 29 ms, nearly all of it
     copying). Small controls take the buffer: a target each would cost memory
@@ -1469,7 +1469,7 @@ begin
   if GetKeyState(VK_TAB) < 0 then
   begin
     KeyboardCues := True;
-    { ---> AulumicNS: the Tab key came to a control of a scrolled page: the
+    { the Tab key came to a control of a scrolled page: the
       page follows, so the control with the focus is in view (it glides
       there with animations on) }
     P := Parent;
@@ -2320,7 +2320,7 @@ begin
   if V = FPos then Exit;
   Old := FPos;
   FPos := V;
-  { ---> AulumicNS: a repaint only when the fill's end moves to another pixel
+  { a repaint only when the fill's end moves to another pixel
     (the seek bar is set 20 times a second; on a 1080p screen its end moves
     less than half a pixel per step) }
   if (FMax > FMin) and (Round(TrackWidth * (V - FMin) / (FMax - FMin)) =
@@ -2662,8 +2662,8 @@ begin
   if FSearch then DrawIcon(G, icSearch, S(18), Height / 2, S(15), clTextDim);
   F := UIFont(13);
   TL := TextLeft;
-  { ---> AulumicNS: intersect (a replaced clip lost the parent's in RenderTo:
-    a field of a scrolled page showed outside it in the screenshots) }
+  { intersect (a replaced clip would lose the parent's in RenderTo:
+    a field of a scrolled page would show outside it in the screenshots) }
   St := G.Save;
   G.IntersectClipRect(TL - 1, 1, TextAreaW + 2, Height - 2);
   if Focused and HasSel then
@@ -3154,7 +3154,7 @@ begin
   F := MemoFont;
   Fg := clText;
   if not Enabled then Fg := clTextFaint;
-  St := G.Save;      // ---> AulumicNS: intersect, see TAuEdit.DoPaint
+  St := G.Save;      // intersect, see TAuEdit.DoPaint
   G.IntersectClipRect(1, S(2), Width - 2, Height - S(4));
   A := Math.Min(FCaret, FAnchor);
   B := Math.Max(FCaret, FAnchor);
@@ -4504,7 +4504,7 @@ begin
   FNewW := FStartW;
   { with the graphics card the panes repaint in a few milliseconds: they
     follow the pointer. Drawn by the processor a repaint of both panes per
-    mouse move lagged behind the hand, so there only a line moves. }
+    mouse move lags behind the hand, so there only a line moves. }
   FLive := GpuPaintAllowed;
   if not FLive then ShowGhost;
 end;

@@ -6,11 +6,10 @@ unit AuPrefs;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The Preferences dialog (Main menu > Preferences..., Ctrl+P, the gear in the
-  title bar): the content of Aulumic's Preferences (uFormPrefs) in the
-  Aulos layout - the pages on the left, every setting with a description
+  title bar): the pages on the left, every setting with a description
   line under its name (no hint bar).
 
-  ---> AulumicNS (2026-11-13, agreed with the user): nine pages, grouped by
+  Nine pages, grouped by
   subject, with CARDS for the settings that are set once and then left
   alone. A card is one row (title, a line that sums up its settings, a
   chevron); a click opens it in place. With all cards closed every page fits
@@ -18,8 +17,7 @@ unit AuPrefs;
   writes prefs-fit.txt); a page scrolls when open cards make it longer, and
   on smaller screens. The open cards are remembered (PrefsCards). "Related
   settings" buttons lead to the page or card where a neighbouring subject
-  lives. (Before: twelve pages, none with cards - the rule "no page scrolls"
-  had cut the resampler in two and left a grab-bag "Advanced" page.)
+  lives.
 
     Library      the library folders (with Scan and Repair), watching the
                  folders, the scan at start
@@ -40,15 +38,15 @@ unit AuPrefs;
     System       keeping the drives awake; animations, the graphics card.
                  Cards: Audio thread (CPU affinity, MMCSS, the timer), Log,
                  Artist information (the user's Last.fm API key)
-    Shortcuts    the keyboard shortcuts (AulumicNS: from Aulos)
+    Shortcuts    the keyboard shortcuts
 
   A new setting goes where its subject is: visible when people change it
   now and then, into a card when it is set once. A page that would scroll
   with its cards closed gets a card more, not a page more.
   The dialog edits a copy of the settings and of the folder list; the main
-  window applies them after OK (as Aulumic's TfrmMain.ShowPrefsDialog). Scan
+  window applies them after OK (TMainForm.ShowPrefsPage). Scan
   and Repair hand the folder list to the main window at once and start the
-  scan (as Aulumic); the progress shows in the dialog.
+  scan; the progress shows in the dialog.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -106,7 +104,7 @@ var
     devices of this computer (the help screenshots) }
   PrefsDemoDevices: Boolean = False;
 { True when a changed audio setting needs the playing track restarted
-  (Aulumic's RequiresRestart; the device is compared by the caller) }
+  (the device is compared by the caller) }
 function PlaybackRestartNeeded(const A, B: TManagerConfig): Boolean;
 
 implementation
@@ -350,7 +348,7 @@ const
   PAGE_W = DLG_W - SIDE_W;
   TEXT_SIZES: array[0..3] of Integer = (90, 100, 110, 120);
 
-  { AulumicNS: Aulumic's keys and the ones taken from Aulos }
+  { the keyboard shortcuts of the Shortcuts page }
   SHORTCUTS: array[0..32, 0..1] of string = (
     ('Space', 'Play / pause'),
     ('Ctrl+Left / Ctrl+Right', 'Back / forward 10 seconds'),
@@ -505,7 +503,7 @@ var
   I: Integer;
 begin
   CreateAu(AOwner, TITLE_PREFERENCES, DLG_W, DLG_H);
-  { ---> AulumicNS: the pages scroll, the buttons are aligned at the bottom:
+  { the pages scroll, the buttons are aligned at the bottom:
     on a small screen at a large scaling the window gets lower }
   FitToWorkArea;
   HelpKeyword := 'Preferences';
@@ -1382,7 +1380,7 @@ begin
   FReplayGain := ComboRow('ReplayGain mode',
     'Track: every song plays at the same loudness. Album: whole albums play at the same loudness, ' +
     'keeping the differences between their tracks.', REPLAYGAIN_OPTIONS);
-  { ---> AulumicNS (2026-11-12): one setting for the automatic headroom and
+  { one setting for the automatic headroom and
     the fixed preamp (HEADROOM_OPTIONS). Not disabled by the locked volume:
     Automatic works there too (it only acts where the sound is converted
     anyway); a fixed value is not applied then. }
@@ -1648,7 +1646,7 @@ begin
   D.LastFmApiKey := Trim(FLastFmKey.Text);
 end;
 
-{ the settings that depend on another one (as Aulumic's EnableControls) }
+{ the settings that depend on another one }
 procedure TPrefsForm.EnableControls;
 var
   R, V: Boolean;
@@ -1676,7 +1674,7 @@ begin
 end;
 
 { the devices of the chosen interface; the configured device stays listed
-  under its name when it is switched off or unplugged (Aulumic) }
+  under its name when it is switched off or unplugged }
 procedure TPrefsForm.FillDevices;
 var
   L: TStringList;
@@ -1853,9 +1851,9 @@ begin
 end;
 
 { Remove works on the selected folders; Scan Now and Repair always on all of
-  them, so they only need a folder (---> AulumicNS: they asked for
-  FLibrary <> nil too, which ShowPreferences sets after the constructor:
-  they stayed off until the first selection change) }
+  them, so they only need a folder (not FLibrary <> nil, which
+  ShowPreferences sets after the constructor: they would
+  stay off until the first selection change) }
 procedure TPrefsForm.UpdateLibraryButtons;
 begin
   FFolderList.Enabled := not FScanning;
@@ -1912,7 +1910,7 @@ begin
   UpdateLibraryButtons;
 end;
 
-{ as Aulumic: the folder list is applied at once, then the scan starts }
+{ the folder list is applied at once, then the scan starts }
 procedure TPrefsForm.ScanClick(Sender: TObject);
 begin
   if (FLibrary = nil) or not Assigned(FOnScan) or FScanning then Exit;

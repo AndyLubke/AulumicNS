@@ -9,12 +9,12 @@ unit ALOutputAsio;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: TAsioOutput, the ASIO output of the engine - a TAudioOutput
+  TAsioOutput, the ASIO output of the engine - a TAudioOutput
   like TWasapiOutput, so the play thread (TPlayThread.RunOutput: reading,
   DSP, track switches, waits and retries) is the same for both.
 
-  The ASIO driver interface is declared here (no Steinberg SDK; taken from
-  Aulos' AuOutAsio). ASIO drivers are apartment threaded COM objects without
+  The ASIO driver interface is declared here (no Steinberg SDK).
+  ASIO drivers are apartment threaded COM objects without
   a proxy, so they are created and controlled on an own STA thread with a
   message loop (TAsioHost); the play thread (MTA, for WASAPI) asks it to
   open, start, stop and close. The driver calls bufferSwitch on its own
@@ -99,12 +99,12 @@ type
     function GetBuffer(out AData: PByte; out AError: HRESULT): Boolean; override;
     procedure ReleaseBuffer(AFull: Boolean); override;
     procedure Close; override;
-    // ---> AulumicNS: about 40 ms before the driver starts; the ring plays
+    // About 40 ms before the driver starts; the ring plays
     // empty before Close / a reopen (see TAudioOutput)
     function PrefillBuffers: Integer; override;
     procedure Drain(AStopEvent: THandle); override;
     procedure FadeOut; override;
-    // ---> AulumicNS: the ring's underruns and least fill (see TAudioOutput)
+    // The ring's underruns and least fill (see TAudioOutput)
     function DropoutCount: Integer; override;
     function LeastBufferedMs: Integer; override;
     function BufferedMs: Integer; override;
@@ -124,7 +124,7 @@ type
     FOwner: TAsioOutput;
     FCmd: Integer;
     FCmdEvent, FDoneEvent: THandle;
-    // ---> AulumicNS: the window the driver gets at init (its sysHandle): a
+    // The window the driver gets at init (its sysHandle): a
     // hidden window of this thread, not the main window (see Execute)
     FWnd: HWND;
   protected
@@ -135,7 +135,7 @@ type
     function Run(ACmd: Integer; ATimeoutMs: Cardinal): Boolean;
   end;
 
-{ ---> AulumicNS: windows of this program that hang on a window of another
+{ Windows of this program that hang on a window of another
   thread (owner or parent): such a pair shares its input, and a thread of
   the pair that does not handle messages freezes the other one at a click.
   AToMain: pairs with the main thread (MainThreadID), AToOther: the rest.
@@ -318,15 +318,12 @@ end;
 const
   HOST_WND_CLASS = 'AulumicNSAsioHost';
 
-{ ---> AulumicNS: the driver's window (its sysHandle). It was the main window,
-  as in a host that calls ASIO on its UI thread; but ASIO runs on this thread
+{ The driver's window (its sysHandle). Not the main window,
+  as in a host that calls ASIO on its UI thread: ASIO runs on this thread
   here. A window that a driver makes as a child / owned window of the main
   window on another thread would tie that thread's input to the UI thread's.
   A hidden top-level window of this thread (the one that calls the driver)
-  keeps whatever the driver does with it away from the UI.
-  (It was first suspected for the freeze on the user's NUC; the hang report
-  showed TAudioEngine.EnumerateDevices instead. The Topping and Holo drivers
-  work with this window and tie none of theirs to it.) }
+  keeps whatever the driver does with it away from the UI. }
 type
   TTieCount = record
     Pid: DWORD;
@@ -576,7 +573,7 @@ begin
   FNativeDsd := False;
   FDraining := False;
   if FFade <> nil then FFade.Reset;
-  { the driver no longer calls bufferSwitch (its buffers are disposed) }
+  { the driver does not call bufferSwitch now (its buffers are disposed) }
   FreeAndNil(FRing);
 end;
 
@@ -614,7 +611,7 @@ begin
   FDriver := Unk;
   Unk := nil;
   D := Drv(Self);
-  // ---> AulumicNS: the host thread's hidden window (was the main window)
+  // The host thread's hidden window (never the main window)
   Parent := nil;
   if FHost <> nil then Parent := Pointer(FHost.FWnd);
   if Parent = nil then Parent := Pointer(GetDesktopWindow);
@@ -747,7 +744,7 @@ begin
   SetLength(FStage, FPeriodBytes);
   SetLength(FSwitchBuf, FPeriodBytes div 4);
   { the ring: about the buffer time of the settings, at least 3 periods
-    (---> was always 3: 4.4 ms at 352.8 kHz with 512 samples, too little for
+    (3 alone would be 4.4 ms at 352.8 kHz with 512 samples, too little for
     any stall of the play thread) }
   Periods := RingPeriodsFor(FPeriodBytes div FFormat.BlockAlign, FFormat.SampleRate, FReqBufferMs);
   FreeAndNil(FRing);
@@ -877,10 +874,10 @@ begin
   WaitForSingleObject(AStopEvent, PeriodMs);
 end;
 
-{ ---> AulumicNS: the driver thread fades the periods it takes from now on
+{ The driver thread fades the periods it takes from now on
   (FADE_MS), then hands over silence; this waits until SILENT_MS of silence
   went to the driver (what it had queued has played then), at most
-  FADE_LIMIT_MS. What is still in the ring is not played: the user asked for
+  FADE_LIMIT_MS. What is still in the ring is not played: the listener asked for
   something else. Not for DSD (native or DoP): those samples are no levels. }
 procedure TAsioOutput.FadeOut;
 const
@@ -963,7 +960,7 @@ begin
   Tmp := @FSwitchBuf[0];
   { take one period from the ring (or silence; counted as an underrun) }
   Have := FStarted and (FRing <> nil) and FRing.Take(PByte(Tmp), not FDraining);
-  { ---> AulumicNS: FadeOut (PCM only): this period goes down to nothing }
+  { FadeOut (PCM only): this period goes down to nothing }
   if FFade.Active then
     if Have then FFade.Apply(PLongInt(Tmp), Frames, Ch) else FFade.Silence(Frames);
   for C := 0 to Ch - 1 do

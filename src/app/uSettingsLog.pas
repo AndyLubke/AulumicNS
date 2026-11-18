@@ -19,9 +19,8 @@ unit uSettingsLog;
   the same names and values. The value texts come from the same option tables
   as the Preferences comboboxes (uAppStrings).
 
-  ---> AulumicNS: the log is AuLog (no log window unit); the output interface
-  (WASAPI exclusive / ASIO) is one more audio item, and DeviceNameForID knows
-  the ASIO drivers.
+  The log is AuLog. The output interface (WASAPI exclusive / ASIO) is one of
+  the audio items, and DeviceNameForID knows the ASIO drivers.
   =============================================================================}
 
 interface
@@ -41,7 +40,7 @@ procedure LogSettingsChanges(const AOld, ANew: TManagerConfig;
 procedure LogLibraryFolderChanges(AOldFolders, ANewFolders: TStrings);
 
 // Friendly name of an output device ('Unknown Device' when not found);
-// ---> AulumicNS: AApi 0 = WASAPI endpoint id, 1 = ASIO driver CLSID
+// AApi 0 = WASAPI endpoint id, 1 = ASIO driver CLSID
 function DeviceNameForID(AApi: Integer; const ADeviceID: string): string;
 
 implementation
@@ -102,7 +101,7 @@ end;
 function AudioItems(const A: TManagerConfig; const ADeviceName: string): TSettingItems;
 begin
   Result := nil;
-  // ---> AulumicNS: the output interface
+  // The output interface
   if A.OutputApi = 1 then
     AddItem(Result, LBL_SET_OUTPUT_API, LBL_SET_API_ASIO)
   else
@@ -116,7 +115,7 @@ begin
   AddBool(Result, LBL_SET_RESAMPLE,   A.ResamplePCM);
   AddBool(Result, LBL_SET_LOCK_VOLUME, A.VolumeLocked);
   AddItem(Result, LBL_SET_REPLAYGAIN, OptionName(REPLAYGAIN_OPTIONS, A.ReplayGainMode));
-  // ---> AulumicNS: one setting: Automatic or the fixed preamp
+  // One setting: Automatic or the fixed preamp
   if A.AutoHeadroom then
     AddItem(Result, LBL_SET_PREAMP,   HEADROOM_OPTIONS[0].DisplayName)
   else

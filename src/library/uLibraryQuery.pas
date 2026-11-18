@@ -186,7 +186,7 @@ begin
                            ((TrackCleanValLower <> '') and
                             (Pos(Conditions[I].SubValues[J].CleanLower, TrackCleanValLower) > 0));
               opStartsWith:
-                // ---> AUDIT FIX: Check Pos(...) = 1 (not > 1) on accent-stripped string!
+                // Pos(...) = 1 (not > 1), on the accent-stripped string too
                 SubPass := (Pos(Conditions[I].SubValues[J].LowerStr, TrackStrValLower) = 1) or
                            ((TrackCleanValLower <> '') and
                             (Pos(Conditions[I].SubValues[J].CleanLower, TrackCleanValLower) = 1));

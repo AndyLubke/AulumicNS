@@ -25,7 +25,7 @@ type
     AlbumGain : Double;
     TrackPeak : Double;
     AlbumPeak : Double;
-    // ---> AulumicNS: a track without an album tag: only the track gain and
+    // A track without an album tag: only the track gain and
     // peak are written (album gain and peak fields are removed)
     TrackOnly : Boolean;
   end;
@@ -47,7 +47,7 @@ type
 
   TTagEditorPayload = record
     Current            : TAudioTagValues;
-    // ---> AUDIT FIX: Values as loaded from the file; the custodian only
+    // Values as loaded from the file; the custodian only
     // writes the fields where Current differs from Original.
     Original           : TAudioTagValues;
     IsModified         : Boolean;

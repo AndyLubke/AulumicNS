@@ -8,15 +8,14 @@ unit ALReaderWAV;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read WAV files.
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic; the
-  file name is UTF-8 (opened as it is, no conversion).
+  The file name is UTF-8 (opened as it is, no conversion).
 ==============================================================================}
 
 interface
 
 uses
   SysUtils, Classes,
-  AuAudioTypes;  // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  AuAudioTypes;  // LongPath (paths of 260 characters and more)
 
 type
   TWavReader = class
@@ -29,7 +28,7 @@ type
     FSampleRate: cardinal;
     FChannels: word;
     FBitsPerSample: word;
-    // ---> AUDIT FIX 2.3: Cached frame size in bytes for whole-frame read alignment
+    // Cached frame size in bytes for whole-frame read alignment
     FBlockAlign: integer;
     // Supports 32-bit IEEE Float WAVs (converted to 32-bit Int PCM)
     FIsFloat: boolean;
@@ -69,7 +68,7 @@ var
 begin
   inherited Create;
 
-  // ---> AUDIT FIX: Initialize local variables
+  // Initialize local variables
   ChunkID      := Default(TFourCC);
   ChunkSize    := 0;
   RiffType     := Default(TFourCC);
@@ -119,7 +118,7 @@ begin
       FFileStream.Seek(6, soFromCurrent); // Skip ByteRate and BlockAlign
       FFileStream.ReadBuffer(FBitsPerSample, 2);
 
-      // ---> AUDIT FIX 2.1: Strictly whitelist PCM ($0001) and IEEE_FLOAT ($0003)
+      // Strictly whitelist PCM ($0001) and IEEE_FLOAT ($0003)
       if AudioFormat = WAV_FORMAT_PCM then
       begin
         FIsFloat    := False;
@@ -187,7 +186,7 @@ begin
     end;
   end;
 
-  // ---> AUDIT FIX 2.1: Validate parsed format, channels, and bit depth
+  // Validate parsed format, channels, and bit depth
   if (not HasFmtChunk) or (FChannels < 1) or (FSampleRate = 0) then
     raise Exception.Create(ERR_DECODE_WAVINVALID);
 
@@ -199,7 +198,7 @@ begin
   else if not (FBitsPerSample in [16, 24, 32]) then
     raise Exception.Create(ERR_DECODE_WAVINVALID);
 
-  // ---> AUDIT FIX 2.3: Trim FDataSize to an exact multiple of FBlockAlign
+  // Trim FDataSize to an exact multiple of FBlockAlign
   FBlockAlign := Integer(FChannels) * (Integer(FBitsPerSample) div 8);
   if (FBlockAlign <= 0) or (FDataSize < FBlockAlign) then
     raise Exception.Create(ERR_DECODE_WAVINVALID);
@@ -228,7 +227,7 @@ begin
   if (FBytesRead + Count) > FDataSize then
     Count := FDataSize - FBytesRead;
 
-  // ---> AUDIT FIX 2.3: Round Count down to whole frames
+  // Round Count down to whole frames
   if FBlockAlign > 1 then
     Count := Count - (Count mod FBlockAlign);
 
@@ -239,7 +238,7 @@ begin
   if Result <= 0 then
     Exit(0);
 
-  // ---> AUDIT FIX 2.3: If a short read returned a partial frame, rewind the
+  // If a short read returned a partial frame, rewind the
   // trailing bytes so gapless buffer splices never lose frame alignment!
   if (FBlockAlign > 1) and ((Result mod FBlockAlign) <> 0) then
   begin

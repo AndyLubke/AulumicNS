@@ -5,14 +5,14 @@ unit uLibraryWatcher;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Watches the library folders (from Aulos: TAuWatcher) and reports when
+  Watches the library folders and reports when
   something in them changed; the main window then starts a quiet library
   refresh after a calm period (TakeChange).
 
   Only local folders are watched (fixed and removable drives). A network
   folder is left out: a standing change request keeps some NAS units from
   hibernating, so network folders are only checked by Refresh / Rescan and
-  the scan at start (agreed with the user, milestone 3).
+  the scan at start.
 
   The change notifications are opened on the watcher's own thread: opening
   one on a drive that is asleep can block until it has spun up, and the UI
@@ -46,7 +46,7 @@ type
     destructor Destroy; override;
     { True once after a change, when nothing changed for AQuietMs since }
     function TakeChange(AQuietMs: QWord): Boolean;
-    { ---> AulumicNS: forgets the changes seen so far (the program's own tag
+    { Forgets the changes seen so far (the program's own tag
       and ReplayGain writes: the library records are updated by the writer;
       a change notification does not say which files changed) }
     procedure Discard;

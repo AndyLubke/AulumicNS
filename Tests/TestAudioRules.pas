@@ -16,17 +16,16 @@ unit TestAudioRules;
                        falling back to track, off, limits) and
                        PrepareNextSource on generated WAV files (rates, bit
                        depth matched, mono as stereo, the ReplayGain factor,
-                       unsupported and missing files); ---> ADDED: the tests
-                       run in UTF-8 like Aulumic, tags and PrepareNextSource
+                       unsupported and missing files); the tests
+                       run in UTF-8 like the program, tags and PrepareNextSource
                        of a file with a non-ASCII name (TestHelpers.NonAsciiName)
-    TTestDsdToPcm    : ---> ADDED: the DSD-to-PCM rate rules of ALReaders: the
+    TTestDsdToPcm    : the DSD-to-PCM rate rules of ALReaders: the
                        DC blocker's -3 dB point is DSD_DC_BLOCK_HZ and 20 Hz
                        passes within 0.1 dB at every DSD rate (DsdDcBlockPole),
                        the fade-in lasts DSD_FADE_IN_MS at every rate
-  ---> CHANGED (ObjFPC switch, step 2): ALSourceFactory is ObjFPC now; file
-  names are passed as they are (UTF-8), as uPlaybackIOWorker does. Resampling is
-  tested in TestResampler; the DSD gain correction is not tested here (it
-  needs a tagged DSF file).
+  File names are passed as they are (UTF-8), as uPlaybackIOWorker does.
+  Resampling is tested in TestResampler; the DSD gain correction is not
+  tested here (it needs a tagged DSF file).
   =============================================================================}
 
 interface
@@ -74,7 +73,6 @@ type
     procedure NonAsciiNameIsPrepared;
   end;
 
-  // ---> ADDED
   TTestDsdToPcm = class(TTestCase)
   published
     procedure DcBlockerCornerIsTheSameAtEveryRate;
@@ -185,7 +183,7 @@ begin
   AssertEquals('Unknown peak: not limited', DbToFactor(10.0), CalcRGFactor(C, 10.0, 0.0), DELTA);
   AssertEquals('No clipping: not limited', DbToFactor(-6.0), CalcRGFactor(C, -6.0, 0.9), DELTA);
 
-  { ---> 2026-11-12: the peak protection keeps the preamp's headroom: the
+  { The peak protection keeps the preamp's headroom: the
     peak comes up to -3 dBFS at most with -3 dB (not to full scale) }
   C.PreampDB := -3.0;
   AssertEquals('Limited by the peak, the headroom kept', DbToFactor(-3.0) / 0.9,
@@ -401,7 +399,7 @@ begin
   AssertTrue('...and no source', Prep.Source = nil);
 end;
 
-// ---> ADDED: Aulumic runs with UTF-8 as its code page (Lazarus' LazUTF8):
+// AulumicNS runs with UTF-8 as its code page (Lazarus' LazUTF8):
 // every `string` outside the audio units is UTF-8. The tests with non-ASCII
 // file names mean something only when the test program does the same.
 procedure TTestTrackSource.TheTestsRunInUtf8LikeAulumic;
@@ -413,7 +411,7 @@ begin
     Length(UTF8Decode(NonAsciiName)));
 end;
 
-// ---> ADDED: The ReplayGain tags of a file whose name is not plain ASCII
+// The ReplayGain tags of a file whose name is not plain ASCII
 procedure TTestTrackSource.NonAsciiNameReadsTheReplayGainTags;
 var
   Gain, Peak: Double;
@@ -425,7 +423,7 @@ begin
   AssertEquals('Track peak', 0.95, Peak, DELTA);
 end;
 
-// ---> ADDED: PrepareNextSource (the I/O worker's next track) on a file whose
+// PrepareNextSource (the I/O worker's next track) on a file whose
 // name is not plain ASCII
 procedure TTestTrackSource.NonAsciiNameIsPrepared;
 var

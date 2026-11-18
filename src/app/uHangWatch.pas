@@ -8,7 +8,7 @@ unit uHangWatch;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: a watchdog for a frozen main window. A thread looks at the
+  A watchdog for a frozen main window. A thread looks at the
   window every second: it is frozen when Windows calls it hung (IsHungAppWindow:
   no message taken for 5 s although it does not wait for input - the white
   "Not responding" window) or when it does not answer a sent message within
@@ -673,12 +673,10 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: FIX tried once only. When another program had the fresh
-  report open at that moment without sharing it for writing (a virus scanner,
-  the search indexer, an editor - or the test that reads it every 100 ms:
-  TTestHangWatch.FrozenWindowIsReported failed about once in four runs), the
-  open failed and the "answered again" line was lost for good. Now tried for
-  up to 3 s. }
+{ Tried for up to 3 s. When another program has the fresh report open at that
+  moment without sharing it for writing (a virus scanner, the search indexer,
+  an editor - or a test that reads it every 100 ms), the open fails; with one
+  try only the "answered again" line would be lost for good. }
 procedure THangWatch.AppendLine(const ALine: string);
 const
   TRIES   = 30;

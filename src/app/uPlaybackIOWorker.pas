@@ -12,11 +12,11 @@ unit uPlaybackIOWorker;
     * Open  : optional pre-delay (DAC release), then up to 3 existence checks
               with 250 ms pauses (wakes sleeping drives).
     * Probe : existence check + tag read (no cover art) of the next gapless
-              track, returning its sample rate. ---> ADDED: when it can follow
-              the current track gaplessly, its audio source is built here too
+              track, returning its sample rate. When it can follow the
+              current track gaplessly, its audio source is built here too
               (PrepareNextSource: decoder, resampler, ReplayGain), so the UI
               thread only hands it to the engine.
-    * Meta  : ---> ADDED: full tag read (with cover art) of the track that just
+    * Meta  : full tag read (with cover art) of the track that just
               started, plus the folder cover image when there is no embedded
               cover and the PDF booklet check, so the UI thread does no disk
               access at a track change.
@@ -44,7 +44,7 @@ interface
 
 uses
   Classes, SysUtils, SyncObjs, ALMetadata,
-  ALSourceFactory;  // ---> CHANGED (phase 7b): was ALAudioThread (PrepareNextSource moved there)
+  ALSourceFactory;  // PrepareNextSource
 
 type
   TPlaybackIOJobKind = (iojOpen, iojProbe, iojMeta);
@@ -56,7 +56,7 @@ type
     Found      : Boolean;
     SampleRate : Integer;          // iojProbe only
     Meta       : TAudioMetadata;   // iojMeta only (plain copy, owned by the result)
-    // ---> ADDED: iojProbe only: the next track's source when it was built
+    // iojProbe only: the next track's source when it was built
     // (Source = nil otherwise). Owned by the result: see FreePreparedNext.
     Prepared   : TPreparedNext;
   end;
@@ -78,7 +78,7 @@ type
     FProbePending : Boolean;
     FProbeGen     : Integer;
     FProbePath    : string;
-    // ---> ADDED: Build the probed track's source (see RequestProbe)
+    // Build the probed track's source (see RequestProbe)
     FProbePrepare : Boolean;
     FProbeParams  : TNextPrepareParams;
     FProbeCurRate : Integer;
@@ -101,7 +101,7 @@ type
 
     // UI thread
     procedure RequestOpen(AGeneration: Integer; const AFilePath: string; APreDelayMs: Integer);
-    // ---> CHANGED: APrepare = also build the track's source with AParams when
+    // APrepare = also build the track's source with AParams when
     // it can follow the current track gaplessly: same DSD / PCM kind
     // (ACurrentIsDSD) and the same sample rate (ACurrentRate; 0 = not known
     // yet, then it is built anyway and the UI thread checks the rate)
@@ -121,7 +121,7 @@ implementation
 uses
   AuAudioTypes, Windows, uAppConsts, uMetaUtils, uDriveKeepAlive, uAudioUtils;
 
-// ---> ADDED: Frees the prepared sources of AResults (nil is fine)
+// Frees the prepared sources of AResults (nil is fine)
 procedure FreeResultSources(var AResults: TPlaybackIOResults);
 var
   I: Integer;
@@ -165,7 +165,7 @@ begin
     end;
   end;
 
-  // ---> AulumicNS: the booklets the viewer finds (also in Scans / Artwork sub
+  // The booklets the viewer finds (also in Scans / Artwork sub
   // folders and next to a disc folder), not only a PDF beside the track
   Result.FolderHasPDF := False;
   Pdfs := TStringList.Create;
@@ -204,10 +204,10 @@ end;
 destructor TPlaybackIOWorker.Destroy;
 begin
   // Normally Shutdown has already been called; make sure the thread is gone
-  // before the synchronization objects are freed. (---> CHANGED: A worker that
+  // before the synchronization objects are freed. (A worker that
   // did not stop in time is set aside, uDriveKeepAlive.SetThreadAside, and
   // freed only after its thread has ended, so Finished is True then.)
-  // ---> AUDIT FIX: "not Suspended" as in TThread.Destroy: when the
+  // "not Suspended" as in TThread.Destroy: when the
   // constructor fails before Start, the thread never ran and WaitFor would
   // wait forever.
   if (not Finished) and (not Suspended) then
@@ -218,7 +218,7 @@ begin
     WaitFor;
   end;
 
-  // ---> ADDED: Sources built for results nobody collected
+  // Sources built for results nobody collected
   FreeResultSources(FResults);
 
   FWakeEvent.Free;
@@ -291,7 +291,7 @@ begin
     FOpenPending  := False;
     FProbePending := False;
     FMetaPending  := False;
-    FreeResultSources(FResults);  // ---> ADDED
+    FreeResultSources(FResults);
     SetLength(FResults, 0);
   finally
     FLock.Leave;
@@ -324,7 +324,7 @@ begin
   end;
 end;
 
-// ---> CHANGED: var: the result list takes over AResult.Prepared.Source (the
+// var: the result list takes over AResult.Prepared.Source (the
 // caller drops its copy); when it is not added, its source is freed here
 procedure TPlaybackIOWorker.AddResult(var AResult: TPlaybackIOResult);
 begin
@@ -354,7 +354,7 @@ var
   Res     : TPlaybackIOResult;
   Retry   : Integer;
   Meta    : TAudioMetadata;
-  // ---> ADDED: Probe: build the source as well (copies taken under FLock)
+  // Probe: build the source as well (copies taken under FLock)
   WantPrep   : Boolean;
   PrepParams : TNextPrepareParams;
   CurRate    : Integer;
@@ -442,7 +442,7 @@ begin
               if FileExists(LongPath(Path)) then
               begin
                 Res.Found := True;
-                // ---> ADDED: FileExists is answered from Windows' folder
+                // FileExists is answered from Windows' folder
                 // cache, also while the drive sleeps. Read the start of the
                 // file for real, so the drive spins up here ("Opening...")
                 // and not later in the audio thread.
@@ -465,7 +465,7 @@ begin
               Meta           := ReadTrackMetadata(Path, False);
               Res.SampleRate := Meta.SampleRate;
 
-              // ---> ADDED: Build the source too when the track can follow the
+              // Build the source too when the track can follow the
               // current one gaplessly (the same test as ApplyGaplessProbe), so
               // the UI thread does no disk access at the change. A failure
               // leaves Prepared.Source nil: the UI thread then tries itself.

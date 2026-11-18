@@ -32,7 +32,7 @@ function FindCoverArt(const APath: string): string;
 // Collects all cover/artwork images in the track's folder and subfolders
 procedure FindAllCoverArt(const APath: string; AList: TStrings);
 
-// ---> AulumicNS (from Aulos' AuBooklet): the PDF booklets of an album folder:
+// The PDF booklets of an album folder:
 // the folder, its sub folders (Scans, Artwork, ...) and the parent of a disc
 // folder (CD1, Disc 2). Plain file access (the playback IO worker uses it).
 procedure FindBooklets(const Folder: string; List: TStrings);
@@ -100,7 +100,7 @@ var
   I, ValidCount: Integer;
   S, Token: string;
 begin
-  // ---> AUDIT FIX: Initialize managed Result to nil to silence Warning 5093
+  // Initialize managed Result to nil to silence Warning 5093
   Result := nil;
   if Trim(RawTags) = '' then
     Exit;
@@ -156,7 +156,7 @@ var
   end;
 
 begin
-  // ---> AUDIT FIX: Initialize OutWS to silence Hint 5057
+  // Initialize OutWS to silence Hint 5057
   OutWS := '';
   if S = '' then
     Exit('');
@@ -386,7 +386,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: Aulos' AddPdfs / FindBooklets (AuBooklet)
+// The PDFs of Dir and its sub folders, for FindBooklets
 procedure AddBookletPdfs(const Dir: string; List: TStrings; Depth: Integer);
 var
   SR: TSearchRec;
@@ -483,7 +483,7 @@ var
     if (SR.Name = '') or (SR.Name = '.') or (SR.Name = '..') then
       Exit;
 
-    {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile: Windows-only (so is Aulumic)
+    {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile: Windows-only (so is the program)
     if (SR.Attr and (faHidden or faSysFile or FA_SYMLINK_ATTR)) <> 0 then
     {$POP}
       Exit;
@@ -667,8 +667,8 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: ApplyCoverArt (LCL TImage) removed; the banner draws
-  Meta.CoverData / FolderCoverData with AuGfx.ImageFromBytes }
+{ The banner draws Meta.CoverData / FolderCoverData with
+  AuGfx.ImageFromBytes }
 
 function GenerateAlbumHash(const AlbumArtist, Album, FolderPath: string): string;
 var
@@ -715,12 +715,12 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: the thumbnail is made with the picture decoder of Windows
-  (AuGfx / WIC) instead of FPImage. FPImage decoded the whole cover with 16
-  bits per channel (3000 x 3000 px: 72 MB, for every album of a repair) and
-  scaled it in Pascal; WIC decodes a JPEG at a reduced size straight away. The
-  result is as before: CACHE_THUMB_SIZE square, a cover within 2 % of square
-  fills it, any other keeps its proportions on black. }
+{ The thumbnail is made with the picture decoder of Windows (AuGfx / WIC),
+  never with FPImage: FPImage decodes the whole cover with 16 bits per
+  channel (3000 x 3000 px: 72 MB, for every album of a repair) and scales it
+  in Pascal; WIC decodes a JPEG at a reduced size straight away. The result
+  is CACHE_THUMB_SIZE square: a cover within 2 % of square fills it, any
+  other keeps its proportions on black. }
 function ThumbnailSquare(ASrc: TGfxBitmap; AFullW, AFullH: Integer): TGfxBitmap;
 var
   FitW, FitH, OffX, OffY, X, Y, X0, Y0, X1, Y1, K: Integer;
@@ -876,7 +876,7 @@ begin
       end;
     except
       // a cover that cannot be read or a thumbnail that cannot be written:
-      // no thumbnail (as before: the scan goes on)
+      // no thumbnail (the scan goes on)
     end;
   finally
     Src.Free;
@@ -885,13 +885,13 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX M3: Writes downscaled JPEG to a temporary file first and swaps
-// atomically via CommitAtomicFile so an interrupted write never truncates AFilePath!
-// ---> AUDIT FIX: The output is always JPEG data, so the function only accepts
+// Writes the downscaled JPEG to a temporary file first and swaps atomically
+// via CommitAtomicFile, so an interrupted write never truncates AFilePath.
+// The output is always JPEG data, so the function only accepts
 // a .jpg / .jpeg target. This prevents JPEG bytes ending up under a .png (or
-// other) name, which TPicture.LoadFromFile would then fail to decode.
-// ---> AulumicNS: with the picture decoder of Windows (AuGfx / WIC) instead of
-// FPImage: the size comes from the header, a JPEG is decoded at the reduced
+// other) name.
+// Uses the picture decoder of Windows (AuGfx / WIC):
+// the size comes from the header, a JPEG is decoded at the reduced
 // size, and pictures over AuGfx.MAX_IMAGE_PIXELS are refused there.
 function DownscaleImageFile(const AFilePath: string; MaxDim: Integer): Boolean;
 var
@@ -952,7 +952,7 @@ begin
 end;
 
 // =============================================================================
-// ---> AUDIT FIX M1: Hardened Zero-Allocation ReplayGain Parser
+// Hardened ReplayGain parser
 // 1. Never skips across CR/LF (#10/#13) so empty tags never steal the next line's value.
 // 2. Requires the numeric value (+, -, 0..9) to begin immediately after the key's
 //    delimiter (ignoring prose comments that happen to mention 'replaygain').
@@ -1056,7 +1056,7 @@ begin
       begin
         if (not IsNan(ParsedVal)) and (not IsInfinite(ParsedVal)) then
         begin
-          // ---> AUDIT FIX: R128_TRACK_GAIN / R128_ALBUM_GAIN (RFC 7845) are Q7.8
+          // R128_TRACK_GAIN / R128_ALBUM_GAIN (RFC 7845) are Q7.8
           // fixed-point integers (1/256 dB) relative to -23 LUFS, whereas
           // ReplayGain 2.0 is in dB relative to -18 LUFS. Convert before clamping:
           // e.g. -512 -> -2.0 dB (R128) -> +3.0 dB (ReplayGain).

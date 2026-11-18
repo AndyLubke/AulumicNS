@@ -32,15 +32,15 @@ type
   // What became of a track in a scan
   TRGResultStatus = (
     rsReadyToSave,      // analysed: its track and album gain can be saved
-    rsTrackOnly,        // ---> AulumicNS: analysed, no album tag: its track gain can be saved
+    rsTrackOnly,        // analysed, no album tag: its track gain can be saved
     rsAlbumIncomplete,  // analysed, but not every track of its album: not saved
     rsDecodeError,      // could not be decoded (unsupported or damaged)
     rsFileMissing,      // the file no longer exists
     rsDriveOffline      // its drive or network share cannot be reached
   );
 
-  // ---> MOVED (phase 6a) from uFormReplayGain; StatusMsg (the shown text, also
-  // compared to decide what is saved) became Status
+  // One scanned track. Status decides what is saved; its shown text is
+  // RGStatusText(Status)
   TRGScanResult = record
     FilePath : string;
     Album    : string;
@@ -160,8 +160,6 @@ begin
   end;
 end;
 
-// ---> MOVED (phase 6a) from TfrmReplayGain.ExecuteExplicitSelectionScan
-// (AlbumBucketKey), unchanged
 function RGAlbumKey(const ATrack: TTrackInfo): string;
 begin
   Result := LowerCase(Trim(ExtractFileDir(ATrack.FilePath)) + '|' +
@@ -169,8 +167,7 @@ begin
                       Trim(ATrack.Album));
 end;
 
-// ---> MOVED (phase 6a) from TReplayGainThread.Execute (the same rule for a
-// track and an album), unchanged
+// The same rule for a track and an album
 function GainFromLoudness(ALoudness: Double): Double;
 begin
   if (not IsNan(ALoudness)) and (not IsInfinite(ALoudness)) and (ALoudness > RG_SILENCE_LUFS) then
@@ -211,11 +208,10 @@ begin
   end;
 end;
 
-// ---> MOVED (phase 6a) from TfrmReplayGain.ExecuteExplicitSelectionScan
-// (unchanged; the fallback group for "no album key" was dropped: every track
-// with a file path gets a key, so it could only ever be empty). The selected
-// tracks grouped by album into AGroups, each album completed with its other
-// library tracks; ATrackCount counts the files added.
+// The selected tracks grouped by album into AGroups, each album completed
+// with its other library tracks; ATrackCount counts the files added. Every
+// track with a file path gets an album key, so no group for "no album key"
+// is needed.
 procedure AddSelectionGroups(AManager: TLibraryManager; ATracks: TTrackList;
   AGroups: TRGAlbumGroups; var ATrackCount: Integer);
 var
@@ -258,13 +254,13 @@ begin
       end;
     end;
 
-    // ---> AUDIT FIX: Complete every selected album with all its library
-    // tracks. The album gain must be measured over the whole album; measured
-    // over the selected tracks only, it was wrong (and differed from the
-    // album gain of the tracks that were not selected).
+    // Complete every selected album with all its library tracks. The album
+    // gain must be measured over the whole album; measured over the selected
+    // tracks only, it would be wrong (and differ from the album gain of the
+    // tracks that were not selected).
     if DistinctAlbums.Count > 0 then
     begin
-      // ---> CHANGED: A copy of the library instead of its lock
+      // A copy of the library, so its lock is not held
       LibTracks := AManager.SnapshotTracks;
       for I := 0 to High(LibTracks) do
       begin

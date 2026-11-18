@@ -7,7 +7,7 @@ unit ALReaderDFF;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: reads DSDIFF (.dff) files for the DSD path of the engine.
+  Reads DSDIFF (.dff) files for the DSD path of the engine.
   TDsfReader hands a DFF file to this reader, so the rest of the engine
   (TDsfSource, DoP, DSD to PCM, gapless) treats both formats the same.
 
@@ -16,7 +16,7 @@ unit ALReaderDFF;
   right, the DSD bits MSB first (DFF stores them MSB first, so - unlike DSF -
   no bit reversal). Mono files are sent as dual mono; files with more than
   two channels report their channel count (the source factory refuses them).
-  The DFF container is parsed by Aulos' TAuDffDecoder (DST compressed files
+  The DFF container is parsed by AuDecDsd.TAuDffDecoder (DST compressed files
   are refused there).
 ==============================================================================}
 

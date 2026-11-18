@@ -5,11 +5,11 @@ unit AuPlaylistPane;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The playlist pane on the right of the main window - Aulumic's playlist
-  frame (uFramePlaylist) on the AulumicNS group list: the playlist selector,
+  The playlist pane on the right of the main window, on the AulumicNS group
+  list (TAuGroupList): the playlist selector,
   "View" (grouping and formats) and "Edit" above the list.
 
-  The list (as Aulumic):
+  The list:
   - grouped by album (folder + album artist + album), by folder, or flat
     (uPlaylistRows.PlaylistGroupKey); a new group also starts when a file is
     in the open group already;
@@ -155,13 +155,13 @@ type
     { selects the entry; in a collapsed group AOpenGroup opens it, otherwise
       the header is selected }
     procedure SelectEntry(E: Integer; AOpenGroup: Boolean = True; ACenter: Boolean = False);
-    { the track that starts playing (Aulumic's FocusLastPlayedTrack at a track
+    { the track that starts playing (at a track
       change): selected, its group opened, and brought to the middle of the
       list when it is not in view - a row in view stays where it is }
     procedure FollowEntry(E: Integer);
     function SelectedFilePath: string;
     { where a drop at client Y goes: the entry index to insert at, and the
-      drop marker (as Aulumic: flat before / after the row, grouped before
+      drop marker (flat before / after the row, grouped before
       the group on the upper half of its header, else after the group) }
     function InsertIndexAt(Y: Integer; out AMarkRow: Integer; out AMarkAbove: Boolean): Integer;
     function CollapsedNames: TStringArray;
@@ -249,7 +249,7 @@ begin
   List.BorderSpacing.Bottom := S(4);
   List.DragEnabled := True;
   List.OnDrawRow := @DrawRow;
-  List.OnRowText := @RowText;   // ---> AulumicNS: type-ahead as in the library tree
+  List.OnRowText := @RowText;   // type-ahead as in the library tree
   List.OnRowClick := @RowClick;
   List.OnCollapseChange := @ListCollapse;
   List.EmptyText := PL_EMPTY_TEXT;
@@ -305,7 +305,7 @@ begin
   Result.FileNameOnly := ExtractFileName(E.FilePath);
 end;
 
-{ the rating of a track by its tags (Aulumic's RowRatingFingerprint) }
+{ the rating of a track by its tags (RowRatingFingerprint) }
 function TPlaylistPane.RatingOf(const E: TPlEntry): Integer;
 var
   Row: TTrackNodeData;
@@ -369,7 +369,7 @@ begin
     T.SampleRate := M.SampleRate;
     T.BitDepth := M.BitDepth;
   end;
-  { Aulumic's TrackFromMusicFile: the folder name as album, Unknown Artist }
+  { without tags: the folder name as album, Unknown Artist }
   if T.Album = '' then T.Album := ExtractFileName(ExcludeTrailingPathDelimiter(ExtractFilePath(APath)));
   if T.Artist = '' then T.Artist := LBL_UNKNOWN_ARTIST;
   Result := EntryFromTrack(T);
@@ -589,7 +589,7 @@ begin
   FTrackFmt := ATrackFmt;
   FDateSuffix := ADateSuffix;
   FReadOnly := AReadOnly;
-  { ---> AulumicNS: an auto-playlist cannot take dropped music: its own text }
+  { an auto-playlist cannot take dropped music: its own text }
   if AReadOnly then List.EmptyText := PL_AUTO_EMPTY_TEXT else List.EmptyText := PL_EMPTY_TEXT;
   List.DragEnabled := True;
   case FGroupMode of
@@ -607,7 +607,7 @@ begin
 end;
 
 { the texts of the headers and the tracks (the formats with the library's
-  date added and the play statistics, as Aulumic's BuildFormatContext) }
+  date added and the play statistics) }
 procedure TPlaylistPane.BuildTexts;
 var
   I, J, Total, N: Integer;
@@ -637,11 +637,11 @@ var
     if Ctx.Meta.Album = '' then Ctx.Meta.Album := LBL_UNKNOWN_ALBUM;
   end;
 
-  { ---> AulumicNS: the library's date added and the play statistics of
-    every entry, looked up once and only when a format shows them. Was: one
+  { the library's date added and the play statistics of
+    every entry, looked up once and only when a format shows them. One
     lookup per entry for its text and another one for its header, each a full
-    copy of the library record, also when no format used them - most of the
-    0.15 s that every edit of a 46,000 track playlist took. }
+    copy of the library record, would cost about 0.15 s at every edit of a
+    46,000 track playlist. }
   var
     EntKnown: array of Boolean;
     EntAdded: array of Int64;
@@ -813,7 +813,7 @@ begin
   finally
     List.EndUpdate;
   end;
-  { collapsed groups, by header text or album (as Aulumic) }
+  { collapsed groups, by header text or album }
   if FCollapsed.Count > 0 then
     for I := 0 to List.RowCount - 1 do
       if List.Kind[I] = rkHeader then
@@ -940,7 +940,7 @@ begin
   if HandleAllocated then List.Invalidate;
 end;
 
-{ ---> AulumicNS: what type-ahead searches: the text a row shows (a track's
+{ what type-ahead searches: the text a row shows (a track's
   line in the chosen format, without the number column; a header's text) }
 function TPlaylistPane.RowText(Sender: TObject; Row: Integer): string;
 var
@@ -997,7 +997,7 @@ begin
     end;
     DrawStars(G, X + W - StW - S(4), Y + H / 2, StSz, Hdr.Rating, clAccentText);
     TW := X + W - StW - S(16) - TX;
-    { as Aulumic's PaintHeaderText: one line in the larger font when it fits,
+    { the header text: one line in the larger font when it fits,
       else two lines (split at a ' • ') in the smaller one }
     HF := UIFont(List.TextSize + 2, True);
     if TextWidth(Hdr.Text, HF) <= TW then
@@ -1056,7 +1056,7 @@ var
   RowR: TRect;
 begin
   IsHeader := List.Kind[Row] = rkHeader;
-  { the cover of a header (as drawn in DrawRow): Aulumic's group cover popup }
+  { the cover of a header (as drawn in DrawRow): the group's cover viewer }
   if IsHeader and (FGroupMode <> gmFolder) and (not FDemo) and Assigned(FOnCoverClick) then
   begin
     RowR := List.RowRect(Row);

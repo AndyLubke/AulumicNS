@@ -5,13 +5,12 @@ unit AuCoverViewer;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The cover viewer (Aulumic's uPanelCoverArt in its popup; a click on the
-  cover or the album in the banner): the playing album's cover as large as
+  The cover viewer (a click on the cover or the album in the banner): the playing album's cover as large as
   the window allows, and every other image of the album folder (back cover,
   scans) to step through - click / right click, the mouse wheel, the arrow
   keys, Page Up / Down, Home / End. The footer shows the format and which
   image it is. The embedded cover comes first unless the folder has its own
-  front cover (Aulumic's rule). One window; it follows the next album when
+  front cover. One window; it follows the next album when
   it is opened again.
   =============================================================================}
 
@@ -133,7 +132,7 @@ constructor TCoverViewerForm.CreateViewer(AOwner: TComponent);
 var
   W, H: Integer;
 begin
-  { ---> AulumicNS: larger at first (was 720 x 800), then the size it had }
+  { 900 x 940 at first, then the size it had }
   ToolWindowSize(AppSettings.Data.CoverWinW, AppSettings.Data.CoverWinH, 900, 940, W, H);
   CreateAu(AOwner, 'Cover Art', W, H);
   DropIn := VIEWER_DROP_PX;                // comes down from above as it opens
@@ -210,7 +209,7 @@ procedure TCoverViewerForm.Resize;
 begin
   inherited Resize;
   Layout;
-  { ---> AulumicNS: the size for the next time (not a maximized one) }
+  { the size for the next time (not a maximized one) }
   if Showing and (WindowState = wsNormal) then
     SizeToRemember(AppSettings.Data.CoverWinW, AppSettings.Data.CoverWinH);
 end;
@@ -287,7 +286,7 @@ begin
   try
     if P = TOKEN_EMBEDDED then FView.Bitmap := ImageFromBytes(FCover, 2400)
     else if FileExists(LongPath(P)) then FView.Bitmap := ImageFromFile(P, 2400);
-    { ---> AulumicNS: not shown because it is too large? Then say so. }
+    { not shown because it is too large? Then say so. }
     TooLarge := False;
     if FView.Bitmap = nil then
     begin

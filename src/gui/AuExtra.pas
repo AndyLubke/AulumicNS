@@ -5,17 +5,16 @@ unit AuExtra;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Controls added for AulumicNS:
+  Controls of the main window:
   TAuDropButton - a button that looks like a combo box (or a flat text
                   button with a chevron) and opens a menu or popup of the
                   owner (playlist selector, output device, view options)
   TAuPeakMeter  - stereo peak meter whose background can be painted by the
                   owner (the banner gradient), so it repaints on its own
-                  without the banner. ---> AulumicNS: drawn as Aulumic's
-                  (uPeakMeterController, 2026-11-11): a thin frame, fine
+                  without the banner. A thin frame, fine
                   blocks, a colour per block from green over amber to red,
-                  60 dB scale, Aulumic's rise / fall, a red top block after
-                  clipping
+                  60 dB scale, a quick rise and a slow fall, a red top block
+                  after clipping
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -78,7 +77,7 @@ type
     FActive: Boolean;
     FOnPaintBack: TAuPaintBackEvent;
     { what the last paint showed: a new level repaints only when it lights
-      another number of blocks (Aulumic's NeedsRepaint) }
+      another number of blocks (CheckChanged) }
     FShownN: Integer;                   // blocks per bar (0 = not painted)
     FShownLit: array[0..1] of Integer;
     FShownClip: array[0..1] of Boolean;
@@ -93,7 +92,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    { new peaks (linear, 0 .. 1), once per UI read (50 ms): Aulumic's rise
+    { new peaks (linear, 0 .. 1), once per UI read (50 ms): the rise
       (35 % of the way) and fall (at most 7 %) on the 60 dB scale }
     procedure SetLevels(L, R: Single);
     { the engine saw a clipped sample: the top block turns red for 1.5 s }
@@ -259,8 +258,8 @@ begin
   BarW := (Width - 4 - BarGap) div 2;
 end;
 
-{ ---> AulumicNS: repaint only when the picture changes - another number of
-  lit blocks or the clip block (a repaint on every 50 ms read cost about
+{ repaint only when the picture changes - another number of
+  lit blocks or the clip block (a repaint on every 50 ms read costs about
   12 % of a slow core at 4K) }
 procedure TAuPeakMeter.CheckChanged;
 var
@@ -296,7 +295,7 @@ begin
   Invalidate;
 end;
 
-{ a linear peak on Aulumic's meter scale: -60 .. 0 dBFS (log10 / 3 + 1) }
+{ a linear peak on the meter scale: -60 .. 0 dBFS (log10 / 3 + 1) }
 function MeterPos(V: Single): Single;
 begin
   if V <= 0.0001 then Exit(0);
@@ -312,7 +311,7 @@ begin
   V[1] := MeterPos(R);
   for I := 0 to 1 do
   begin
-    { Aulumic's UpdateLevels: up 35 % of the way, down at most 7 % (never
+    { up 35 % of the way, down at most 7 % (never
       below the new value); the floor and the ceiling }
     if V[I] >= FLevel[I] then FLevel[I] := FLevel[I] + (V[I] - FLevel[I]) * 0.35
     else FLevel[I] := Math.Max(V[I], FLevel[I] * 0.93);
@@ -332,8 +331,8 @@ begin
   CheckChanged;
 end;
 
-{ Aulumic's colours (uThemeManager MeterLow / Mid / High) and its gradient
-  table (UpdateColorCache): the lower half low, a blend to mid up to 65 %,
+{ the meter's colours (low / mid / high) and its gradient
+  table: the lower half low, a blend to mid up to 65 %,
   mid to 75 %, a blend to high up to 85 %, high above }
 function MeterColor(Pct: Single): TARGB;
 var
@@ -358,9 +357,9 @@ begin
   else Result := Hi;
 end;
 
-{ ---> AulumicNS: Aulumic's look (PaintTo / DrawPeakBars). A 1 px frame;
+{ A 1 px frame;
   inside it the two bars, only their lit blocks. The blocks are fine at
-  every scaling (Aulumic: 4 px + 2 px gap, unscaled - here about 1.8 +
+  every scaling (about 1.8 +
   0.9 logical px, at least 3 + 1 px), all of the same whole-pixel height,
   stacked from the bottom; each takes its colour from its height
   (MeterColor). After a clipped sample the top block is red. }

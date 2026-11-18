@@ -342,7 +342,7 @@ begin
   Touch('HiddenDir\b.flac');
   Touch('notes.txt');
   Touch('cover.jpg');
-  {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile: Windows-only (so is Aulumic)
+  {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile: Windows-only (so is AulumicNS)
   AssertEquals('Hide a file', 0, FileSetAttr(FRoot + 'hidden.flac', faHidden));
   AssertEquals('System file', 0, FileSetAttr(FRoot + 'system.flac', faSysFile));
   AssertEquals('Hide a folder', 0, FileSetAttr(FRoot + 'HiddenDir', faHidden));
@@ -427,7 +427,7 @@ begin
   finally
     SL.Free;
   end;
-  // ---> AulumicNS: Aulumic's text library imported (the store is library.adb)
+  // The text library imported (the store is library.adb)
   FLib := TLibraryManager.Create(FDir + 'library.adb');
   ImportAulumicDatabase(FLib, FDir + 'Library.db');
 end;
@@ -509,7 +509,7 @@ begin
   AssertEquals('Unknown length', '', T.DurationStr);
 end;
 
-// ---> ADDED: An entry on a network drive whose server does not answer
+// An entry on a network drive whose server does not answer
 // (ADriveAnswers = False): outside the library it is left out and its file is
 // not read (the file here exists and has tags); a library track is kept
 procedure TTestImportTracks.M3UEntryOnADriveThatDoesNotAnswer;

@@ -5,8 +5,8 @@ unit AuGroupList;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  TAuGroupList - owner-drawn list of groups and items for the playlist pane
-  (replaces the VirtualTreeView of Aulumic's playlist). A row is either a
+  TAuGroupList - owner-drawn list of groups and items for the playlist pane.
+  A row is either a
   group header (an album: cover, one or two lines of text) or an item (a
   track). Items of a collapsed group are hidden. The list holds only the row
   structure and an owner value per row; the owner paints the content
@@ -42,7 +42,7 @@ type
   TAuGLRowEvent = procedure(Sender: TObject; Row: Integer) of object;
   TAuGLClickEvent = procedure(Sender: TObject; Row: Integer; X, Y: Integer) of object;
   TAuGLContextEvent = procedure(Sender: TObject; Row: Integer; ScreenPt: TPoint) of object;
-  // ---> AulumicNS: the text type-ahead searches in (OnRowText)
+  // the text type-ahead searches in (OnRowText)
   TAuGLTextEvent = function(Sender: TObject; Row: Integer): string of object;
 
   { TAuGroupList }
@@ -73,7 +73,7 @@ type
     FOnRowClick: TAuGLClickEvent;
     FOnRowContext: TAuGLContextEvent;
     FOnSelChange, FOnTextSizeChange, FOnCollapseChange: TNotifyEvent;
-    // ---> AulumicNS: type-ahead as in TAuTreeView (the letters typed within
+    // type-ahead as in TAuTreeView (the letters typed within
     // 0.9 s; OnRowText gives each row's text)
     FOnRowText: TAuGLTextEvent;
     FTypeText: string;
@@ -117,7 +117,7 @@ type
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure UTF8KeyPress(var UTF8Key: TUTF8Char); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -167,7 +167,7 @@ type
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
     property OnTextSizeChange: TNotifyEvent read FOnTextSizeChange write FOnTextSizeChange;
     property OnCollapseChange: TNotifyEvent read FOnCollapseChange write FOnCollapseChange;
-    // ---> AulumicNS: the text of a row for type-ahead (not set: no type-ahead)
+    // the text of a row for type-ahead (not set: no type-ahead)
     property OnRowText: TAuGLTextEvent read FOnRowText write FOnRowText;
   end;
 
@@ -923,7 +923,7 @@ begin
   Key := 0;
 end;
 
-{ ---> AulumicNS: as TAuTreeView.TypeAhead: the visible row after the focus
+{ as TAuTreeView.TypeAhead: the visible row after the focus
   (a new search) or from it (more letters) whose text starts with the letters
   typed within 0.9 s }
 procedure TAuGroupList.TypeAhead(const Ch: string);
@@ -975,7 +975,7 @@ begin
   FScroll.WheelBy(-Sign(WheelDelta) * FItemH * 3);     // glides; ScrollChanged follows
 end;
 
-{ ---> AulumicNS: touch - the list follows the finger (pixels) }
+{ touch - the list follows the finger (pixels) }
 function TAuGroupList.PanBy(DX, DY: Integer): Boolean;
 begin
   if not FScroll.Visible then Exit(inherited PanBy(DX, DY));

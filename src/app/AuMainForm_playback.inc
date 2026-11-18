@@ -4,7 +4,7 @@
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  AuMainForm_playback.inc - TMainForm: the engine (Aulumic's TPlaybackManager)
+  AuMainForm_playback.inc - TMainForm: the engine (TPlaybackManager)
   and everything that shows or changes playback:
     InitPlayback, UpdateManagerConfig, UiTimerTick, UpdateTimerPace,
     UpdatePosition, UpdateMeter, UpdateEngineStatus, CheckOpeningUI,
@@ -17,7 +17,7 @@
     DevicePick, BannerRate, RatePick, VolumeClick, SeekChange, SeekEnd
   =============================================================================}
 
-{ ---> AulumicNS: what the rate line shows, in one string: a change of any of
+{ what the rate line shows, in one string: a change of any of
   it (a restart with other settings, the next track at another rate) shows
   the line again (UiTimerTick) }
 function SignalKey(const S: TSignalInfo): string;
@@ -56,7 +56,7 @@ begin
   FStatus.StatusText := STATUS_IDLE;
   FUiTimer.Enabled := True;
   AddLog(SafeFormat('%s %s (built %s) started.', [APP_TITLE, GetAppVersion, GetAppBuildDate]), True);
-  { ---> AulumicNS: the resampler's inner loop on this CPU (AVX or SSE2) }
+  { the resampler's inner loop on this CPU (AVX or SSE2) }
   AddLog('Resampler: ' + ResampleSimdName + ', long filters by FFT (the output is the same with each)');
   LogSettingsSummary(AppSettings.Data.Audio);
   MarkLogHead;
@@ -94,14 +94,14 @@ begin
     CheckIncoming;
     CheckOpeningUI;
     CheckStallUI;
-    { ---> AulumicNS: FIX the "busy" cursor (arrow + hourglass) stayed after an
-      error had interrupted the code that resets it (seen after an access
-      violation on a slow NAS): it belongs only to "Opening...", "Waiting for
+    { the "busy" cursor (arrow + hourglass) would stay after an error that
+      interrupts the code that resets it (e.g. an access violation on a
+      slow NAS): it belongs only to "Opening...", "Waiting for
       drive..." and the drive-wait window }
     if (Screen.Cursor = crAppStart) and (FOpeningSince = 0) and (not FStallShown) and
        (not DriveWaitShowing) then
       Screen.Cursor := crDefault;
-    { ---> AulumicNS: the same safety net for the hourglass. Every place that
+    { the same safety net for the hourglass. Every place that
       shows it works on this thread without handling messages and takes it
       away in a finally, so by the time this timer runs none of them is at
       work: an hourglass seen here was left behind (an OldCursor saved while
@@ -142,13 +142,13 @@ begin
       begin
         FLastStatusTick := GetTickCount64;
         UpdateEngineStatus;
-        { ---> AulumicNS: also when what the stream does has changed }
+        { also when what the stream does has changed }
         if (FPlayback.State = psPlaying) and
            ((not FRateShown) or (SignalKey(FPlayback.GetSignalInfo) <> FRateKey)) then
           UpdateRateLine;
       end
-      { ---> AulumicNS: four times a second in between (was: only with the
-        status line, once a second): after a setting that restarts the track
+      { four times a second in between (the status line: once a second):
+        after a setting that restarts the track
         - Play DSD natively, Lock volume, the output - the rate line, the
         volume icon and the Tone Control follow within a quarter of a second }
       else if (FPlayback.State = psPlaying) and (GetTickCount64 - FKeyTick >= 250) then
@@ -211,13 +211,12 @@ end;
 { The audio thread measures the peak of every 20 ms of output (meter slices)
   when it hands the audio to the device: in bursts of a buffer, about one
   buffer ahead of what is heard. The slices wait in a FIFO and are shown at
-  the pace of real time, as in Aulumic (TPeakMeterState.ProcessMeterSlices):
+  the pace of real time:
   each tick takes the slices due since the last one (elapsed time / 20 ms)
   and shows their peak; with none due, the last value stays. So the meter
   moves with the music, about in step with the sound.
-  ---> AulumicNS (test list 2: "a bit too jumpy"): before, every slice beyond
-  one buffer was shown at once and the ticks in between showed 0 - the meter
-  jumped up with every burst and fell back in between. }
+  Showing every slice at once, and 0 in the ticks in between, would make the
+  meter jump up with every burst and fall back in between. }
 procedure TMainForm.UpdateMeter;
 const
   FIFO_MAX_BACKLOG = 75;     // 1.5 s: the display fell behind (e.g. after a stall)
@@ -306,7 +305,7 @@ begin
     end;
     FBanner.Meter.Active := True;
     FBanner.Meter.SetLevels(FMeterLastL, FMeterLastR);
-    FBanner.Meter.SetClip(CL, CR);           // ---> AulumicNS: the red top block (as Aulumic)
+    FBanner.Meter.SetClip(CL, CR);           // the red top block
   end
   else if FPlayback.State = psPaused then
   begin
@@ -324,7 +323,7 @@ begin
   end;
 end;
 
-{ the status line during playback (Aulumic's TAGFMT_STATUS_ENGINE):
+{ the status line during playback:
   [resampling phase | ][gain | ]Buffer: n ms | CPU: x % }
 procedure TMainForm.UpdateEngineStatus;
 var
@@ -409,7 +408,7 @@ begin
   if (FStallSince = 0) or (P <> FStallProgress) then
   begin
     if FStallShown then EndStallUI(True);
-    { ---> AulumicNS: the track moves on: its drive delivers, so a click on a
+    { the track moves on: its drive delivers, so a click on a
       cover of the same drive needs no "is it awake?" check (WakeDrives) }
     if FStallSince <> 0 then NoteDriveAnswered(FPlayingPath);
     FStallProgress := P;
@@ -509,7 +508,7 @@ begin
     Exit;
   end;
   M := FCurrentMeta;
-  { ---> AulumicNS: another track: the banner fades over to it }
+  { another track: the banner fades over to it }
   if FBanner.Title <> M.Title then Before := SnapshotControls(FBanner) else Before := nil;
   FBanner.Playing := True;
   FBanner.Title := M.Title;
@@ -575,11 +574,11 @@ begin
 end;
 
 { the rate line of the banner and the bit-perfect badge
-  ---> AulumicNS: from what the engine really does (the snapshot of the signal
-  path), no longer from the settings when the track started: they change
+  from what the engine really does (the snapshot of the signal
+  path), not from the settings when the track started: they change
   while it plays (the output, "Play DSD natively", resampling DSD), and a
-  restart sends no track change. A stale DoP flag read the 88.2 kHz of DSD64
-  converted to PCM as "DSD32". }
+  restart sends no track change. A stale DoP flag would read the 88.2 kHz of
+  DSD64 converted to PCM as "DSD32". }
 procedure TMainForm.UpdateRateLine;
 var
   Si: TSignalInfo;
@@ -587,11 +586,11 @@ var
   Stale: Boolean;
 begin
   Si := FPlayback.GetSignalInfo;
-  { ---> AulumicNS: right after a track change the engine may still describe
+  { right after a track change the engine may still describe
     the stream of the track before (the device is reopened for another rate
-    or for DSD). Taken as the new track's, a PCM track after DSD showed the
-    volume as fixed - and played at 100 % - and DSD after PCM did not, until
-    something else updated the volume icon. Such a snapshot is not shown: the
+    or for DSD). Taken as the new track's, a PCM track after DSD would show
+    the volume as fixed - and play at 100 % - and DSD after PCM would not, until
+    something else updates the volume icon. Such a snapshot is not shown: the
     timer asks again at once (FRateShown stays False). After 3 s whatever the
     engine says counts (a file whose tags give another rate than its audio). }
   Stale := Si.Valid and (GetTickCount64 - FTrackTick < 3000) and
@@ -610,9 +609,9 @@ begin
     Exit;
   end;
   { the rate menu and the tone control's note follow the stream as well }
-  { ---> AulumicNS: everything on the main window that depends on "DSD goes
+  { everything on the main window that depends on "DSD goes
     out as DSD" follows together: the Tone Control and its button, and the
-    volume (fixed at 100 % or not; before, only the tone control followed) }
+    volume (fixed at 100 % or not) }
   if FIsCurrentDoP <> (Si.DoP or Si.NativeDsd) then
   begin
     FIsCurrentDoP := Si.DoP or Si.NativeDsd;
@@ -739,10 +738,10 @@ begin
       It.Checked := (AppSettings.Data.OutputApi = 0) and SameText(Id, AppSettings.Data.WasapiDeviceID);
       if SameText(Id, AppSettings.Data.WasapiDeviceID) then ChosenListed := True;
     end;
-    { ---> AulumicNS: the chosen WASAPI device also when Windows does not list
+    { the chosen WASAPI device also when Windows does not list
       it as active, as Preferences does: during native DSD over ASIO the DAC's
-      WASAPI device is gone (on the user's NUC the menu had no WASAPI entry
-      then, so there was no way back). Picking it stops ASIO; the new stream
+      WASAPI device is gone (without this entry the menu could have no WASAPI
+      device then, and no way back). Picking it stops ASIO; the new stream
       waits for the device to come back (TPlayThreadConfig.SettleMs). }
     Id := AppSettings.Data.WasapiDeviceID;
     if (not ChosenListed) and (Id <> '') then
@@ -906,10 +905,10 @@ procedure TMainForm.VolumeClick(Sender: TObject);
 var
   Txt: string;
 begin
-  { ---> AulumicNS: a popup frees itself when it closes (TAuPopup: caFree);
-    VolumePopupClosed forgets it then. Before, FVolPopup kept pointing at
-    the freed popup and the next click used it: an access violation as soon
-    as its memory had been reused (seen on the NUC, 2026-11-11). }
+  { a popup frees itself when it closes (TAuPopup: caFree);
+    VolumePopupClosed forgets it then. Otherwise FVolPopup would keep
+    pointing at the freed popup and the next click would use it: an access
+    violation as soon as its memory has been reused. }
   if FVolPopup = nil then
   begin
     FVolPopup := TVolumePopup.CreateVolume(Self);
@@ -946,8 +945,8 @@ var
   A: TManagerConfig;
 begin
   A := AppSettings.Data.Audio;
-  { ---> AulumicNS: not lit while DSD goes out as DSD (it does not apply), and
-    the Tone Control window follows (Aulumic: SetDSDMode) }
+  { not lit while DSD goes out as DSD (it does not apply), and
+    the Tone Control window follows }
   FTransport.BtnTone.Active := (not A.ToneDirect) and (not FIsCurrentDoP) and
     ((A.ToneBassDB <> 0) or (A.ToneLowMidDB <> 0) or (A.ToneMidDB <> 0) or (A.ToneHighMidDB <> 0) or
      (A.ToneTrebleDB <> 0));
@@ -955,7 +954,7 @@ begin
   UpdateToneHeadroom;
 end;
 
-{ ---> AulumicNS: the Tone Control shows what the automatic headroom takes off
+{ the Tone Control shows what the automatic headroom takes off
   at the moment (a boost raises the peaks, so the level comes down): from the
   play thread's snapshot, four times a second while the window is open }
 procedure TMainForm.UpdateToneHeadroom;
@@ -1070,7 +1069,7 @@ end;
 
 procedure TMainForm.ManagerTrackChange(const Item: TQueueItem; const Meta: TAudioMetadata);
 begin
-  { the track before counts as played (30 s or half of it, Aulumic) }
+  { the track before counts as played (30 s or half of it) }
   CommitPlay;
   FCurrentMeta := Meta;
   FPlayingPath := Item.FilePath;
@@ -1086,8 +1085,7 @@ begin
   FIsCurrentDsdToPcm := FIsCurrentDsd and not AppSettings.Data.Audio.UseDoP;
   FTrackTick := GetTickCount64;
   FPl.PlayingEntry := FPl.IndexOfId(Item.TrackId);
-  { ---> AulumicNS (the user, 2026-11-17; Aulumic: FocusLastPlayedTrack at
-    every track change): the selection goes with the track, and the track
+  { the selection goes with the track, and the track
     comes into view - only in the playlist that plays, and only when
     "Cursor follows playback" is on (Preferences > Playlists) }
   if AppSettings.Data.CursorFollowsPlayback and SameText(FShownPl, FPlayingPl) and
@@ -1164,8 +1162,7 @@ begin
   UpdateTimerPace;
 end;
 
-{ the DAC refused the sample rate: offer to resample (as Aulumic's sample
-  rate fallback dialog) }
+{ the DAC refused the sample rate: offer to resample }
 procedure TMainForm.ManagerSampleRateError(AttemptedRate: Integer; AIsDSD: Boolean);
 var
   F: TAuForm;

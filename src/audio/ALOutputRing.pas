@@ -8,10 +8,10 @@ unit ALOutputRing;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: the ring between the play thread and a device that pulls
+  The ring between the play thread and a device that pulls
   whole periods on its own thread (the ASIO driver's bufferSwitch; the
-  simulated driver of Tools\AudioSim). Taken out of TAsioOutput, so the
-  simulation runs the same code.
+  simulated driver of Tools\AudioSim). A unit of its own, so the
+  simulation runs the same code as TAsioOutput.
 
   The play thread waits for room for one period (WaitForSpace), fills a
   period and puts it in (Put); the device thread takes one period per call
@@ -20,9 +20,9 @@ unit ALOutputRing;
   is closed in the middle of the music (a manual switch, Stop).
 
   RingPeriodsFor sizes the ring by time: the buffer of the settings (about
-  BufferMs, at least 3 periods). Three periods alone were too few: ASIO
+  BufferMs, at least 3 periods). Three periods alone are too few: ASIO
   drivers keep their period in samples, so at 352.8 kHz three periods of 512
-  samples hold 4.4 ms - every stall of the play thread longer than that was a
+  samples hold 4.4 ms - every stall of the play thread longer than that is a
   dropout (at 44.1 kHz the same ring holds 35 ms).
   ============================================================================}
 

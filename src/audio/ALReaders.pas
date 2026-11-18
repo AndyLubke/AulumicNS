@@ -10,15 +10,14 @@ unit ALReaders;
   Used by the AudioEngine to read FLAC, WAV, DSF and DFF files: the audio
   sources of the play thread, among them DSD as DoP (TDsfSource) and DSD
   converted to PCM (TDsdToPcmSource).
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic (file
-  names are UTF-8).
+  File names are UTF-8.
 ==============================================================================}
 
 interface
 
 uses
   Classes, SysUtils, Math, ALReaderWAV, ALReaderFLAC, ALReaderDSF, 
-  AuResample,      // ---> AulumicNS: the built-in resampler (was libsoxr)
+  AuResample,      // the built-in resampler
   ALAudioTypes;
 
 type
@@ -118,16 +117,16 @@ type
     FGainLinear: double;
     FFadeInSamples: integer;
     FApplyLPF: Boolean;
-    // ---> ADDED: From the output rate (constructor): the DC blocker's pole
+    // From the output rate (constructor): the DC blocker's pole
     // and the fade-in length, so both act the same at every DSD rate
     FDcPole: double;
     FFadeLength: integer;
     FInvFadeLength: double;
 
     // 256 bytes (2048 bits/taps) for DSD64/128/256/512 support
-    // ---> AulumicNS: as a ring written twice (at P and P + 256), so the
+    // As a ring written twice (at P and P + 256), so the
     // window - FHistL[FHistPos] .. FHistL[FHistPos + 255], oldest first - is
-    // always in one piece (was: both windows moved by 4 bytes per sample)
+    // always in one piece (nothing is moved per sample)
     FHistL: array[0..511] of byte;
     FHistR: array[0..511] of byte;
     FHistPos: integer;
@@ -136,7 +135,7 @@ type
     FLastInL, FLastInR: double;
     FDcOutL, FDcOutR: double;
 
-    // ---> AulumicNS: the output is the DSD rate / (32 x FDecim) (1, 2, 4, 8;
+    // The output is the DSD rate / (32 x FDecim) (1, 2, 4, 8;
     // SetOutputRate)
     FDecim: integer;
 
@@ -145,7 +144,7 @@ type
   public
     constructor Create(const FileName: string; GaindB: Integer; ApplyLPF: Boolean);
     destructor Destroy; override;
-    { ---> AulumicNS: decimates straight to ARate (the DSD rate / 64, / 128
+    { Decimates straight to ARate (the DSD rate / 64, / 128
       or / 256) when the DSD filter alone keeps it free of aliasing; then no
       resampler is needed after it (DSD512 -> 352.8 kHz: one filter instead
       of two, about three times less work). False: unchanged (DSD rate / 32).
@@ -173,14 +172,14 @@ type
   TResamplerSource = class(TAudioSource)
   private
     FBaseSource: TAudioSource;
-    // ---> AulumicNS: the built-in converter (AuResample) instead of a soxr state
+    // The built-in converter (AuResample)
     FSoxrState: TAuStreamResampler;
     FInputBufferFloat: array of double;
     FOutputBufferFloat: array of double;
     FInternalBufferInt: array of byte;
     FLeftoverBuffer: array of double;
     FLeftoverCount: integer;
-    // ---> AulumicNS: the converter got its Flush at the end of the file
+    // The converter got its Flush at the end of the file
     // (its FFT stages compute their last block then)
     FEndFlushed: Boolean;
     FRatio: double;
@@ -233,7 +232,7 @@ type
     function GetDoPMarker: byte; override;
     procedure SetDoPMarker(Value: byte); override;
     function FindLayer(AClass: TClass): TAudioSource; override;
-    // ---> ADDED: Bit depth of the wrapped source (before the conversion)
+    // Bit depth of the wrapped source (before the conversion)
     function GetSourceBitsPerSample: word;
   end;
 
@@ -264,15 +263,15 @@ type
   end;
 
 const
-  // ---> ADDED: DSD-to-PCM (TDsdToPcmSource), the same at every DSD rate
+  // DSD-to-PCM (TDsdToPcmSource), the same at every DSD rate
   DSD_DC_BLOCK_HZ = 2.0;   // the DC blocker's -3 dB point
   DSD_FADE_IN_MS  = 100;   // anti-pop fade-in after start / seek
 
-// ---> ADDED: For TDsdToPcmSource's PCM output rate AOutRate: the pole of its
+// For TDsdToPcmSource's PCM output rate AOutRate: the pole of its
 // first-order DC blocker, so that its -3 dB point is DSD_DC_BLOCK_HZ at every
-// DSD rate (the fixed pole 0.9995 doubled it with every DSD rate: 7 Hz at
-// DSD64, 28 Hz at DSD256, audible as weaker deep bass), and the fade-in length
-// in samples (DSD_FADE_IN_MS; was a fixed 8820 samples = 25 ms at DSD256)
+// DSD rate (a fixed pole of 0.9995 would double it with every DSD rate: 7 Hz
+// at DSD64, 28 Hz at DSD256, audible as weaker deep bass), and the fade-in
+// length in samples (DSD_FADE_IN_MS at every rate)
 function DsdDcBlockPole(AOutRate: Cardinal): Double;
 function DsdFadeInSamples(AOutRate: Cardinal): Integer;
 
@@ -284,7 +283,6 @@ uses
 const
   // ===========================================================================
   // PCM Integer & Floating-Point Rails / Scale Factors
-  // ---> AUDIT FIX: Removed unused PCM16_MAX_INT and PCM16_MIN_INT constants
   // ===========================================================================
   PCM16_MAX_FLT       = 32767.0;
   PCM16_MIN_FLT       = -32768.0;
@@ -327,14 +325,14 @@ const
 
 
   DSD_IN_CHUNK_FRAMES   = 8192;             // 8,192 frames * 12 B = 96 KB L2 chunk
-  // ---> CHANGED: The fade-in length and the DC blocker pole come from the
+  // The fade-in length and the DC blocker pole come from the
   // output rate (DsdFadeInSamples, DsdDcBlockPole; DSD_FADE_IN_MS / DSD_DC_BLOCK_HZ)
   DSD_LPF_CUTOFF_HZ     = 30000.0;          // 30 kHz ultrasonic low-pass cutoff
   DSD_DEFAULT_RAW_RATE  = 2822400.0;        // DSD64 raw bit rate (64 * 44.1 kHz)
   DSD_FALLBACK_PCM_RATE = 88200;
 
   // ===========================================================================
-  // Resampler (libSoXR) & Converter Buffer Constants
+  // Resampler & Converter Buffer Constants
   // ===========================================================================
   RESAMP_IN_BUF_SAMPLES  = 16384;
   RESAMP_OUT_BUF_SAMPLES = 65536;
@@ -466,7 +464,7 @@ end;
 
 procedure TWavSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FReader.Seek(EnsureRange(Percent, 0.0, 1.0));
 end;
 
@@ -525,7 +523,7 @@ end;
 
 procedure TFlacSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FReader.Seek(EnsureRange(Percent, 0.0, 1.0));
 end;
 
@@ -591,7 +589,7 @@ end;
 
 procedure TDsfSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FReader.Seek(EnsureRange(Percent, 0.0, 1.0));
 end;
 
@@ -640,11 +638,11 @@ end;
 
 { TDsdToPcmSource }
 
-{ ---> AulumicNS: the 2048-tap FIR of both channels from the byte lookup
+{ The 2048-tap FIR of both channels from the byte lookup
   table: ARows = FLookupFIR[0, 0] (256 rows of 256 doubles), AL / AR = the
   256-byte windows, oldest first. On its own, so the compiler keeps the
-  pointers and sums in registers (in ReadData it reloaded Self and the row
-  offset for every byte). Four partial sums per channel (byte J goes to sum
+  pointers and sums in registers (inside ReadData it would reload Self and
+  the row offset for every byte). Four partial sums per channel (byte J goes to sum
   J mod 4) break the chain of 256 dependent additions: about twice as fast.
   The result differs from one running sum only in the last bits of a double
   (rarely +-1 in the 32-bit output, about -186 dBFS). }
@@ -679,7 +677,7 @@ begin
   FDecim  := 1;
   FSource := TDsfSource.Create(FileName);
 
-  // ---> AUDIT FIX 2.2 & 2.3: Validate DSF DoP rate and stereo channel count
+  // Validate DSF DoP rate and stereo channel count
   // BEFORE building the FIR lookup table! If this raises, TDsdToPcmSource.Destroy
   // automatically frees FSource.
   // Accept both the 44.1 kHz family (DSD64 = 176,400 Hz DoP) and the
@@ -721,8 +719,8 @@ begin
   FGainLinear := Power(10.0, GainDB / 20.0);
 end;
 
-{ ---> ADDED: The same DC blocker corner and fade-in time at every DSD rate
-  (---> AulumicNS: also after SetOutputRate) }
+{ The same DC blocker corner and fade-in time at every DSD rate
+  (also after SetOutputRate) }
 procedure TDsdToPcmSource.InitRateDependent;
 begin
   FDcPole        := DsdDcBlockPole(GetSampleRate);
@@ -770,7 +768,7 @@ begin
   if Assigned(Previous) then
   begin
     Prev := TDsdToPcmSource(Previous.FindLayer(TDsdToPcmSource));
-    // ---> AulumicNS: the window holds DSD bytes: only from a stream of the
+    // The window holds DSD bytes: only from a stream of the
     // same DSD rate and decimation (another one starts with its fade-in)
     if Assigned(Prev) and (Prev.FDecim = Self.FDecim) and Assigned(Prev.FSource) and
        (Prev.FSource.GetSampleRate = Self.FSource.GetSampleRate) then
@@ -803,7 +801,7 @@ begin
   else
     fc := (GetSampleRate * 0.45) / RawDsdRate;
 
-  // ---> AUDIT FIX 2.2: Ensure fc is strictly positive so sumH can never be 0.0
+  // Ensure fc is strictly positive so sumH can never be 0.0
   if fc <= 0.0 then
     fc := DSD_LPF_CUTOFF_HZ / DSD_DEFAULT_RAW_RATE;
 
@@ -881,7 +879,7 @@ end;
 
 procedure TDsdToPcmSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FSource.Seek(EnsureRange(Percent, 0.0, 1.0));
   FillChar(FHistL, SizeOf(FHistL), 0);
   FillChar(FHistR, SizeOf(FHistR), 0);
@@ -910,7 +908,7 @@ begin
     Exit(0);
 
   // Process in fixed chunks that fit inside FInputBuffer (Zero SetLength)
-  // ---> AulumicNS: 2 x FDecim DoP frames (12 x FDecim bytes) per output sample
+  // 2 x FDecim DoP frames (12 x FDecim bytes) per output sample
   InBytesPerOut   := DOP_DECIMATE_IN_BYTES * FDecim;
   MaxChunkSamples := Length(FInputBuffer) div InBytesPerOut;
   if MaxChunkSamples <= 0 then
@@ -939,7 +937,7 @@ begin
 
     for I := 0 to SamplesRead - 1 do
     begin
-      // ---> AulumicNS: the new DSD bytes of this sample into the ring (per
+      // The new DSD bytes of this sample into the ring (per
       // DoP frame and channel the high byte is the earlier one); the window
       // is then the newest 256 bytes (2048 bits), oldest first
       for N := 1 to 2 * FDecim do
@@ -1123,8 +1121,8 @@ begin
   end;
 end;
 
-// ---> AulumicNS: the built-in converter (AuResample) with the same settings
-// as libsoxr had: precision from the quality, the phase response for up- or
+// The built-in converter (AuResample) with the settings libsoxr
+// knows: precision from the quality, the phase response for up- or
 // downsampling, the pass band end (bandwidth) and the stop band start
 // (anti-aliasing).
 procedure TResamplerSource.CreateSoxrState;
@@ -1179,10 +1177,10 @@ end;
 procedure TResamplerSource.Seek(Percent: double);
 begin
   if Assigned(FBaseSource) then
-    // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+    // Clamp seek range to 0.0..1.0
     FBaseSource.Seek(EnsureRange(Percent, 0.0, 1.0));
 
-  // ---> AulumicNS: the converter starts again (the designed filter is kept
+  // The converter starts again (the designed filter is kept
   // in the cache, so this costs nothing)
   if FSoxrState <> nil then
     FSoxrState.Reset
@@ -1216,7 +1214,7 @@ begin
   if len <= 0 then
     Exit(0);
 
-  // ---> AUDIT FIX 2.1: If FSoxrState is nil, return 0 (EOF) rather than
+  // If FSoxrState is nil, return 0 (EOF) rather than
   // feeding mismatched sample rate / bit depth bytes into the WASAPI buffer.
   if FSoxrState = nil then
     Exit(0);
@@ -1258,7 +1256,7 @@ begin
     if MaxReadFrames < 0 then
       MaxReadFrames := 0;
 
-    // ---> AUDIT FIX 2.7: Clamp Int64 Trunc before narrowing to Integer
+    // Clamp Int64 Trunc before narrowing to Integer
     SamplesNeeded := EnsureRange(Trunc(TargetFramesOut / FRatio), 0, MaxReadFrames) +
                      SOXR_LOOKAHEAD_FRAMES - FLeftoverCount;
     if SamplesNeeded > MaxReadFrames then
@@ -1276,7 +1274,7 @@ begin
 
     if FileHitEOF and (FLeftoverCount = 0) then
     begin
-      // ---> AulumicNS: all input is in: the converter's FFT stages compute
+      // All input is in: the converter's FFT stages compute
       // their last (shorter) block; what it gives is taken below like any
       // output (input 0). A gapless next track continues the converter.
       if not FEndFlushed then
@@ -1511,7 +1509,7 @@ end;
 
 procedure TBitDepthConverterSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FBaseSource.Seek(EnsureRange(Percent, 0.0, 1.0));
 end;
 
@@ -1808,7 +1806,7 @@ end;
 
 procedure TMonoToStereoSource.Seek(Percent: double);
 begin
-  // ---> AUDIT FIX 2.7: Clamp seek range to 0.0..1.0
+  // Clamp seek range to 0.0..1.0
   FBaseSource.Seek(EnsureRange(Percent, 0.0, 1.0));
 end;
 

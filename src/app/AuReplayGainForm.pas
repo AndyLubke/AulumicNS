@@ -5,7 +5,7 @@ unit AuReplayGainForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The ReplayGain scanner window (Aulumic's uFormReplayGain): Main menu >
+  The ReplayGain scanner window: Main menu >
   Tools > Calculate ReplayGain (the whole library), the library menu (the
   selection - each album completed with its other tracks), the status line
   while a hidden scan runs.
@@ -14,7 +14,7 @@ unit AuReplayGainForm;
        it running (the status line shows it), Stop ends it after the track
     3. the results: every track with its gains and peaks or why it was not
        measured; Save All hands the measured ones to the metadata custodian
-  The loudness is measured by the built-in EBU R128 meter (no libebur128).
+  The loudness is measured by the built-in EBU R128 meter (AuLoudness).
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -116,7 +116,7 @@ begin
   Result := Format('%.6f', [V], FS);
 end;
 
-{ Aulumic's PromptScanScope }
+{ asks what to scan: missing only or all }
 function PromptScanScope(ATracks, AAlbums, AMissing: Integer; out AForce: Boolean): Boolean;
 var
   R: TModalResult;
@@ -438,7 +438,7 @@ begin
   FStats.Caption := '';
   FBtnStop.Enabled := True;
   FThread := TReplayGainThread.Create(AGroups, AForce, FLibrary);
-  { ---> AulumicNS: Preferences > Advanced > ReplayGain scan }
+  { Preferences > Volume > ReplayGain scan }
   FThread.ThreadCount := AppSettings.Data.RGScanThreads;
   FThread.OnProgress := @ShowProgress;
   FThread.OnResults := @TakeResults;

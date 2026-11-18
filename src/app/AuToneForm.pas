@@ -5,20 +5,20 @@ unit AuToneForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The tone control window: five bands (bass, low mid, mid, high mid, treble;
-  three - bass, mid, treble - until 2026-11-14), each with a selectable
-  frequency and a vertical slider (-10 .. +10 dB in 0.1 dB steps); Aulumic's
-  "semi Baxandall" tone control with two bands more. Changes apply at
+  The tone control window: five bands (bass, low mid, mid, high mid,
+  treble), each with a selectable frequency and a vertical slider
+  (-10 .. +10 dB in 0.1 dB steps); a "semi Baxandall" tone control with
+  three bands between the two shelves. Changes apply at
   once (OnChange); Enabled off, or all bands at 0 dB, keeps the playback
   bit-perfect. Above the bands: the curve of all bands together
   (TAuToneCurve), from the coefficients the engine uses, and a line that
   says how much the automatic headroom lowered the level (SetHeadroom).
-  ---> AulumicNS: from Aulos, for Aulumic's engine: the values are a
-  TToneState (ALAudioTypes; DirectMode = disabled, gains in tenths of a dB).
+  The values are a TToneState (ALAudioTypes; DirectMode = disabled, gains
+  in tenths of a dB).
 
   Slider keys: Up / Down 0.5 dB (Ctrl 0.1 dB), Page Up / Down 2 dB,
   Home or a double click = 0 dB; the mouse wheel moves 0.5 dB. The steps
-  and a mouse drag land on the 0.5 dB grid (Ctrl: 0.1 dB), as in Aulumic.
+  and a mouse drag land on the 0.5 dB grid (Ctrl: 0.1 dB).
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -64,7 +64,7 @@ type
     procedure DblClick; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function GesturePan: Integer; override;   // ---> AulumicNS: a touch drag moves the knob
+    function GesturePan: Integer; override;   // a touch drag moves the knob
   public
     constructor Create(AOwner: TComponent); override;
     property Value: Integer read FValue write SetValue;
@@ -121,7 +121,7 @@ type
     procedure SetValues(const C: TToneState);
     function Values: TToneState;
     { a DSD stream sent as DSD (DoP / native): the tone control cannot apply.
-      As in Aulumic (SetDSDMode): the title says so, the switch, the sliders
+      The title says so, the switch, the sliders
       and the frequencies are disabled; the settings stay as they are for PCM }
     procedure SetDsdNote(Dsd: Boolean);
     { the sample rate the stream goes out at: the curve is drawn for it }
@@ -192,9 +192,8 @@ begin
   Result := Round(ToneMaxDb - (Y - TrackTop) / Max(1, TrackBottom - TrackTop) * 2 * ToneMaxDb);
 end;
 
-{ ---> AulumicNS (the user's test list 2): as in Aulumic, steps land on the
-  0.5 dB grid (Value + Step, then rounded to it), so the keys and the wheel
-  always reach 0 dB; Ctrl keeps the 0.1 dB steps }
+{ Steps land on the 0.5 dB grid (Value + Step, then rounded to it), so the
+  keys and the wheel always reach 0 dB; Ctrl keeps the 0.1 dB steps }
 function OnGrid(Tenths: Integer): Integer;
 begin
   Result := Round(Tenths / 5) * 5;

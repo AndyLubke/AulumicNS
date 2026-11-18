@@ -9,8 +9,9 @@ unit TestPlaylistPane;
 
   The playlist pane's texts (TPlaylistPane.BuildTexts): the library's date
   added and the play statistics are looked up only when a format shows them,
-  and then once per track (it was twice per track on every rebuild, used or
-  not - the larger part of the time an edit of a very large playlist took).
+  and then once per track (a lookup per track on every rebuild, used or
+  not, would be the larger part of the time an edit of a very large
+  playlist takes).
   A format with %added% must still show the date.
   FollowEntry ("Cursor follows playback"): the selection moves to the track
   that starts, and the list scrolls to it only when it was out of sight.

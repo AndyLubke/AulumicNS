@@ -9,10 +9,9 @@ unit uVersionHelper;
 
   Loads the .exe's version info (Project Options > Version Info in Lazarus:
   the numbers and strings of AulumicNS.lpi).
-  ---> AulumicNS: ported from Aulumic. GetAppBuildDate is the time the program
-  file was written, not the compile time of this unit: the DATE macro only
-  changes when this unit itself is compiled again, so a build that left it
-  alone showed an old date. New: GetCompilerInfo.
+  GetAppBuildDate is the time the program file was written, not the compile
+  time of this unit: the DATE macro only changes when this unit itself is
+  compiled again, so a build that leaves it alone would show an old date.
   =============================================================================}
 
 interface
@@ -31,7 +30,7 @@ function GetAppComments     : string;
 
 function GetAllVersionInfo: string;
 
-// ---> AulumicNS: 'Lazarus 4.8, Free Pascal 3.2.2, x86_64-win64'
+// For example 'Lazarus 4.8, Free Pascal 3.2.2, x86_64-win64'
 function GetCompilerInfo: string;
 
 implementation
@@ -40,7 +39,7 @@ uses
   LCLVersion, uAppConsts;
 
 // =========================================================================
-// ---> Private global variables to cache the strings in memory
+// Private global variables to cache the strings in memory
 // =========================================================================
 var
   FCachedAppVersion     : string  = '';
@@ -92,8 +91,8 @@ begin
     FileVerInfo.Free;
   end;
 
-  // Fallbacks (---> AulumicNS: a program without version info says so; it
-  // showed a made-up '1.0.0.0')
+  // Fallbacks (a program without version info says so, it shows no made-up
+  // number)
   if FCachedAppVersion = '' then
     FCachedAppVersion := 'unknown';
 
@@ -126,7 +125,7 @@ function GetAppBuildDate: string;
 var
   Age: TDateTime;
 begin
-  // ---> AulumicNS: when the program file was written (see the unit header)
+  // When the program file was written (see the unit header)
   if FileAge(AppExePath, Age) then
     Result := FormatDateTime('yyyy-mm-dd hh:nn', Age)
   else

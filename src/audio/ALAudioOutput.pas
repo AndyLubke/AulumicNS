@@ -14,13 +14,12 @@ unit ALAudioOutput;
   TAsioOutput (ALOutputAsio), the memory output of the tests and the
   simulated devices of Tools\AudioSim.
 
-  ---> CHANGED (step 2b): Open finds the device, chooses the format and
+  Open finds the device, chooses the format and
   starts the stream; it reports a failure by kind (TOutputOpenResult). The
   waits and retries for each kind are the play thread's (TPlayThread.
   RunOutput), the same for every output.
 
-  ---> CHANGED (ObjFPC switch, step 1): ObjFPC like the rest of Aulumic: the
-  device id and the error text are UTF-8 strings.
+  The device id and the error text are UTF-8 strings.
   ============================================================================}
 
 interface
@@ -35,10 +34,10 @@ type
     BlockAlign : Word;   // bytes per frame (all channels)
   end;
 
-  // ---> ADDED (step 2b): Open's answer. The play thread decides by the kind:
+  // Open's answer. The play thread decides by the kind:
   // waits for a device that is not there yet (during a recovery), retries a
   // device in use, reports a format the device does not take. The two "lost"
-  // kinds are handled differently (as before the split): lost while checking
+  // kinds are handled differently: lost while checking
   // the formats is retried only during a recovery; lost while starting the
   // stream is also retried three times like a device in use.
   TOutputOpenResult = (
@@ -57,7 +56,7 @@ type
     owBufferReady,  // the device wants the next buffer
     owStop,         // the stop event was set
     owTimeout,      // nothing within the time (a device that stopped asking)
-    owFailed        // the wait itself failed (ignored, as before the split)
+    owFailed        // the wait itself failed (ignored)
   );
 
   { TAudioOutput: an open output stream. Every buffer is BufferBytes long and
@@ -65,13 +64,13 @@ type
     by the play thread. }
   TAudioOutput = class
   public
-    // ---> ADDED (step 2b): Opens ADeviceId ('' = the default device; never
+    // Opens ADeviceId ('' = the default device; never
     // another one) for ARate / AChannels with the best bit depth it takes
     // (DoP: at least 24 bits) and a buffer of about ABufferMs, and prepares
     // the stream (not started). Not oorOK: AError = the device's error code
     // (for the log), AErrorText = the message for oorFormatUnsupported /
     // oorFailed (the message of EAudioEngineError). Closes a stream that is
-    // still open first. ---> CHANGED (ObjFPC switch): both strings are UTF-8.
+    // still open first. Both strings are UTF-8.
     function Open(const ADeviceId: string; ARate: Cardinal; AChannels: Word;
       AIsDoP: Boolean; ABufferMs: Integer; out AError: HRESULT;
       out AErrorText: string): TOutputOpenResult; virtual; abstract;
@@ -97,43 +96,43 @@ type
     // Stops the stream and releases the device; safe to call more than once
     procedure Close; virtual; abstract;
 
-    // ---> AulumicNS: buffers the play thread fills before Start (WASAPI 1;
+    // Buffers the play thread fills before Start (WASAPI 1;
     // a ring - ASIO - a few, so the device does not start on one period).
     // They are got and released one after another, without WaitForBuffer.
     function PrefillBuffers: Integer; virtual;
-    // ---> AulumicNS: True = at the end of the stream the play thread hands
+    // True = at the end of the stream the play thread hands
     // over one buffer of silence before Drain (WASAPI plays a buffer it was
     // not given as whatever it still holds)
     function DrainTail: Boolean; virtual;
-    // ---> AulumicNS: waits until what was handed over has played, or
+    // Waits until what was handed over has played, or
     // AStopEvent: before Close at the end of the stream and before a reopen at
-    // another rate (they cut the last buffers before)
+    // another rate (without it they would cut the last buffers)
     procedure Drain(AStopEvent: THandle); virtual;
-    // ---> AulumicNS: before a Close in the middle of the music (a manual
+    // Before a Close in the middle of the music (a manual
     // switch to a track of another rate, Stop): the sound goes down to nothing
     // over a few milliseconds, where the output can do that at once (ASIO, PCM;
     // see TPeriodFade). The default does nothing.
     procedure FadeOut; virtual;
-    // ---> AulumicNS: diagnostics for the log (TPlayThread.RunOutput): the
+    // Diagnostics for the log (TPlayThread.RunOutput): the
     // times the device found no buffer ready since Open (a dropout; ASIO:
     // counted by the ring, WASAPI: a buffer released after it should have
     // started playing) and the least audio that was ready ahead in ms.
     // -1 = the output cannot tell (the default; the test program's output).
     function DropoutCount: Integer; virtual;
     function LeastBufferedMs: Integer; virtual;
-    // ---> AulumicNS: the audio the open stream holds ahead in ms (WASAPI:
+    // The audio the open stream holds ahead in ms (WASAPI:
     // its buffer, which Open may have made shorter than asked; ASIO: the
     // ring). -1 = not known.
     function BufferedMs: Integer; virtual;
   end;
 
-  // ---> ADDED (output split, step 3a): Makes the output the play thread opens
+  // Makes the output the play thread opens
   // (TPlayThread.OutputFactory). Called on the play thread for each open (a
   // rate switch or a recovery opens a new one); the play thread frees it.
   // Not set = TWasapiOutput. The test program sets it to a memory output.
   TAudioOutputFactory = function: TAudioOutput of object;
 
-// ---> AulumicNS: microseconds of the performance counter (the output
+// Microseconds of the performance counter (the output
 // diagnostics and the play thread's time per buffer)
 function OutputNowUs: Int64;
 

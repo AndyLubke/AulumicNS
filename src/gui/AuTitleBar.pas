@@ -41,7 +41,7 @@ uses
   AuGfx, AuTheme, AuIcons, AuControls, AuAppIcon;
 
 type
-  { ---> AulumicNS: tbX0 .. tbX3 are the program's own buttons (AddButton):
+  { tbX0 .. tbX3 are the program's own buttons (AddButton):
     at the left next to the icon (the main menu of the main window) or at
     the right before minimize (its Preferences) }
   TAuTitleBtn = (tbNone, tbIcon, tbX0, tbX1, tbX2, tbX3, tbMin, tbMax, tbClose);
@@ -61,7 +61,7 @@ type
     FHot, FDown: TAuTitleBtn;
     FFormActive: Boolean;
     FShowMinMax, FSizeable, FShowIcon: Boolean;
-    FShowMinimize: Boolean;          // ---> AulumicNS: with ShowMinMax (not for a modal dialog)
+    FShowMinimize: Boolean;          // with ShowMinMax (not for a modal dialog)
     FOnPaintBack: TAuTitlePaintEvent;
     FExtras: array of TAuTitleExtra;
     procedure SetFormActive(V: Boolean);
@@ -78,7 +78,7 @@ type
     constructor Create(AOwner: TComponent); override;
     function ButtonRect(B: TAuTitleBtn): TRect;
     function ButtonAt(X, Y: Integer): TAuTitleBtn;
-    { ---> AulumicNS: a button of the program (at most 4): before minimize,
+    { a button of the program (at most 4): before minimize,
       or with ALeft next to the icon; each side in the order added. A click
       runs AClick. The index. }
     function AddButton(AIcon: TAuIcon; const AHint: string; AClick: TNotifyEvent;
@@ -95,7 +95,7 @@ type
     property Down: TAuTitleBtn read FDown;
     property FormActive: Boolean read FFormActive write SetFormActive;
     property ShowMinMax: Boolean read FShowMinMax write FShowMinMax;
-    { ---> AulumicNS: False shows maximize without minimize (a modal dialog:
+    { False shows maximize without minimize (a modal dialog:
       minimized it has no taskbar button and its owner stays disabled) }
     property ShowMinimize: Boolean read FShowMinimize write FShowMinimize;
     property Sizeable: Boolean read FSizeable write FSizeable;
@@ -539,7 +539,7 @@ begin
   if CapW < CapAvail then
     CapL := Math.Max(CapL, Math.Min((Width - CapW) div 2, CapL + CapAvail - CapW));
   G.Text(Cap, CapL, 0, Math.Max(0, CapR - CapL - S(8)), Height, UIFont(12), TextC, 0, 1);
-  { ---> AulumicNS: the program's buttons }
+  { the program's buttons }
   for B := tbX0 to tbX3 do
   begin
     if not IsExtra(B) then Break;

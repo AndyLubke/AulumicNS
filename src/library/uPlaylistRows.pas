@@ -27,11 +27,6 @@ unit uPlaylistRows;
     RowFileState /            Remove dead items: present, missing, or on a
     IsOnOfflineDrive          drive that is not connected (the row is kept)
   Covered by Tests\TestPlaylistRows.pas.
-
-  ---> AulumicNS: removed on 2026-11-12, with their tests (nothing used
-  them; they are in the backups): FillRowFromTrack, TrackFromRow and
-  EntryFromRow (copies for the rows of Aulumic's playlist tree; the pane of
-  AulumicNS keeps TPlEntry records).
   =============================================================================}
 
 interface
@@ -42,7 +37,6 @@ uses
 type
   PTrackNodeData = ^TTrackNodeData;
 
-  // ---> MOVED (phase 5c-1) from uFramePlaylist, unchanged
   TTrackNodeData = record
     IsGroupHeader: boolean;
     AlbumTitle: string;
@@ -61,8 +55,7 @@ type
     DateStr: string;
     SampleRate: integer;
     BitDepth: integer;
-    // ---> ADDED: Track is not in the library. Set when the row is built
-    // (LoadFromTrackList). Not shown yet (a way to show it is to be decided).
+    // Track is not in the library. Not shown yet.
     NotInLibrary: boolean;
   end;
 
@@ -183,7 +176,6 @@ end;
 
 { Row rules }
 
-// ---> MOVED from TFramePlaylist.LoadFromTrackList (nested CleanTag), unchanged
 function CleanTag(const S: string): string;
 var
   K: Integer;
@@ -207,7 +199,6 @@ begin
   Result := StringReplace(Result, #13, ' ', [rfReplaceAll]);
 end;
 
-// ---> MOVED from TFramePlaylist.LoadFromTrackList (nested), unchanged
 function TimeStrToSecs(const S: string): Integer;
 var
   P1, P2, H, M, Sec: integer;
@@ -231,7 +222,6 @@ begin
   end;
 end;
 
-// ---> MOVED from TFramePlaylist.LoadFromTrackList (FinalizeGroup)
 function FormatGroupDuration(ATotalSecs: Integer): string;
 begin
   if ATotalSecs >= 3600 then
@@ -240,8 +230,8 @@ begin
     Result := SafeFormat(FMT_DURATION_MS, [ATotalSecs div 60, ATotalSecs mod 60]);
 end;
 
-// ---> The group key of TFramePlaylist.LoadFromTrackList (NewGroupHash) and
-// uAutoPlaylist.SortAutoPlaylistByDate (GKey), which were the same
+// The group key of the playlist's rows and of
+// uAutoPlaylist.SortAutoPlaylistByDate (GKey)
 function PlaylistGroupKey(const ATrack: TTrackInfo; AGrouping: TGroupingMode): string;
 begin
   case AGrouping of
@@ -268,9 +258,9 @@ begin
       Exit(True);
 end;
 
-// Aulumic's rule: only a file that is gone from a drive that answers is dead.
-// (Without it Remove dead items removed every row of a USB disk that was not
-// connected.) Used by TMainForm.MnRemoveDead since 2026-11-12.
+// Only a file that is gone from a drive that answers is dead. (Without this
+// rule Remove dead items would remove every row of a USB disk that is not
+// connected.) Used by TMainForm.MnRemoveDead.
 function RowFileState(const APath: string; AOfflineDrives: TStrings;
   AFileExists: TFileExistsFunc): TRowFileState;
 begin
@@ -285,8 +275,7 @@ end;
 
 { Ratings }
 
-// ---> The rule of the star clicks and the rating menu
-// (TFramePlaylist.vstPlaylistMouseDown, ApplyRatingToSelection)
+// The rule of the star clicks and the rating menu
 procedure RatingTags(const ARow: TTrackNodeData; out AArtist, AAlbum: string);
 begin
   AArtist := ARow.AlbumArtist;
@@ -335,8 +324,7 @@ end;
 
 { Group header text }
 
-// ---> MOVED from TFramePlaylist.vstPlaylistAfterCellPaint (nested); the
-// canvas is replaced by AWidthOf, otherwise unchanged
+// The text is measured by AWidthOf, so no canvas is needed
 function FitTextWithEllipsis(const AText: string; AMaxWidth: Integer;
   AWidthOf: TTextWidthFunc): string;
 var
@@ -355,8 +343,7 @@ begin
   Result := TrimRight(String(TempStr)) + '...';
 end;
 
-// ---> MOVED from TFramePlaylist.vstPlaylistAfterCellPaint (nested); the
-// canvas is replaced by AWidthOf, otherwise unchanged
+// The text is measured by AWidthOf, so no canvas is needed
 procedure SplitHeaderIntoTwoLines(const AText: string; AMaxWidth: Integer;
   AWidthOf: TTextWidthFunc; out ALine1, ALine2: string);
 const

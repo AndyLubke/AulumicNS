@@ -12,13 +12,13 @@ unit uReplayGainThread;
   main thread (Synchronize): OnProgress for the progress, OnResults hands
   over the results of each album (TRGScanResult, uReplayGainScan). After it
   has ended: HealedFiles, StaleFileCount. It does not know the window that
-  started it (---> CHANGED, phase 6b); Detach stops the events when that
+  started it; Detach stops the events when that
   window goes away. Covered by Tests\TestReplayGainThread.pas.
 
-  ---> AulumicNS: the loudness is measured by the built-in EBU R128 meter
-  (AuLoudness, from Aulos) instead of libebur128: one TAuLoudnessMeter per
+  The loudness is measured by the built-in EBU R128 meter
+  (AuLoudness): one TAuLoudnessMeter per
   track, the album loudness over the blocks of all its tracks (as
-  ebur128_loudness_global_multiple). No DLL is needed any more.
+  ebur128_loudness_global_multiple does).
   The tracks of an album are measured on ThreadCount workers (TRGTrackWorker)
   at the same time; a worker never calls Synchronize or the log, the scan
   thread reports for them.
@@ -28,13 +28,13 @@ interface
 
 uses
   Classes, AuLoudness, uLibraryManager, uLibraryTypes,
-  uReplayGainScan;  // ---> ADDED (phase 6a): TRGAlbumGroups, TRGScanResult, GainFromLoudness
+  uReplayGainScan;  // TRGAlbumGroups, TRGScanResult, GainFromLoudness
 
 type
-  // ---> AulumicNS: the meters of an album's tracks (were PEbur128State)
+  // The meters of an album's tracks
   TLoudnessMeterArray = array of TAuLoudnessMeter;
 
-  // ---> ADDED (phase 6b): The progress of a scan (was passed field by field)
+  // The progress of a scan
   TRGProgress = record
     AlbumText  : string;   // the album being scanned
     TrackText  : string;   // its track (file name) or what happens
@@ -55,20 +55,19 @@ type
   TReplayGainThread = class(TThread)
   private
     FLibraryManager      : TLibraryManager;
-    FAlbumsToScan        : TRGAlbumGroups;  // ---> CHANGED (phase 6a): owned
+    FAlbumsToScan        : TRGAlbumGroups;  // owned
     FHarvestedResults    : TList;
     FForceOverwrite      : Boolean;
     FTotalHarvestedCount : Integer;
 
-    // ---> AulumicNS: how many tracks of an album are measured at the same
-    // time (1 .. RG_MAX_THREADS; the decode buffers moved to the workers)
+    // How many tracks of an album are measured at the same
+    // time (1 .. RG_MAX_THREADS; the decode buffers belong to the workers)
     FThreadCount         : Integer;
 
     FLogMsg              : string;
     FLogIsError          : Boolean;
 
-    // ---> CHANGED (phase 6b): Events and results instead of the window
-    // (FScanFormRef) and public fields
+    // Events and results (the thread knows no window)
     FProgress            : TRGProgress;  // filled by the thread, sent by PushUIProgress
     FOnProgress          : TRGProgressEvent;
     FOnResults           : TRGResultsEvent;
@@ -82,7 +81,7 @@ type
     procedure PushUIProgress;
     procedure PushHarvest;
 
-    // Modularized album name resolution, tag checking, and C-state cleanup
+    // Album name resolution, tag checking, and meter cleanup
     function  ResolveAlbumName(AlbumFiles, MissingInAlbum: TStringList): string;
     function  IsAlbumAlreadyScanned(AlbumFiles: TStringList; const AlbumName: string;
                                     AlbIdx: Integer; var LastTick: QWord; ANoAlbum: Boolean): Boolean;
@@ -92,9 +91,7 @@ type
   protected
     procedure Execute; override;
   public
-    // ---> CHANGED (phase 6a): Owns AAlbums from here on (also when Create fails)
-    // ---> CHANGED (phase 6b): No window reference (was AFormRef, which also
-    // gave the library when ALibraryManager was nil)
+    // Owns AAlbums from here on (also when Create fails)
     constructor Create(AAlbums: TRGAlbumGroups; AForceOverwrite: Boolean;
                        ALibraryManager: TLibraryManager);
     destructor Destroy; override;
@@ -104,7 +101,7 @@ type
     procedure Detach;
 
     property LibraryManager: TLibraryManager read FLibraryManager write FLibraryManager;
-    // ---> AulumicNS: set before Start. The albums are still scanned one
+    // Set before Start. The albums are scanned one
     // after the other; the tracks of an album are measured by this many
     // threads at once. The results and their order do not depend on it.
     property ThreadCount: Integer read FThreadCount write SetThreadCount;
@@ -122,8 +119,7 @@ implementation
 uses
   AuAudioTypes, Windows, SysUtils, Math, uAppConsts, ALMetadata, ALReaderFLAC,
   ALReaderWAV, ALReaders,
-  // ---> REMOVED (phase 6b): uFormReplayGain (no window reference any more)
-  uAudioUtils, uOSUtils, AuLog, uAppStrings;  // ---> AulumicNS: AuLog
+  uAudioUtils, uOSUtils, AuLog, uAppStrings;  // AuLog: AddLog
 
 const
   INV_PCM16_FLT = 1.0 / 32768.0;
@@ -132,7 +128,7 @@ const
   CHUNK_FRAMES  = 8192;
 
 type
-  // ---> AulumicNS: the tracks of one album, shared by the threads that
+  // The tracks of one album, shared by the threads that
   // measure them. A worker takes the next index (Next, interlocked) and
   // writes only the slots of that index; the scan thread reads Done, Started
   // and Pct for the progress and takes the rest when all workers have ended.
@@ -167,8 +163,8 @@ type
 constructor TReplayGainThread.Create(AAlbums: TRGAlbumGroups; AForceOverwrite: Boolean;
   ALibraryManager: TLibraryManager);
 begin
-  // ---> CHANGED (phase 6a): Taken over first, so Destroy frees it even when
-  // something below raises (before, the pointers were copied into a new list)
+  // Taken over first, so Destroy frees it even when
+  // something below raises
   FAlbumsToScan := AAlbums;
   if not Assigned(FAlbumsToScan) then
     FAlbumsToScan := TRGAlbumGroups.Create;
@@ -177,9 +173,7 @@ begin
   FreeOnTerminate  := False;
   Priority         := tpLower;
 
-  // ---> AulumicNS: no libFLAC to load (the FLAC decoder is built in)
-
-  FForceOverwrite      := AForceOverwrite;
+  FForceOverwrite     := AForceOverwrite;
   FLibraryManager      := ALibraryManager;
   FDetached            := False;
 
@@ -243,8 +237,8 @@ begin
   FOnProgress(Self, FProgress);
 end;
 
-// Main thread (Synchronize). ---> CHANGED (phase 6b): The receiver takes the
-// results over (before, they were added to the window's list from here)
+// Main thread (Synchronize). The receiver takes the
+// results over
 procedure TReplayGainThread.PushHarvest;
 begin
   if Terminated or (not Assigned(FOnResults)) then
@@ -273,8 +267,8 @@ begin
      LibMgr.TryGetTrack(AlbumFiles[0], LibTrack) then
     Result := Trim(LibTrack.Album);
 
-  // 2. Fallback: Read text tags only (---> AulumicNS: really without the
-  // cover now: ReadTrackTextTags)
+  // 2. Fallback: Read text tags only (without the
+  // cover: ReadTrackTextTags)
   if (Result = '') and (AlbumFiles.Count > 0) then
   begin
     Meta   := ReadTrackTextTags(AlbumFiles[0]);
@@ -294,7 +288,7 @@ end;
 // =============================================================================
 // Thread-safe check for existing ReplayGain tags on disk/RAM
 // =============================================================================
-// ---> AulumicNS: the files of a group have no album tag (a group is one
+// The files of a group have no album tag (a group is one
 // folder + album artist + album, so the first file answers for all): the
 // library's record says so when it has a real album name (no disk access for
 // the albums, which are nearly all); the library keeps "Unknown Album" for an
@@ -333,7 +327,7 @@ begin
     Exit;
 
   LibMgr := FLibraryManager;
-  LibTrack := Default(TTrackInfo);  // ---> AulumicNS: no warning in the release build
+  LibTrack := Default(TTrackInfo);  // no warning in the release build
 
   for J := 0 to AlbumFiles.Count - 1 do
   begin
@@ -358,11 +352,11 @@ begin
     end;
 
     // 3. Physical tag check (without extracting embedded cover art)
-    // ---> AUDIT FIX: A track counts as scanned only when it has both a track
-    // gain and an album gain (the same rule as the library scan). Before, any
-    // ReplayGain or R128 tag was enough, so a file with only a track gain
-    // never got an album gain from a normal scan.
-    // ---> AulumicNS: tracks without an album tag (ANoAlbum) get no album
+    // A track counts as scanned only when it has both a track
+    // gain and an album gain (the same rule as the library scan): if any
+    // ReplayGain or R128 tag were enough, a file with only a track gain
+    // would never get an album gain from a normal scan.
+    // Tracks without an album tag (ANoAlbum) get no album
     // gain: their track gain is all there is to find
     Meta      := ReadTrackTextTags(AlbumFiles[J]);
     UpperTags := UpperCase(Meta.AllTags);
@@ -455,7 +449,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: was TReplayGainThread.ScanFile. One track: decoded and fed
+// One track: decoded and fed
 // to its meter (FWork.Meters[AIndex], nil when it failed), its peak, its
 // progress (FWork.Pct) and, when something went wrong, a line for the log
 // (FWork.Logs). Nothing here touches the main thread: several of these run
@@ -495,7 +489,7 @@ begin
   if not FileExists(LongPath(FilePath)) then
     Exit;
 
-  // ---> CHANGED (ObjFPC switch): the readers take the UTF-8 path as it is
+  // The readers take the UTF-8 path as it is
   LastThermalTick := GetTickCount64;
 
   try
@@ -545,7 +539,7 @@ begin
       else
         ExpectedFrames := Round(DsdSource.GetDuration * SampleRate);
 
-      // ---> AulumicNS: the built-in meter (integrated loudness + sample peak)
+      // The built-in meter (integrated loudness + sample peak)
       OutState := TAuLoudnessMeter.Create(SampleRate, Channels);
 
       // Only grow reusable buffers if needed
@@ -624,9 +618,9 @@ begin
           ProgressVal := DsdSource.GetProgress;
         FWork.Pct[AIndex] := EnsureRange(Round(ProgressVal * 100.0), 0, 100);
       end;
-      // ---> AUDIT FIX R1: Reject empty or failed decodes (0 frames decoded)
+      // Reject empty or failed decodes (0 frames decoded)
       // so they are marked as 'Decode error / unsupported' rather than '0.00 dB'!
-      // ---> AUDIT FIX R1: Also reject decodes that stopped well short of the
+      // Also reject decodes that stopped well short of the
       // length declared in the header (corrupt FLAC section, truncated file),
       // so a partial loudness measurement is never saved as the track's gain.
       if (not FWork.Cancel) and (TotalFramesDecoded > 0) and (ExpectedFrames > 0) and
@@ -639,7 +633,7 @@ begin
 
       if (not FWork.Cancel) and (TotalFramesDecoded > 0) then
       begin
-        // ---> AulumicNS: the meter's sample peak (the largest of the channels)
+        // The meter's sample peak (the largest of the channels)
         OutPeak := OutState.Peak;
         if IsNan(OutPeak) or IsInfinite(OutPeak) then
           OutPeak := 0.0;
@@ -682,7 +676,7 @@ var
   AlbumFiles     : TStringList;
   MissingInAlbum : TStringList;
   States         : TLoudnessMeterArray;
-  CleanStates    : TLoudnessBlockSets;  // ---> AulumicNS: the blocks of the album
+  CleanStates    : TLoudnessBlockSets;  // the blocks of the album
   TrkLoud,
   TrkPeaks       : array of Double;
   AlbLoud,
@@ -698,7 +692,7 @@ var
   LastTick       : QWord;
   Work           : TRGAlbumWork;
 
-  // ---> AulumicNS: the tracks of the album on up to FThreadCount worker
+  // The tracks of the album on up to FThreadCount worker
   // threads; this thread waits for them, reports the progress every 40 ms
   // and passes a Stop on. Returns when all workers have ended.
   procedure MeasureTracks(AWork: TRGAlbumWork; const AAlbumName: string; AAlbIdx: Integer);
@@ -817,7 +811,7 @@ begin
           Continue;
 
         AlbumName := ResolveAlbumName(AlbumFiles, MissingInAlbum);
-        // ---> AulumicNS: loose tracks without an album tag are no album:
+        // Loose tracks without an album tag are no album:
         // each gets its track gain, none an album gain
         NoAlbum := GroupHasNoAlbumTag(AlbumFiles);
 
@@ -861,7 +855,7 @@ begin
 
             if States[J] <> nil then
             begin
-              // ---> AulumicNS: the meter cannot fail; a silent track gives
+              // The meter cannot fail; a silent track gives
               // -Infinity LUFS and so 0.00 dB below (GainFromLoudness)
               TrkLoud[J]  := States[J].Loudness;
               TrkPeaks[J] := Work.Peaks[J];
@@ -873,10 +867,10 @@ begin
         finally
           Work.Free;
         end;
-        // ---> AUDIT FIX: An album gain is only valid when every track of the
+        // An album gain is only valid when every track of the
         // album was analysed. If a track failed or a file is missing, nothing
         // of this album is offered for saving ('Album Incomplete').
-        // ---> AulumicNS: without an album tag there is no album to complete:
+        // Without an album tag there is no album to complete:
         // every track that was analysed is saved (its track gain)
         AlbumIncomplete := (not NoAlbum) and
                            ((ValidCount < AlbumFiles.Count) or (MissingInAlbum.Count > 0));
@@ -886,7 +880,7 @@ begin
         AlbGainCalc := 0.0;
         if (ValidCount > 0) and (not AlbumIncomplete) and (not NoAlbum) then
         begin
-          // ---> AulumicNS: the gates over the blocks of all tracks together
+          // The gates over the blocks of all tracks together
           SetLength(CleanStates, ValidCount);
           Idx := 0;
           for J := 0 to AlbumFiles.Count - 1 do
@@ -899,7 +893,7 @@ begin
           end;
           AlbLoud := IntegratedLoudness(CleanStates);
           CleanStates := nil;
-          // ---> MOVED (phase 6a): The rule is in uReplayGainScan (a silent
+          // The rule is in uReplayGainScan (a silent
           // album: 0 dB)
           AlbGainCalc := GainFromLoudness(AlbLoud);
         end
@@ -907,7 +901,7 @@ begin
           LogSafe(SafeFormat(FMT_LOG_RG_ALBUM_INCOMPLETE,
                   [AlbumName, ValidCount, AlbumFiles.Count + MissingInAlbum.Count]), True);
 
-        // 4. Append VALID and CORRUPTED files to the Receipt Grid
+        // 4. Append VALID and CORRUPTED files to the results
         for J := 0 to AlbumFiles.Count - 1 do
         begin
           New(PRes);
@@ -929,7 +923,7 @@ begin
             end
             else if States[J] <> nil then
             begin
-              // ---> MOVED (phase 6a): The rule is in uReplayGainScan
+              // The rule is in uReplayGainScan
               TrkGainCalc := GainFromLoudness(TrkLoud[J]);
 
               PRes^.TrackGain := TrkGainCalc;
@@ -965,7 +959,7 @@ begin
           end;
         end;
 
-        // 5. Append MISSING files to the Receipt Grid
+        // 5. Append MISSING files to the results
         for J := 0 to MissingInAlbum.Count - 1 do
         begin
           New(PRes);

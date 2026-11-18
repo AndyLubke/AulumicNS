@@ -18,7 +18,7 @@ uses
   Classes, SysUtils, Forms, Controls, Dialogs, ALAudioEngine, ALMetadata,
   ALReaders, uAppConsts, AuDialogs, uFileLockRegistry, uAudioUtils,
   ALAudioTypes, uPlaybackIOWorker, uDriveKeepAlive,
-  ALSourceFactory;  // ---> CHANGED (phase 7b): was ALAudioThread (TPreparedNext moved there)
+  ALSourceFactory;  // TPreparedNext
 
 type
   TPlaybackState  = (psStopped, psPlaying, psPaused, psMaintenance);
@@ -34,7 +34,7 @@ type
     ResamplePCM             : Boolean;
     ResampleQuality         : integer;
     DeviceID                : string;
-    // ---> AulumicNS: 0 WASAPI (DeviceID = endpoint id), 1 ASIO (DeviceID =
+    // 0 WASAPI (DeviceID = endpoint id), 1 ASIO (DeviceID =
     // driver CLSID); AsioNativeDsd: DSD as DSD over ASIO (else DoP)
     OutputApi               : Integer;
     AsioNativeDsd           : Boolean;
@@ -43,14 +43,14 @@ type
     VolumeLocked            : Boolean;
     PreampDB                : Double;  // e.g., 0.0, -2.0, -3.0
     EnableSoftClipping      : Boolean;
-    // ---> AulumicNS: automatic headroom (ALHeadroom): the level of an album
+    // Automatic headroom (ALHeadroom): the level of an album
     // is lowered as far as its highest peak needs, no further
     AutoHeadroom            : Boolean;
 
     UpsamplePhase           : Integer; // (0=Linear, 1=Intermediate, 2=Minimum)
     DownsamplePhase         : Integer; // (0=Linear, 1=Intermediate, 2=Minimum)
 
-    // Advanced SoX properties
+    // Resampler filter properties
     ResampleBandWidthIndex  : Integer;
     ResampleAntiAliasIndex  : Integer;
 
@@ -60,7 +60,7 @@ type
     UseHighResTimer         : Boolean;
     OptimizeAffinity        : Boolean;
     EnableMMCSS             : Boolean;
-    KeepDrivesAwake         : Boolean;  // ---> ADDED: see uDriveKeepAlive
+    KeepDrivesAwake         : Boolean;  // see uDriveKeepAlive
 
     ToneDirect              : Boolean;
     ToneBassDB              : Integer; // -100 to +100 (represents -10.0dB to +10.0dB)
@@ -88,13 +88,13 @@ type
   TStateChangeEvent     = procedure(NewState: TPlaybackState) of object;
   TModeChangeEvent      = procedure(RepeatMode: TRepeatMode;
                             ShuffleMode: TShuffleMode) of object;
-  // ---> CHANGED: AIsDSD = the failed track is a DSD file. Taken from the
+  // AIsDSD = the failed track is a DSD file. Taken from the
   // queue before the stop: the owner's own "current track" state is cleared
   // by the stop (or may still be the previous track's when the error comes
   // before the new track's info).
   TSampleRateErrorEvent = procedure(AttemptedRate: Integer; AIsDSD: Boolean) of object;
 
-  // ---> ADDED: The dialog ShowEngineErrorAsync opens (see Update)
+  // The dialog ShowEngineErrorAsync opens (see Update)
   TEngineErrorDialog = (eedMessage, eedSampleRate);
 
   { TPlaybackManager }
@@ -104,22 +104,22 @@ type
     FAudioEngine     : TAudioEngine;
     FNotifyHandle    : THandle;
 
-    // ---> AUDIT FIX: Background disk access (see uPlaybackIOWorker). Results
+    // Background disk access (see uPlaybackIOWorker). Results
     // are collected on the UI thread in Update (ProcessIOResults).
     FIOWorker          : TPlaybackIOWorker;
     FOpenGeneration    : Integer;   // Current "open track" request
     FOpenPending       : Boolean;   // A track is being opened in the background
-    FOpenFilePath      : string;    // ---> ADDED: the file of that open request
+    FOpenFilePath      : string;    // the file of that open request
     FGaplessGeneration : Integer;   // Current gapless probe request
     FProbePath         : string;    // Next track being probed
     FProbeTrackId      : Integer;
-    // ---> ADDED: The started track's tags / cover are read on the I/O worker
+    // The started track's tags / cover are read on the I/O worker
     FMetaGeneration    : Integer;   // Current track-info request
     FMetaPending       : Boolean;   // Waiting for the started track's info
-    FMetaIsRefresh     : Boolean;   // ---> ADDED: that request is a RefreshTrackInfo
+    FMetaIsRefresh     : Boolean;   // that request is a RefreshTrackInfo
     FProbeDeferred     : Boolean;   // A gapless probe result arrived before it
 
-    // ---> ADDED: Keeps the drives of the current and next track awake
+    // Keeps the drives of the current and next track awake
     // (Config.KeepDrivesAwake). Created on first use; targets are updated
     // from Update on the UI timer (UpdateKeepAlive).
     FKeepAlive         : TDriveKeepAlive;
@@ -130,10 +130,10 @@ type
     FKeepAliveFailed   : Boolean;   // the thread could not be created: no retry
     FGaplessLogKey     : string;    // current|next of the last "not gapless" line
 
-    // ---> ADDED: An engine error dialog waiting for ShowEngineErrorAsync
+    // An engine error dialog waiting for ShowEngineErrorAsync
     FPendingErrMsg     : string;
     FPendingFailRate   : Integer;
-    FPendingFailIsDSD  : Boolean;   // ---> ADDED: the failed track is a DSD file
+    FPendingFailIsDSD  : Boolean;   // the failed track is a DSD file
 
     // The "Two-List" Memory System
     FOriginalQueue   : TList;
@@ -141,10 +141,10 @@ type
     FQueueRevision   : Integer;
 
     FCurrentIndex        : Integer;
-    // ---> AUDIT FIX: Guards the single retry in UpdateGapless when the engine
+    // Guards the single retry in UpdateGapless when the engine
     // rejects a stale "next" track because a swap happened in between.
     FInGaplessRetry      : Boolean;
-    // ---> AUDIT FIX N2 & N3: Tracks both the file path and unique TrackId
+    // Tracks both the file path and unique TrackId
     // preloaded into FNextSource so gapless swaps and custodian checks are exact!
     FQueuedNextFilePath  : string;
     FQueuedNextTrackId   : Integer;
@@ -158,17 +158,17 @@ type
     FShuffleMode     : TShuffleMode;
 
     FOnTrackChange     : TTrackChangeEvent;
-    FOnTrackInfoRefreshed : TTrackChangeEvent;  // ---> ADDED: RefreshTrackInfo's result
+    FOnTrackInfoRefreshed : TTrackChangeEvent;  // RefreshTrackInfo's result
     FOnStateChange     : TStateChangeEvent;
     FOnModeChange      : TModeChangeEvent;
     FOnSampleRateError : TSampleRateErrorEvent;
-    FOnBackgroundRequest : TNotifyEvent;  // ---> ADDED: a request went to the I/O worker
+    FOnBackgroundRequest : TNotifyEvent;  // a request went to the I/O worker
 
     FConfig          : TManagerConfig;
 
     procedure PrepareEngineForTrack(const AFilePath: string);
     procedure AttemptPlayCurrent;
-    // ---> AUDIT FIX: Second halves of the background requests (UI thread)
+    // Second halves of the background requests (UI thread)
     procedure ProcessIOResults;
     procedure ContinuePlayCurrent(const AFilePath: string; AFound: Boolean);
     function  ResolveGaplessNext(out ANextItem: PQueueItem): Boolean;
@@ -197,7 +197,7 @@ type
     // in the queue at its old place and plays on (a tag edit took it out of an
     // auto-playlist); without it the playback stops (the user removed it)
     procedure SyncQueue(NewQueueItems: TList; AKeepCurrent: Boolean = False);
-    // ---> AUDIT FIX: A playlist was renamed: queue items from it get the new name
+    // A playlist was renamed: queue items from it get the new name
     procedure RenameQueueSource(const AOldSourceID, ANewSourceID: string);
     // For the tests: the queue as if the track at AIndex were playing and
     // paused, without opening it (no device, no file)
@@ -222,14 +222,14 @@ type
     function  GetCurrentItem: PQueueItem;
     procedure Update;
     procedure UpdateGapless;
-    // ---> AUDIT FIX N2 & N3: Helpers for custodian and pre-Update swap handling
+    // Helpers for custodian and pre-Update swap handling
     procedure ClearGaplessPreload;
     function  ConsumePendingTrackSwap: Boolean;
     procedure RestartCurrent;
     procedure EnterMaintenance;
     procedure ExitMaintenance;
     procedure RetryCurrent;
-    // ---> ADDED: Reads the current track's tags, cover and folder info again
+    // Reads the current track's tags, cover and folder info again
     // on the I/O worker (after a library change: tags edited, a scan, a
     // ReplayGain save) and reports them with OnTrackInfoRefreshed. Unlike a
     // track change nothing else happens (no play is counted). Nothing to do
@@ -238,11 +238,11 @@ type
     procedure SetToneControl(const State: TToneState);
 
     function  GetEngineStats: TAudioStats;
-    // ---> AulumicNS: the stages of the signal path (the badge popup)
+    // The stages of the signal path (the badge popup)
     function  GetSignalInfo: TSignalInfo;
-    // ---> ADDED: True while a track open or track-info request is outstanding
+    // True while a track open or track-info request is outstanding
     function  HasPendingIO: Boolean;
-    // ---> ADDED: A track is being opened (existence check on the I/O worker)
+    // A track is being opened (existence check on the I/O worker)
     property  IsOpening: Boolean read FOpenPending;
     property  OpeningFilePath: string read FOpenFilePath;
     class procedure EnumerateDevices(List: TStrings; out DefaultIdx: Integer);
@@ -260,7 +260,7 @@ type
 
     property OnTrackChange     : TTrackChangeEvent read FOnTrackChange
                                  write FOnTrackChange;
-    // ---> ADDED: The result of RefreshTrackInfo (UI thread)
+    // The result of RefreshTrackInfo (UI thread)
     property OnTrackInfoRefreshed : TTrackChangeEvent read FOnTrackInfoRefreshed
                                     write FOnTrackInfoRefreshed;
     property OnStateChange     : TStateChangeEvent read FOnStateChange
@@ -269,13 +269,13 @@ type
                                  write FOnModeChange;
     property OnSampleRateError : TSampleRateErrorEvent read FOnSampleRateError
                                  write FOnSampleRateError;
-    // ---> ADDED: Fired on the UI thread right after a request is handed to the
+    // Fired on the UI thread right after a request is handed to the
     // I/O worker, so the owner can collect the result without delay
     property OnBackgroundRequest : TNotifyEvent read FOnBackgroundRequest
                                    write FOnBackgroundRequest;
   end;
 
-// ---> AulumicNS: the buffer of a DSD track: DSDBufferMs when the DSD goes to
+// The buffer of a DSD track: DSDBufferMs when the DSD goes to
 // the DAC as DSD ("Play DSD natively": DoP over WASAPI, native or DoP over
 // ASIO), PCMBufferMs when it is converted to PCM
 function DsdBufferFor(const AConfig: TManagerConfig): Integer;
@@ -326,20 +326,20 @@ end;
 
 destructor TPlaybackManager.Destroy;
 begin
-  // ---> ADDED: An engine error dialog that has not opened yet
+  // An engine error dialog that has not opened yet
   if Assigned(Application) then
     Application.RemoveAsyncCalls(Self);
 
   Stop;
   ClearQueue;
 
-  // ---> ADDED: Stop the keep-alive thread. A read can be stuck on a sleeping
+  // Stop the keep-alive thread. A read can be stuck on a sleeping
   // or unreachable drive.
-  // ---> CHANGED: Its read is aborted first where Windows can (a network
+  // Its read is aborted first where Windows can (a network
   // share), so it usually ends at once. If it is still blocked after 3 s, it
   // is set aside (uDriveKeepAlive.SetThreadAside): freed once it has ended or
-  // left to Windows at exit. Before, it was told to free itself later, which
-  // could happen while the program was already being taken down.
+  // left to Windows at exit. It never frees itself: that could happen
+  // while the program is already being taken down.
   if Assigned(FKeepAlive) then
   begin
     FKeepAlive.Terminate;
@@ -353,13 +353,12 @@ begin
     end;
   end;
 
-  // ---> AUDIT FIX: Stop the I/O worker. It may be blocked in the file system
+  // Stop the I/O worker. It may be blocked in the file system
   // (opening a track on a sleeping drive, an unreachable network share).
-  // ---> CHANGED: As the keep-alive thread above: its file access is aborted
+  // As the keep-alive thread above: its file access is aborted
   // first where possible (terminated before, so its retry loop ends), after
-  // 3 s it is set aside instead of freeing itself; libFLAC / libsoxr then stay
-  // loaded at exit (uAppLifetime.UnloadAudioLibraries), as it may be inside
-  // them building the next track.
+  // 3 s it is set aside (it never frees itself); it may still be building
+  // the next track then.
   if Assigned(FIOWorker) then
   begin
     FIOWorker.Terminate;
@@ -631,7 +630,7 @@ var
   TrackStillExists: Boolean;
   OldState: TPlaybackState;
 begin
-  // ---> AUDIT FIX N3: Process any pending track swap against the current queue
+  // Process any pending track swap against the current queue
   // BEFORE rebuilding the queue!
   if FState <> psStopped then
     ConsumePendingTrackSwap;
@@ -647,7 +646,7 @@ begin
     TargetFilePath := PQueueItem(FPlayQueue[FCurrentIndex])^.FilePath;
   end;
 
-  // ---> AulumicNS: the playing track is not in the new list and is to play
+  // The playing track is not in the new list and is to play
   // on: a copy of its item goes into the new list where the track was
   if AKeepCurrent and (FState <> psStopped) and Assigned(NewQueueItems) and
      (FCurrentIndex >= 0) and (FCurrentIndex < FPlayQueue.Count) then
@@ -687,7 +686,7 @@ begin
   FCurrentIndex := -1;
   ChangeRevision;
 
-  // ---> AUDIT FIX N4: Prevent duplicate PQueueItem pointers in FOriginalQueue
+  // Prevent duplicate PQueueItem pointers in FOriginalQueue
   if Assigned(NewQueueItems) then
   begin
     for I := 0 to NewQueueItems.Count - 1 do
@@ -740,7 +739,7 @@ procedure TPlaybackManager.ToggleShuffle;
 var
   TargetID: Integer;
 begin
-  // ---> AUDIT FIX N3: Process any pending track swap BEFORE reshuffling!
+  // Process any pending track swap BEFORE reshuffling!
   if FState <> psStopped then
     ConsumePendingTrackSwap;
 
@@ -764,9 +763,9 @@ begin
     FOnModeChange(FRepeatMode, FShuffleMode);
 end;
 
-// ---> AUDIT FIX: First half of starting a track (UI thread). The existence
-// check with its retries (and the 50 ms DAC release pause) now runs on the I/O
-// worker, so a sleeping drive no longer freezes the window. ContinuePlayCurrent
+// First half of starting a track (UI thread). The existence
+// check with its retries (and the 50 ms DAC release pause) runs on the I/O
+// worker, so a sleeping drive does not freeze the window. ContinuePlayCurrent
 // finishes the start once the worker reports back (via Update, <= 50 ms later).
 procedure TPlaybackManager.AttemptPlayCurrent;
 var
@@ -775,7 +774,7 @@ var
 begin
   Item := GetCurrentItem;
 
-  // ---> ADDED: The same track is still being opened (an impatient second
+  // The same track is still being opened (an impatient second
   // double-click / Enter / Play): let that open finish instead of starting
   // over. ContinuePlayCurrent compares by path, so a rebuilt queue is fine.
   if FOpenPending and Assigned(Item) and SameText(Item^.FilePath, FOpenFilePath) then
@@ -822,7 +821,7 @@ begin
     FOnBackgroundRequest(Self);
 end;
 
-// ---> AUDIT FIX: Second half of starting a track (UI thread)
+// Second half of starting a track (UI thread)
 procedure TPlaybackManager.ContinuePlayCurrent(const AFilePath: string; AFound: Boolean);
 var
   Item: PQueueItem;
@@ -886,7 +885,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Invalidates every outstanding background request
+// Invalidates every outstanding background request
 procedure TPlaybackManager.CancelBackgroundIO;
 begin
   Inc(FOpenGeneration);
@@ -901,7 +900,7 @@ begin
     FIOWorker.CancelAll;
 end;
 
-// ---> AUDIT FIX: Collects finished background requests (UI thread, called
+// Collects finished background requests (UI thread, called
 // from Update). Results of an outdated generation are ignored.
 procedure TPlaybackManager.ProcessIOResults;
 var
@@ -923,7 +922,7 @@ begin
           if (Results[I].Generation = FGaplessGeneration) and
              ((FState = psPlaying) or (FState = psPaused)) then
           begin
-            // ---> ADDED: The probe compares with the current track's sample
+            // The probe compares with the current track's sample
             // rate, which is only known once its info has arrived
             if FMetaPending then
               FProbeDeferred := True
@@ -938,7 +937,7 @@ begin
       end;
     end;
   finally
-    // ---> ADDED: Prepared next-track sources that were not handed to the
+    // Prepared next-track sources that were not handed to the
     // engine (outdated, deferred, not gapless, ...)
     for I := 0 to High(Results) do
       FreePreparedNext(Results[I].Prepared);
@@ -1025,7 +1024,7 @@ begin
       FQueuedNextTrackId  := 0;
       FAudioEngine.Stop;
 
-      // ---> Only check that the drive is there (no disk access, so a drive
+      // Only check that the drive is there (no disk access, so a drive
       // that fell asleep during a long pause does not freeze the UI). The
       // audio thread opens the file; a deleted file is reported by it.
       if not IsDrivePresent(Item^.FilePath) then
@@ -1072,7 +1071,7 @@ end;
 
 procedure TPlaybackManager.EnterMaintenance;
 begin
-  // ---> AUDIT FIX: A track that is still being opened in the background is
+  // A track that is still being opened in the background is
   // cancelled and restarted from the beginning by ExitMaintenance
   if FOpenPending and (FState = psStopped) then
   begin
@@ -1104,9 +1103,9 @@ begin
     Exit;
 
   Item := GetCurrentItem;
-  // ---> CHANGED: Only checks that the drive is there, as PlayCurrent does (no
+  // Only checks that the drive is there, as PlayCurrent does (no
   // disk access: after a long pause the drive may be asleep, and FileExists
-  // froze the window until it woke). The audio thread opens the file and
+  // would freeze the window until it woke). The audio thread opens the file and
   // reports a file that is gone.
   if Assigned(Item) and IsDrivePresent(Item^.FilePath) then
   begin
@@ -1175,7 +1174,7 @@ begin
     FOnModeChange(FRepeatMode, FShuffleMode);
 end;
 
-// ---> AUDIT FIX: The tags, cover and folder info of the started track are now
+// The tags, cover and folder info of the started track are
 // read on the I/O worker (no disk access on the UI thread at a track change).
 // OnTrackChange fires when the result arrives (Update -> ProcessIOResults,
 // normally within one 50 ms timer tick). Playback itself is not delayed.
@@ -1220,7 +1219,7 @@ begin
     FOnBackgroundRequest(Self);
 end;
 
-// ---> ADDED: Second half of TriggerTrackChange (UI thread)
+// Second half of TriggerTrackChange (UI thread)
 procedure TPlaybackManager.ApplyTrackInfo(const AFilePath: string; AFound: Boolean;
   const AMeta: TAudioMetadata);
 var
@@ -1246,7 +1245,7 @@ begin
   else
     FCurrentMeta := Default(TAudioMetadata);
 
-  // ---> ADDED: A RefreshTrackInfo result only updates what is shown
+  // A RefreshTrackInfo result only updates what is shown
   if FMetaIsRefresh then
   begin
     FMetaIsRefresh := False;
@@ -1256,7 +1255,7 @@ begin
   else if Assigned(FOnTrackChange) then
     FOnTrackChange(Item^, FCurrentMeta);
 
-  // The manager only needs the tags; the cover bytes now live in the UI copy
+  // The manager only needs the tags; the cover bytes live in the UI copy
   SetLength(FCurrentMeta.CoverData, 0);
   SetLength(FCurrentMeta.FolderCoverData, 0);
 
@@ -1271,7 +1270,7 @@ end;
 
 procedure TPlaybackManager.ClearGaplessPreload;
 begin
-  // ---> AUDIT FIX: Also drop a gapless probe that is still running
+  // Also drop a gapless probe that is still running
   Inc(FGaplessGeneration);
   FProbePath    := '';
   FProbeTrackId := 0;
@@ -1283,7 +1282,7 @@ begin
 end;
 
 // =============================================================================
-// ---> AUDIT FIX N3: Central handler for WasTrackSwapped.
+// Central handler for WasTrackSwapped.
 // 1. Called from Update() on the main timer, AND called before any queue
 //    mutation (SyncQueue, ToggleShuffle, ToggleRepeat, UpdateGapless) so a
 //    swap that already occurred on the audio thread is never overwritten!
@@ -1324,7 +1323,7 @@ begin
   end;
 
   // 2. Search by TrackId, forward (wrapping) from FCurrentIndex.
-  // ---> AUDIT FIX N3: The same library track queued twice shares one TrackId,
+  // The same library track queued twice shares one TrackId,
   // so searching from index 0 would jump back to the earlier copy.
   if (not FoundMatch) and (FQueuedNextTrackId > 0) and (FPlayQueue.Count > 0) then
   begin
@@ -1367,7 +1366,7 @@ begin
   TriggerTrackChange;
 end;
 
-// ---> AUDIT FIX: Selects the next gapless candidate (UI thread). Returns False
+// Selects the next gapless candidate (UI thread). Returns False
 // (after disabling gapless preload) when there is no usable next track.
 function TPlaybackManager.ResolveGaplessNext(out ANextItem: PQueueItem): Boolean;
 var
@@ -1411,7 +1410,7 @@ begin
   Result := True;
 end;
 
-// ---> AUDIT FIX: First half of the gapless preload (UI thread). The existence
+// First half of the gapless preload (UI thread). The existence
 // check and tag read of the next file run on the I/O worker; the engine keeps
 // its current "next" (and FQueuedNext* keep describing it) until
 // ApplyGaplessProbe replaces it.
@@ -1425,7 +1424,7 @@ begin
   if not Assigned(FAudioEngine) then
     Exit;
 
-  // ---> AUDIT FIX N3: If the audio thread already swapped to the next track
+  // If the audio thread already swapped to the next track
   // before Update() polled it, advance FCurrentIndex first!
   if (FState = psPlaying) or (FState = psPaused) then
     ConsumePendingTrackSwap;
@@ -1445,7 +1444,7 @@ begin
   FProbePath    := NextItem^.FilePath;
   FProbeTrackId := NextItem^.TrackId;
 
-  // ---> ADDED: Let the worker also build the next track's source (with the
+  // Let the worker also build the next track's source (with the
   // current play thread's settings), so ApplyGaplessProbe does no disk access.
   // The sample rate is 0 while the current track's info is still pending.
   CurItem  := GetCurrentItem;
@@ -1458,8 +1457,8 @@ begin
       0, False);
 end;
 
-// ---> AUDIT FIX: Second half of the gapless preload (UI thread)
-// ---> CHANGED: APrep = the source the I/O worker built (Source may be nil).
+// Second half of the gapless preload (UI thread)
+// APrep = the source the I/O worker built (Source may be nil).
 // Handed to the engine when it is used; otherwise the caller frees it.
 procedure TPlaybackManager.ApplyGaplessProbe(const AFilePath: string; AFound: Boolean;
   ASampleRate: Integer; var APrep: TPreparedNext);
@@ -1488,7 +1487,7 @@ begin
      (IsDSDFile(NextItem^.FilePath) <> IsDSDFile(CurItem^.FilePath)) or
      (ASampleRate <> FCurrentMeta.SampleRate) then
   begin
-    // ---> ADDED: Say why the next change is not gapless (once per pair)
+    // Say why the next change is not gapless (once per pair)
     if Assigned(CurItem) and AFound and
        (FGaplessLogKey <> CurItem^.FilePath + '|' + NextItem^.FilePath) then
     begin
@@ -1516,9 +1515,9 @@ begin
   FQueuedNextFilePath := NextItem^.FilePath;
   FQueuedNextTrackId  := NextItem^.TrackId;
 
-  // ---> CHANGED: Hand over the source the I/O worker has built (no disk access
+  // Hand over the source the I/O worker has built (no disk access
   // here). Without one (not built, failed, or built for an earlier play
-  // thread) the engine builds it here, as before.
+  // thread) the engine builds it here.
   if Assigned(APrep.Source) and (APrep.StreamId = FAudioEngine.StreamId) then
     Accepted := FAudioEngine.SetPreparedNext(APrep)
   else
@@ -1529,7 +1528,7 @@ begin
 
   if not Accepted then
   begin
-    // ---> AUDIT FIX: The audio thread swapped to the previously queued track
+    // The audio thread swapped to the previously queued track
     // before this call, so the track chosen here is stale and was rejected.
     // Restore the previous queued identity so the swap resolves to the track
     // that is really playing, consume it, and start a new probe once.
@@ -1579,7 +1578,7 @@ end;
 
 procedure TPlaybackManager.Stop;
 begin
-  // ---> AUDIT FIX: Drop a track that is still being opened / probed
+  // Drop a track that is still being opened / probed
   CancelBackgroundIO;
 
   FState              := psStopped;
@@ -1633,7 +1632,7 @@ begin
     Result := 0.0;
 end;
 
-// ---> ADDED: Drive keep-alive targets (UI thread, called from Update).
+// Drive keep-alive targets (UI thread, called from Update).
 // Active while playing, and while paused up to KEEPALIVE_PAUSE_LIMIT_MS; then
 // the drives may sleep. Only when the targets change are they handed over.
 procedure TPlaybackManager.UpdateKeepAlive;
@@ -1669,7 +1668,7 @@ begin
       NextPath := NextItem^.FilePath;
   end;
 
-  // ---> ADDED: Log once when a drive cannot be reached / is back
+  // Log once when a drive cannot be reached / is back
   if Assigned(FKeepAlive) then
   begin
     if Want then
@@ -1696,7 +1695,7 @@ begin
   FKeepAliveCurrent := CurPath;
   FKeepAliveNext    := NextPath;
 
-  // ---> AUDIT FIX: A thread that cannot be created (out of resources) must
+  // A thread that cannot be created (out of resources) must
   // not raise from the UI timer: log once, playback goes on without it
   if (not Assigned(FKeepAlive)) and (not FKeepAliveFailed) and
      ((CurPath <> '') or (NextPath <> '')) then
@@ -1727,11 +1726,11 @@ var
   LocalFailRate: Integer;
   LocalFailIsDSD: Boolean;
 begin
-  // ---> AUDIT FIX: Finish background requests first (also while stopped,
+  // Finish background requests first (also while stopped,
   // because a track that is being opened is still in psStopped)
   ProcessIOResults;
 
-  // ---> ADDED: Hand the current / next track to the drive keep-alive
+  // Hand the current / next track to the drive keep-alive
   UpdateKeepAlive;
 
   if (FState = psStopped) or (FState = psMaintenance) then
@@ -1746,16 +1745,16 @@ begin
     LocalFailRate  := FAudioEngine.GetFailedSampleRate;
 
     FailedIndex := FCurrentIndex;
-    // ---> ADDED: What kind of track failed, also taken before the stop
+    // What kind of track failed, also taken before the stop
     FailedItem     := GetCurrentItem;
     LocalFailIsDSD := Assigned(FailedItem) and IsDSDFile(FailedItem^.FilePath);
 
     Stop;
     Screen.Cursor := crDefault;
 
-    // ---> CHANGED: The dialogs open from the message loop (ShowEngineErrorAsync),
-    // no longer here inside the UI timer: the timer kept firing during the modal
-    // dialog and ran Update and the rest of the UI tick again while this call
+    // The dialogs open from the message loop (ShowEngineErrorAsync),
+    // not here inside the UI timer: the timer would keep firing during the modal
+    // dialog and run Update and the rest of the UI tick again while this call
     // was still in progress.
     if LocalErrType = aeSampleRateUnsupported then
     begin
@@ -1767,7 +1766,7 @@ begin
     else
     begin
       AddLog(LOG_PREFIX_ENGINE_FATAL + LocalErrMsg, False, True);
-      // ---> ADDED: Exception class, message and place (unexpected errors only)
+      // Exception class, message and place (unexpected errors only)
       if LocalErrDetail <> '' then
         AddLog(SafeFormat(FMT_LOG_ENGINE_ERROR_DETAIL, [LocalErrDetail]), False, True);
       FPendingErrMsg := LocalErrMsg;
@@ -1788,7 +1787,7 @@ begin
   end;
 end;
 
-// ---> ADDED: Opens the engine error dialog queued by Update, from the message
+// Opens the engine error dialog queued by Update, from the message
 // loop. FOnSampleRateError is nil during shutdown; Destroy removes a call that
 // is still queued.
 procedure TPlaybackManager.ShowEngineErrorAsync(Data: PtrInt);
@@ -1883,10 +1882,9 @@ begin
 
   if IsDSDFile(AFilePath) then
   begin
-    // ---> AulumicNS: the DSD buffer only for DSD that goes to the DAC as DSD
+    // The DSD buffer only for DSD that goes to the DAC as DSD
     // (DoP, native over ASIO): a dropout there is a pop (the DAC loses the
-    // DSD stream). DSD converted to PCM is PCM from then on: the PCM buffer
-    // (Aulumic used the DSD buffer for both).
+    // DSD stream). DSD converted to PCM is PCM from then on: the PCM buffer.
     FAudioEngine.BufferSizeMs     := DsdBufferFor(FConfig);
     FAudioEngine.DsdGainDB        := FConfig.DsdToPcmGain;
     FAudioEngine.DsdLowPassFilter := FConfig.DsdLowPassFilter;
@@ -1937,7 +1935,7 @@ begin
   AddLog(SafeFormat(FMT_LOG_OPENING_TRACK, [ExtractFileName(AFilePath)]));
 end;
 
-// ---> ADDED: Lets the owner keep its UI timer fast until the results are in
+// Lets the owner keep its UI timer fast until the results are in
 function TPlaybackManager.HasPendingIO: Boolean;
 begin
   Result := FOpenPending or FMetaPending;

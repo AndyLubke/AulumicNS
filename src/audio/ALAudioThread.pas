@@ -14,8 +14,7 @@ unit ALAudioThread;
   hands whole buffers to the output - WASAPI exclusive mode or ASIO
   (ALAudioOutput). Gapless track changes, seeking, the peak levels for the
   meter and the diagnostics of the output are here too.
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic: file
-  name, device id and error texts are UTF-8; UTF-16 only at the Windows W
+  File name, device id and error texts are UTF-8; UTF-16 only at the Windows W
   calls (module name of a code address, the MMCSS task name).
   =============================================================================}
 
@@ -24,33 +23,29 @@ interface
 uses
   Classes, SysUtils, Windows, ActiveX, ComObj, Dialogs, ALReaders,
   Math, ALAudioTypes, AuLog, uToneControl,
-  // ---> REMOVED (phase 7b): libSoxr_Dynamic, ALMetadata (only the source
-  // building used them; it is in ALSourceFactory now)
-  // ---> REMOVED (output split, step 2b): ALWasapiApi (the WASAPI calls are in
-  // ALOutputWasapi now)
-  ALSourceFactory,  // ---> ADDED (phase 7b): TPlayThreadConfig, source building (moved there)
-  ALAudioOutput,    // ---> MOVED (output split, step 3a): from the implementation (TAudioOutputFactory)
-  uAudioUtils;      // ---> AulumicNS: TSignalInfo (moved from the implementation uses)
+  ALSourceFactory,  // TPlayThreadConfig, source building
+  ALAudioOutput,    // TAudioOutputFactory
+  uAudioUtils;      // TSignalInfo
 
 const
-  // ---> MOVED (phase 7a): The WASAPI GUIDs, error codes, wave format
+  // The WASAPI GUIDs, error codes, wave format
   // records and COM interfaces are in ALWasapiApi (used by ALOutputWasapi)
 
   // Device availability (DAC switched off / unplugged / switched on again)
   DEVICE_POLL_MS        = 250;   // poll step while waiting for the device
   DEVICE_RETRY_MS       = 1000;  // wait after a failed format check / Initialize
   RECOVERY_WINDOW_MS    = 20000; // how long a recovery may take (a DAC switching on needs several seconds)
-  // ---> AulumicNS: a refused format is asked again FORMAT_RETRIES times,
+  // A refused format is asked again FORMAT_RETRIES times,
   // FORMAT_RETRY_MS apart (a DAC that changes mode: see RunOutput)
   FORMAT_RETRIES        = 4;
   FORMAT_RETRY_MS       = 500;
   RECOVERY_STABLE_MS    = 5000;  // normal buffer flow this long ends the recovery
 
 type
-  // ---> MOVED (phase 7b): TPlayThreadConfig, TNextPrepareParams and
+  // TPlayThreadConfig, TNextPrepareParams and
   // TPreparedNext are in ALSourceFactory
 
-  // ---> AulumicNS: the two gain stages RunGain works for: integer samples
+  // The two gain stages RunGain works for: integer samples
   // (ApplyDSPBlock) and the resampler's doubles (ApplyFloatDSPBlock)
   TGainKind = (gkInt, gkFloat);
 
@@ -60,7 +55,7 @@ type
   private
     FConfig           : TPlayThreadConfig;
     FNotifyHandle     : THandle;
-    // ---> AulumicNS: GetTickCount64 when the output was closed last (0 =
+    // GetTickCount64 when the output was closed last (0 =
     // never); TAudioEngine.Stop reads it after the thread ended
     FClosedTick       : QWord;
     FFileName         : string;
@@ -71,23 +66,23 @@ type
     FVolumeInt        : integer;
     FToneState        : TToneState;
     FToneDirty        : boolean;
-    FToneGlided       : Boolean;  // ---> AulumicNS: the tone control was gliding in the last block (RunGain)
+    FToneGlided       : Boolean;  // the tone control was gliding in the last block (RunGain)
     FDitherSeed       : Cardinal;
 
-    // ---> AUDIT FIX 3.3: Bit depth negotiated with WASAPI (0 = not yet known).
+    // Bit depth negotiated with WASAPI (0 = not yet known).
     // Lets SetNextFile pre-wrap the next source in a TBitDepthConverterSource on
     // the UI thread so CommitSeamlessSwap normally allocates nothing under FLock.
     FNegotiatedBits   : integer;
-    // ---> ADDED: Valid bits of the negotiated format (e.g. 24 in a 32-bit
+    // Valid bits of the negotiated format (e.g. 24 in a 32-bit
     // container; 0 = not yet known), and the bit-perfect state of the last
     // buffer (1 = untouched, see ApplyDSP). Both via Interlocked*.
     FNegotiatedValid  : integer;
     FBitPerfect       : integer;
-    // ---> AulumicNS: 1 = the open output sends DSD as DSD (ASIO), Interlocked
+    // 1 = the open output sends DSD as DSD (ASIO), Interlocked
     FNativeDsdOut     : integer;
-    // ---> AUDIT FIX 3.3: A retired source handed from the render thread to the
+    // A retired source handed from the render thread to the
     // UI thread (freed in ReadAndClearSwapFlag) so file handles, decoders and
-    // soxr states are normally not torn down on the MMCSS thread.
+    // resampler states are normally not torn down on the MMCSS thread.
     FPendingFree      : TAudioSource;
 
     FProgressCache    : double;
@@ -112,7 +107,7 @@ type
     FErrorType        : TAudioErrorType;
     FFailedSampleRate : Integer;
     FErrorMessage     : string;
-    // ---> ADDED: Technical details of an unexpected exception (class, message,
+    // Technical details of an unexpected exception (class, message,
     // module + offset) for the log; the user sees FErrorMessage. Under FLock.
     FErrorDetail      : string;
 
@@ -120,7 +115,7 @@ type
     FCurrentIsDSD     : boolean;
     FNextIsDSD        : boolean;
 
-    // ---> ADDED (output split, step 3a): see OutputFactory
+    // See OutputFactory
     FOutputFactory    : TAudioOutputFactory;
 
     FReplayGainDB       : double;
@@ -129,11 +124,11 @@ type
     FNextReplayGainDB   : double;
     FNextReplayGainPeak : double;
     FNextRGFactor       : double;
-    { ---> AulumicNS: the DSD gain (FConfig.DsdGainDB) as a factor, applied by
+    { The DSD gain (FConfig.DsdGainDB) as a factor, applied by
       ApplyDSP / ApplyResamplerFloatDSP to DSD converted to PCM (also with the
       volume locked); the converter itself works at 0 dB }
     FDsdGainLin         : double;
-    { ---> AulumicNS: the gain the block routines work with (FGainNow), the
+    { The gain the block routines work with (FGainNow), the
       gain of the last frame played (FGainCur; -1 = no block yet) and the
       glide in work: from FRampFrom to FRampTo over FRampLen frames, FRampPos
       of them done (the gain rests at FRampTo when they are equal). A change
@@ -145,7 +140,7 @@ type
     FRampTo             : double;
     FRampLen            : integer;
     FRampPos            : integer;
-    { ---> AulumicNS: automatic headroom (RunGain). The album and chain of
+    { Automatic headroom (RunGain). The album and chain of
       the track in work and of the queued one (CalcHeadroomKey), the highest
       peak of that album before the gain (of full scale; from the book and
       from the blocks played), the gain limit learned from blocks that went
@@ -171,7 +166,7 @@ type
     FVolatileClipL      : integer;
     FVolatileClipR      : integer;
 
-    // ---> ADDED: Peak meter slices (see ScanMeterSlices / ReadMeterSlices).
+    // Peak meter slices (see ScanMeterSlices / ReadMeterSlices).
     // FMeterRing and FMeterWriteCount are written by the audio thread only;
     // FMeterReadCount is used by the UI thread only.
     FMeterRing       : array[0..METER_RING_SIZE - 1] of TMeterSlice;
@@ -189,14 +184,13 @@ type
     function  CalculateRGFactor(GainDB, Peak: double): double;
     procedure DeferFreeSource(var ASource: TAudioSource);
 
-    procedure RunOutput;  // ---> CHANGED (output split, step 2b): was RunWasapi
+    procedure RunOutput;
     procedure ApplyDSP(Buffer: Pointer; BytesRead: integer);
     procedure ApplyResamplerFloatDSP(Buffer: PDouble; FrameCount, Channels, OutBits: Integer;
                                          out OutClipped: Boolean);
-    // ---> AulumicNS: the two above hand the samples to RunGain (the glide to
+    // The two above hand the samples to RunGain (the glide to
     // a new gain, the automatic headroom), and that to these, which work
-    // with the one gain FGainNow (they were ApplyDSP and
-    // ApplyResamplerFloatDSP themselves)
+    // with the one gain FGainNow
     procedure ApplyDSPBlock(Buffer: Pointer; BytesRead: integer);
     procedure ApplyFloatDSPBlock(Buffer: PDouble; FrameCount, Channels, OutBits: Integer;
                                  out OutClipped: Boolean);
@@ -211,19 +205,18 @@ type
 
     function  CreateSource(const Filename: string; out InRate, OutRate: integer): TAudioSource;
     procedure FillDsdSilence(Buffer: Pointer; ByteCount, BitDepth: integer; var ADoPMarker: byte);
-    // ---> ADDED (output split, step 1): one buffer's work in one place each,
-    // instead of three copies in RunOutput (independent of the device)
+    // One buffer's work in one place each (independent of the device)
     procedure FillTail(PTail: PByte; ACount: Integer; AIsDoP: Boolean);
     procedure CountOutputFrames(ABytes, ABlockAlign: Integer; AUpdateProgress: Boolean);
     function  FillBlock(PData: PByte; ABytes, ABlockAlign: Integer;
                         AUpdateProgress: Boolean): Integer;
     procedure LogEvent(EventCode: integer; HRes: HRESULT = 0);
-    // ---> AulumicNS: a log event with a 64-bit value (the LPARAM on Win64)
+    // A log event with a 64-bit value (the LPARAM on Win64)
     procedure LogEvent64(EventCode: integer; AValue: Int64);
 
     procedure UpdatePeakAtomic(var Target: integer; NewValue: integer);
     function  GetHasError: boolean;
-    // ---> AUDIT FIX 3.2: Thread-safe getters for error state
+    // Thread-safe getters for error state
     function  GetErrorMessageSafe: string;
     function  GetErrorTypeSafe: TAudioErrorType;
     function  GetFailedSampleRateSafe: Integer;
@@ -236,7 +229,7 @@ type
 
   public
     property TrackSwapped: boolean read FTrackSwapped write FTrackSwapped;
-    // ---> AUDIT FIX 3.2: Route error properties through thread-safe getters
+    // The error properties go through thread-safe getters
     property ErrorMessage: string read GetErrorMessageSafe;
     property UseDoP: boolean read FConfig.UseDoP write FConfig.UseDoP;
     property ResamplePCM: boolean read FConfig.ResamplePCM write FConfig.ResamplePCM;
@@ -255,12 +248,12 @@ type
 
     property ErrorType : TAudioErrorType read GetErrorTypeSafe;
     property FailedSampleRate: integer read GetFailedSampleRateSafe;
-    // ---> ADDED: '' unless the thread stopped on an unexpected exception
+    // '' unless the thread stopped on an unexpected exception
     property ErrorDetail: string read GetErrorDetailSafe;
 
-    // ---> ADDED (output split, step 3a): Makes the output for each open of
+    // Makes the output for each open of
     // the device; set before Start. Not set (TAudioEngine never sets it) = a
-    // TWasapiOutput. The test program plays into a memory output with it.
+    // TWasapiOutput or TAsioOutput. The test program plays into a memory output with it.
     property OutputFactory: TAudioOutputFactory read FOutputFactory write FOutputFactory;
 
     // Thread-Level Optimization Properties
@@ -272,7 +265,7 @@ type
     destructor Destroy; override;
 
     procedure StopPlayback;
-    // ---> ADDED: Asks the thread to stop and waits up to ATimeoutMs for it to
+    // Asks the thread to stop and waits up to ATimeoutMs for it to
     // end. True = ended (it can be freed without blocking). UI thread.
     function  StopAndWait(ATimeoutMs: Cardinal): Boolean;
     procedure SetVolume(Value: integer);
@@ -282,39 +275,39 @@ type
     procedure Resume;
     function  IsPaused: boolean;
     function  ReadAndClearSwapFlag: Boolean;
-    // ---> AUDIT FIX: Returns False (and queues nothing) when a gapless swap has
+    // Returns False (and queues nothing) when a gapless swap has
     // happened that the UI has not consumed yet: the caller's idea of "next" is
     // then stale. Returns True in every other case (including load failures).
     function  SetNextFile(const NextFileName: string): Boolean;
-    // ---> ADDED: Snapshot for PrepareNextSource (any thread may then use it)
+    // Snapshot for PrepareNextSource (any thread may then use it)
     procedure GetPrepareParams(out AParams: TNextPrepareParams);
-    // ---> ADDED: Queues a source built by PrepareNextSource; takes ownership
+    // Queues a source built by PrepareNextSource; takes ownership
     // of APrep.Source in every case. Result as SetNextFile.
     function  SetPreparedNext(var APrep: TPreparedNext): Boolean;
     procedure ForceGaplessSwap;
     procedure SetDSDGain(GainDB: Integer);
     procedure GetAndClearPeaks(out L, R: double; out cL, cR: boolean);
-    // ---> ADDED: Like GetAndClearPeaks, but also reports per channel whether
+    // Like GetAndClearPeaks, but also reports per channel whether
     // a new block was measured since the previous read (HasL / HasR)
     procedure ReadPeaks(out L, R: double; out HasL, HasR: boolean; out cL, cR: boolean);
-    // ---> ADDED: Copies the meter slices measured since the previous call
+    // Copies the meter slices measured since the previous call
     // (oldest first, at most Length(Dest)). UI thread only.
     procedure ReadMeterSlices(var Dest: array of TMeterSlice; out Count: Integer);
 
     function GetAppliedReplayGain: double;
     function GetBitDepth: integer;
     function GetChannels: integer;
-    // ---> ADDED: True when the last buffer reached the DAC untouched
+    // True when the last buffer reached the DAC untouched
     function IsBitPerfect: boolean;
-    // ---> AulumicNS: the stages of the signal path (UI thread; reads only)
+    // The stages of the signal path (UI thread; reads only)
     function GetSignalInfo: TSignalInfo;
   end;
 
 
-// ---> MOVED (phase 7b): PrepareNextSource and FreePreparedNext are in
+// PrepareNextSource and FreePreparedNext are in
 // ALSourceFactory
 
-// ---> ADDED: Rounds ACount 32-bit samples to their top AValidBits (16..31)
+// Rounds ACount 32-bit samples to their top AValidBits (16..31)
 // with TPDF dither of +-1 step: the bits below become 0 and a full-scale
 // sample stays inside the container. For a DAC opened with fewer valid bits
 // than its 32-bit container (24 in 32), which ignores the bits below. Any
@@ -326,9 +319,9 @@ procedure RoundSamplesToValidBits(ASamples: PLongInt; ACount, AValidBits: Intege
 implementation
 
 uses uAppStrings, uMetaUtils, uOSUtils,
-  ALHeadroom,      // ---> AulumicNS: the automatic headroom's ceiling and book
-  ALOutputWasapi,  // ---> ADDED (output split, step 2a)
-  ALOutputAsio;    // ---> AulumicNS: the ASIO output
+  ALHeadroom,      // the automatic headroom's ceiling and book
+  ALOutputWasapi,  // the WASAPI output
+  ALOutputAsio;    // the ASIO output
 
 // =========================================================================
 // AUDIO MATH CONSTANTS (Strictly for local DSP use)
@@ -355,16 +348,16 @@ const
   PCM32_CLIP_TH = 1717986918.0; // 80% Threshold
   PCM32_CLIP_HR = 429496730.0;  // 20% Headroom
 
-  // ---> ADDED: The start of a TPDF dither (as ApplyDSP's DEFAULT_PRNG_SEED)
+  // The start of a TPDF dither (as ApplyDSP's DEFAULT_PRNG_SEED)
   DITHER_DEFAULT_SEED = $A341316C;
 
-  // ---> MOVED (phase 7b): RG_MIN_GAIN_DB / RG_MAX_GAIN_DB are in ALSourceFactory
+  // RG_MIN_GAIN_DB / RG_MAX_GAIN_DB are in ALSourceFactory
 
 // Import Timer API from winmm.dll
 function timeBeginPeriod(uPeriod: UINT): UINT; stdcall; external 'winmm.dll' name 'timeBeginPeriod';
 function timeEndPeriod(uPeriod: UINT): UINT; stdcall; external 'winmm.dll' name 'timeEndPeriod';
 
-// ---> ADDED: For the error details of unexpected exceptions (DescribeException)
+// For the error details of unexpected exceptions (DescribeException)
 function AL_GetModuleHandleExW(dwFlags: DWORD; lpModuleName: PWideChar;
   var phModule: HMODULE): BOOL; stdcall; external 'kernel32.dll' name 'GetModuleHandleExW';
 
@@ -372,8 +365,8 @@ const
   AL_MODULE_FROM_ADDRESS      = $00000004; // GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
   AL_MODULE_UNCHANGED_REFCNT  = $00000002; // GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT
 
-// ---> ADDED: 'Aulumic.exe+$1A2B3C' or 'libFLAC.dll+$4D5E' for a code address,
-// so a log line tells whether an error happened in Aulumic or in a library
+// 'AulumicNS.exe+$1A2B3C' or 'driver.dll+$4D5E' for a code address,
+// so a log line tells whether an error happened in AulumicNS or in a library
 // (and, with the map / debug file of that build, where). '$ADDRESS' when the
 // address belongs to no module.
 function DescribeCodeAddress(AAddr: Pointer): string;
@@ -390,7 +383,7 @@ begin
     Len := GetModuleFileNameW(Module, @Name[0], MAX_PATH);
     if Len > 0 then
     begin
-      // ---> CHANGED (ObjFPC switch): the UTF-16 module path as UTF-8
+      // The UTF-16 module path as UTF-8
       Result := ExtractFileName(UTF8Encode(UnicodeString(PWideChar(@Name[0])))) + '+$' +
                 IntToHex(PtrUInt(AAddr) - PtrUInt(Module), 1);
       Exit;
@@ -399,7 +392,7 @@ begin
   Result := '$' + IntToHex(PtrUInt(AAddr), SizeOf(Pointer) * 2);
 end;
 
-// ---> ADDED: Class, message and place of an exception, for the log
+// Class, message and place of an exception, for the log
 function DescribeException(E: TObject; AAddr: Pointer): string;
 begin
   if E is Exception then
@@ -411,7 +404,7 @@ begin
   Result := Result + ' at ' + DescribeCodeAddress(AAddr);
 end;
 
-// ---> MOVED (phase 7b): The source building (CalcTargetRate, CalcRGFactor,
+// The source building (CalcTargetRate, CalcRGFactor,
 // CalcReplayGainForFile, CreateSourceFor, PrepareNextSource,
 // FreePreparedNext) is in ALSourceFactory
 
@@ -494,19 +487,19 @@ begin
   FToneControl := TToneControl.Create;
 end;
 
-// ---> CHANGED: Body moved to CalcRGFactor (shared with PrepareNextSource)
+// The body is CalcRGFactor (shared with PrepareNextSource)
 function TPlayThread.CalculateRGFactor(GainDB, Peak: double): double;
 begin
   Result := CalcRGFactor(FConfig, GainDB, Peak);
 end;
 
-// ---> CHANGED: Body moved to CalcReplayGainForFile (shared with PrepareNextSource)
+// The body is CalcReplayGainForFile (shared with PrepareNextSource)
 procedure TPlayThread.CalculateReplayGainForFile(const AFileName: string;
   out OutGain, OutPeak: double);
 var
   LocalDsdGainDB : Integer;
 begin
-  // ---> AUDIT FIX 3.4: Snapshot DsdGainDB under FLock
+  // Snapshot DsdGainDB under FLock
   EnterCriticalSection(FLock);
   try
     LocalDsdGainDB := FConfig.DsdGainDB;
@@ -525,7 +518,7 @@ begin
   Terminate;
 
   // 2. The Absolute Gatekeeper
-  // ---> CHANGED: WaitForSingleObject instead of TThread.WaitFor (see
+  // WaitForSingleObject, not TThread.WaitFor (see
   // StopAndWait). Normally TAudioEngine has already waited with a time limit,
   // so the thread has ended. Not when it never started (constructor failed:
   // TThread.Destroy starts and ends it) or already finished.
@@ -554,14 +547,14 @@ begin
   if Assigned(FNextSource) then
     FreeAndNil(FNextSource);
 
-  // ---> AUDIT FIX 3.3: Free a retired source the UI never collected
+  // Free a retired source the UI never collected
   if Assigned(FPendingFree) then
     FreeAndNil(FPendingFree);
 
   inherited;
 end;
 
-// ---> AUDIT FIX 3.3: Called on the render thread after a gapless swap. Parks the
+// Called on the render thread after a gapless swap. Parks the
 // retired source for the UI thread (ReadAndClearSwapFlag frees it). Only if the
 // UI has not collected the previous one yet is that older one freed here.
 procedure TPlayThread.DeferFreeSource(var ASource: TAudioSource);
@@ -586,19 +579,19 @@ begin
   SetEvent(FStopEvent);
 end;
 
-// ---> ADDED: Waits with WaitForSingleObject, not TThread.WaitFor. On the UI
+// Waits with WaitForSingleObject, not TThread.WaitFor. On the UI
 // thread, TThread.WaitFor also runs the Synchronize / Queue calls of every
 // other thread while it waits, so e.g. the metadata custodian could pause the
 // player in the middle of TPlaybackManager.PlayNext. This thread never calls
 // Synchronize or Queue (it only posts WM_AUDIO_ENGINE_LOG), so a plain wait
 // cannot deadlock. The time limit keeps the window responsive when the thread
 // is stuck in a file read (unreachable drive) or in the audio driver.
-// ---> AulumicNS: ... and it delivers the messages SENT to this thread's
+// It also delivers the messages SENT to this thread's
 // windows while it waits (only those: input, timers and Synchronize / Queue
-// stay queued). A driver that sends to a window of this thread while it stops
-// (the play thread waits for that in TAsioOutput.Close) no longer waits for
-// the time limit. (ASIO drivers once got the main window at init; they now
-// get a window of their host thread, see ALOutputAsio.CreateHostWindow.)
+// stay queued), so a driver that sends to a window of this thread while it
+// stops (the play thread waits for that in TAsioOutput.Close) does not wait
+// for the time limit. (ASIO drivers get a window of their host thread, not
+// the main window: see ALOutputAsio.CreateHostWindow.)
 function TPlayThread.StopAndWait(ATimeoutMs: Cardinal): Boolean;
 const
   PM_QS_SENDMESSAGE_ = QS_SENDMESSAGE shl 16;   // PeekMessage: sent messages only
@@ -655,7 +648,7 @@ begin
   try
     Result := FTrackSwapped;
     FTrackSwapped := False;
-    // ---> AUDIT FIX 3.3: Collect the source retired by the render thread
+    // Collect the source retired by the render thread
     ToFree       := FPendingFree;
     FPendingFree := nil;
   finally
@@ -687,7 +680,7 @@ procedure TPlayThread.Seek(Percent: double);
 begin
   EnterCriticalSection(FLock);
   try
-    // ---> AUDIT FIX 2.7: Clamp seek position to 0.0..1.0
+    // Clamp seek position to 0.0..1.0
     FSeekPosition  := EnsureRange(Percent, 0.0, 1.0);
     FSeekRequested := True;
   finally
@@ -708,7 +701,7 @@ begin
   try
     DeltaDB := GainDB - FConfig.DsdGainDB;
     FConfig.DsdGainDB := GainDB;
-    // ---> AulumicNS: the DSP applies it (the converter stays at 0 dB)
+    // The DSP applies it (the converter stays at 0 dB)
     FDsdGainLin := Power(10.0, GainDB / 20.0);
 
     if Assigned(FSource) then
@@ -746,10 +739,10 @@ begin
   ReadPeaks(L, R, HasL, HasR, cL, cR);
 end;
 
-// ---> ADDED: The audio thread measures one peak per WASAPI block (one block
+// The audio thread measures one peak per WASAPI block (one block
 // = the buffer size, e.g. 250 ms), while the UI reads every 50 ms. A stored 0
 // means "no block measured since the last read", so the meter can keep the
-// last value instead of averaging in silence (which made it pulse).
+// last value instead of averaging in silence (which would make it pulse).
 // One atomic exchange per channel: the value and the "new" flag cannot tear.
 procedure TPlayThread.ReadPeaks(out L, R: double; out HasL, HasR: boolean; out cL, cR: boolean);
 var
@@ -765,7 +758,7 @@ begin
   cR   := InterlockedExchange(FVolatileClipR, 0) = 1;
 end;
 
-// ---> ADDED: UI thread. Copies the slices written since the previous call.
+// UI thread. Copies the slices written since the previous call.
 // Only slices well inside the ring are copied (a margin of 64 slices, more than
 // the 50 of the largest 1000 ms block), so the audio thread never overwrites a
 // slice while it is being copied.
@@ -778,7 +771,7 @@ procedure TPlayThread.ReadMeterSlices(var Dest: array of TMeterSlice; out Count:
 const
   RING_SAFE = METER_RING_SIZE - 64;
 var
-  W, Avail, First, I: LongInt;  // ---> CHANGED (ObjFPC switch): First (Start is TThread.Start)
+  W, Avail, First, I: LongInt;  // First, not Start: that is TThread.Start
 begin
   Count := 0;
   W     := InterlockedCompareExchange(FMeterWriteCount, 0, 0);  // atomic read
@@ -815,7 +808,7 @@ begin
   // Safely wipe the waiting room if the UI sends a blank string
   if Trim(NextFileName) = '' then
   begin
-    // ---> AUDIT FIX 3.3: Detach pointer inside FLock and free outside FLock
+    // Detach pointer inside FLock and free outside FLock
     // so the real-time WASAPI thread never blocks behind file-handle teardown!
     EnterCriticalSection(FLock);
     try
@@ -828,8 +821,8 @@ begin
     Exit;
   end;
 
-  // ---> CHANGED: The same steps the I/O worker runs (PrepareNextSource), here
-  // on the calling thread. TPlaybackManager now normally hands over a source
+  // The same steps the I/O worker runs (PrepareNextSource), here
+  // on the calling thread. TPlaybackManager normally hands over a source
   // the worker has built (SetPreparedNext) and only falls back to this.
   GetPrepareParams(Params);
   if not PrepareNextSource(Params, NextFileName, Prep) then
@@ -871,7 +864,7 @@ begin
   if NewSource = nil then
     Exit;
 
-  // ---> AUDIT FIX 3.3: Match the negotiated WASAPI bit depth here, outside
+  // Match the negotiated WASAPI bit depth here, outside
   // FLock. It may have become known (or changed) after the source was built.
   Bits := InterlockedCompareExchange(FNegotiatedBits, 0, 0);
   if Bits > 0 then
@@ -898,12 +891,12 @@ begin
     end;
   end;
 
-  // ---> AUDIT FIX 3.3: Swap FNextSource under FLock and free OldSource outside FLock
+  // Swap FNextSource under FLock and free OldSource outside FLock
   EnterCriticalSection(FLock);
   try
     if FTrackSwapped then
     begin
-      // ---> AUDIT FIX: The render thread swapped to the previously queued track
+      // The render thread swapped to the previously queued track
       // after the caller last checked. This "next" was chosen relative to the old
       // current track, so reject it; the caller consumes the swap and retries.
       OldSource := NewSource;
@@ -911,9 +904,9 @@ begin
     end
     else
     begin
-      // ---> ADDED: The DSD gain changed after the source was built: the
+      // The DSD gain changed after the source was built: the
       // ReplayGain compensation as SetDSDGain does for a queued FNextSource
-      // (---> AulumicNS: the gain itself is the DSP's, FDsdGainLin)
+      // (the gain itself is the DSP's, FDsdGainLin)
       DeltaDB := FConfig.DsdGainDB - APrep.DsdGainDB;
       if DeltaDB <> 0 then
       begin
@@ -955,7 +948,7 @@ begin
   until InterlockedCompareExchange(Target, NewValue, CurrentVal) = CurrentVal;
 end;
 
-// ---> AUDIT FIX 3.2: Synchronize error state reads and writes under FLock
+// Error state reads and writes are synchronized under FLock
 function TPlayThread.GetHasError: boolean;
 begin
   EnterCriticalSection(FLock);
@@ -1042,7 +1035,7 @@ begin
     FillChar(P^, ByteCount mod Stride, 0);
 end;
 
-// ---> ADDED (output split, step 1): The rest of a buffer the source did not
+// The rest of a buffer the source did not
 // fill: DoP silence (continuing the marker sequence) or digital zeros
 procedure TPlayThread.FillTail(PTail: PByte; ACount: Integer; AIsDoP: Boolean);
 var
@@ -1060,7 +1053,7 @@ begin
     FillChar(PTail^, ACount, 0);
 end;
 
-// ---> ADDED (output split, step 1): ABytes more were handed to the device.
+// ABytes more were handed to the device.
 // Resampled output counts frames (the source's position is the input side);
 // otherwise the progress is the source's. AUpdateProgress = False: only the
 // frame count (after a seek the progress is the seek target).
@@ -1069,7 +1062,7 @@ begin
   if FConfig.ResamplePCM and (ABlockAlign > 0) then
   begin
     FOutputFramesWritten := FOutputFramesWritten + (ABytes div ABlockAlign);
-    // ---> AUDIT FIX 2.7: Clamp FProgressCache to 0.0..1.0
+    // Clamp FProgressCache to 0.0..1.0
     if AUpdateProgress then
       FProgressCache := EnsureRange(FOutputFramesWritten / FTotalFrames, 0.0, 1.0);
   end
@@ -1077,7 +1070,7 @@ begin
     FProgressCache := EnsureRange(FSource.GetProgress, 0.0, 1.0);
 end;
 
-// ---> ADDED (output split, step 1): Fills one device buffer from the current
+// Fills one device buffer from the current
 // source: read, the rest as silence, count the frames, DSP. Returns the bytes
 // the source delivered. Used for the first buffer and the buffer after a
 // seek; the normal loop also switches tracks between read and DSP.
@@ -1091,7 +1084,7 @@ begin
   ApplyDSP(PData, Result);
 end;
 
-// ---> ADDED: see the declaration. The grid step is 2^(32 - AValidBits) (256
+// See the declaration. The grid step is 2^(32 - AValidBits) (256
 // for 24 valid bits); the dither is the difference of two uniform values of
 // one step each (two xorshift states, as NextTPDFDither in ApplyDSP).
 procedure RoundSamplesToValidBits(ASamples: PLongInt; ACount, AValidBits: Integer;
@@ -1142,17 +1135,17 @@ end;
 // Dithering, and Peak Meter extraction)
 //==============================================================================
 // =============================================================================
-// ---> AulumicNS: the gain, its glide and the automatic headroom (2026-11-12)
+// The gain, its glide and the automatic headroom
 //
 // The glide. A new volume (also Mute), another ReplayGain factor or DSD gain
-// was applied to the next block in one step: a jump in the waveform, heard
-// as a click or, while the volume slider is dragged, as "zipper" noise. Now
+// applied in one step would be a jump in the waveform, heard
+// as a click or, while the volume slider is dragged, as "zipper" noise. So
 // the gain glides from the old value to the new one over GAIN_RAMP_MS, one
 // frame at a time, through the same block routines (so the tone control, the
 // soft clipper, the dither and the meter see every frame as always). The
 // glide goes on in the next block when a block is shorter than it (an ASIO
 // period at 352.8 kHz is 1.5 ms). With an unchanged gain the block goes
-// through in one call, exactly as before: bit-perfect playback is not
+// through in one call: bit-perfect playback is not
 // touched.
 //
 // The automatic headroom (FConfig.AutoHeadroom). The peak of every block is
@@ -1167,7 +1160,7 @@ end;
 // new gain already. Only when there is no room for that - the over is in the
 // first 10 ms of the block, or a glide is in work - the glide begins at once
 // and a frame that would go over inside it is held at the ceiling (for those
-// few frames that is what clipping did to every peak before; it happens once
+// few frames that is what clipping would do to every peak; it happens once
 // per new highest peak, the first time an album is played). The gain itself
 // never jumps. In the integer path (no resampler) samples cannot be
 // above full scale: the headroom works there only with a gain above 1 (DSD
@@ -1726,7 +1719,7 @@ var
 
   IsDSPActive: Boolean;
   IsBitPerfectBypass: Boolean;
-  Untouched: Boolean;  // ---> ADDED: the buffer reaches the DAC unchanged
+  Untouched: Boolean;  // the buffer reaches the DAC unchanged
   ClippedL, ClippedR: Boolean;
   LocalTone: TToneState;
   LocalSeed: Cardinal;
@@ -1736,8 +1729,8 @@ begin
   if (BytesRead <= 0) or (FSource = nil) then
     Exit;
 
-  // ---> MODIFIED: DoP is bit-perfect (the DSD bits pass unchanged); the
-  // check is split only to set the flag, DoP itself is untouched
+  // DoP is bit-perfect (the DSD bits pass unchanged): only the flag is
+  // set, DoP itself is untouched
   if FSource.IsDoP then
   begin
     InterlockedExchange(FBitPerfect, 1);
@@ -1749,13 +1742,13 @@ begin
   // inside TResamplerSource.ReadData via ApplyResamplerFloatDSP!
   if FSource.FindLayer(TResamplerSource) <> nil then
   begin
-    InterlockedExchange(FBitPerfect, 0);  // ---> ADDED: resampled
-    // ---> ADDED: Fewer valid bits than the 32-bit container (24 in 32):
+    InterlockedExchange(FBitPerfect, 0);  // resampled
+    // Fewer valid bits than the 32-bit container (24 in 32):
     // rounded to them with dither (the resampler rounds only to 32 bits)
     if FSource.GetBitsPerSample = 32 then
       RoundSamplesToValidBits(PLongInt(Buffer), BytesRead div 4,
         InterlockedCompareExchange(FNegotiatedValid, 0, 0), FDitherSeed);
-    // ---> ADDED: The buffer is final here as well: measure the meter slices
+    // The buffer is final here as well: measure the meter slices
     ScanMeterSlices(Buffer, BytesRead);
     Exit;
   end;
@@ -1789,7 +1782,7 @@ begin
     Exit;
 
   // Lock-free Volume + Pre-calculated FRGFactor (No Power() calls!)
-  // ---> AulumicNS: the gain of this block from the caller (TargetGain, or a
+  // The gain of this block from the caller (TargetGain, or a
   // step of the glide to it)
   VolFactor  := FGainNow;
   IsSoftClip := (not FConfig.DisableVolume) and FConfig.EnableSoftClipping;
@@ -1804,7 +1797,7 @@ begin
   // =========================================================================
   IsBitPerfectBypass := (not IsDSPActive) and (not IsSoftClip) and (Abs(VolFactor - 1.0) < 1e-9);
 
-  // ---> ADDED: Bit-perfect = the untouched path, no DSD-to-PCM, and no bits
+  // Bit-perfect = the untouched path, no DSD-to-PCM, and no bits
   // lost to the output format (padding to a wider container is lossless)
   SrcBits   := Bits;
   ConvLayer := FSource.FindLayer(TBitDepthConverterSource);
@@ -1813,7 +1806,7 @@ begin
   ValidBits := InterlockedCompareExchange(FNegotiatedValid, 0, 0);
   if (ValidBits <= 0) or (ValidBits > Bits) then
     ValidBits := Bits;
-  // ---> CHANGED: kept in Untouched for the rounding to the valid bits below
+  // Kept in Untouched for the rounding to the valid bits below
   Untouched := IsBitPerfectBypass and (not FCurrentIsDSD) and (SrcBits <= ValidBits);
   if Untouched then
     InterlockedExchange(FBitPerfect, 1)
@@ -2204,7 +2197,7 @@ begin
     TempPeakR := TempPeakR / PCM32_MAX_FLT;
   end;
 
-  // ---> AulumicNS: for RunGain, before the meter's limit of 1
+  // For RunGain, before the meter's limit of 1
   if TempPeakL > FBlockOutPeak then
     FBlockOutPeak := TempPeakL;
   if TempPeakR > FBlockOutPeak then
@@ -2215,7 +2208,7 @@ begin
   if TempPeakR > 1.0 then
     TempPeakR := 1.0;
 
-  // ---> FIX: Stored as peak + 1, so 0 means "no new block measured yet"
+  // Stored as peak + 1, so 0 means "no new block measured yet"
   // (see ReadPeaks). A block of silence is stored as 1.
   UpdatePeakAtomic(FVolatilePeakL, Round(TempPeakL * 1000000) + 1);
   UpdatePeakAtomic(FVolatilePeakR, Round(TempPeakR * 1000000) + 1);
@@ -2227,7 +2220,7 @@ begin
   if ClippedR then
     InterlockedExchange(FVolatileClipR, 1);
 
-  // ---> ADDED: Fewer valid bits than the 32-bit container (24 in 32): a
+  // Fewer valid bits than the 32-bit container (24 in 32): a
   // changed buffer (volume, ReplayGain, tone, soft clipping, DSD to PCM, a
   // source with more bits than the DAC takes) is rounded to them with dither;
   // the DAC would cut the bits below off without it. An untouched buffer is
@@ -2236,11 +2229,11 @@ begin
   if (not Untouched) and (Bits = 32) then
     RoundSamplesToValidBits(PLongInt(Buffer), BytesRead div 4, ValidBits, FDitherSeed);
 
-  // ---> ADDED: Measure the meter slices on the final output samples
+  // Measure the meter slices on the final output samples
   ScanMeterSlices(Buffer, BytesRead);
 end;
 
-// ---> ADDED: Peak meter slices. A WASAPI block holds a whole buffer (e.g.
+// Peak meter slices. A WASAPI block holds a whole buffer (e.g.
 // 250 ms), far too coarse for a lively meter. This read-only pass measures the
 // peak of every METER_SLICE_MS of the final output samples (exactly what goes
 // to the DAC) and stores it in FMeterRing; the UI plays the slices out at real
@@ -2404,7 +2397,7 @@ begin
   end;
 end;
 
-// ---> ADDED: Output format for the log in one value (see AuLog):
+// Output format for the log in one value (see AuLog):
 // rate shl 12 or container bits shl 6 or valid bits
 function PackFormatCode(ARate, ABits, AValidBits: Cardinal): HRESULT;
 begin
@@ -2423,12 +2416,12 @@ begin
     PostMessage(FNotifyHandle, WM_AUDIO_ENGINE_LOG, EventCode, LPARAM(AValue));
 end;
 
-// ---> CHANGED: Body moved to CreateSourceFor (shared with PrepareNextSource)
+// The body is CreateSourceFor (shared with PrepareNextSource)
 function TPlayThread.CreateSource(const Filename: string; out InRate, OutRate: integer): TAudioSource;
 var
   LocalDsdGainDB: integer;
 begin
-  // ---> AUDIT FIX 3.4: Snapshot DsdGainDB under FLock
+  // Snapshot DsdGainDB under FLock
   EnterCriticalSection(FLock);
   try
     LocalDsdGainDB := FConfig.DsdGainDB;
@@ -2499,7 +2492,7 @@ begin
 
   IsDSPActive := Assigned(FToneControl) and FToneControl.IsActive;
 
-  // ---> AulumicNS: the gain of this block from the caller (TargetGain, or a
+  // The gain of this block from the caller (TargetGain, or a
   // step of the glide to it)
   VolFactor  := FGainNow;
   IsSoftClip := (not FConfig.DisableVolume) and FConfig.EnableSoftClipping;
@@ -2682,7 +2675,7 @@ begin
 
   TempPeakL := TempPeakL / ScaleFlt;
   TempPeakR := TempPeakR / ScaleFlt;
-  // ---> AulumicNS: for RunGain, before the meter's limit of 1
+  // For RunGain, before the meter's limit of 1
   if TempPeakL > FBlockOutPeak then
     FBlockOutPeak := TempPeakL;
   if TempPeakR > FBlockOutPeak then
@@ -2692,7 +2685,7 @@ begin
   if TempPeakR > 1.0 then
     TempPeakR := 1.0;
 
-  // ---> FIX: Stored as peak + 1, so 0 means "no new block measured yet"
+  // Stored as peak + 1, so 0 means "no new block measured yet"
   // (see ReadPeaks). A block of silence is stored as 1.
   UpdatePeakAtomic(FVolatilePeakL, Round(TempPeakL * 1000000) + 1);
   UpdatePeakAtomic(FVolatilePeakR, Round(TempPeakR * 1000000) + 1);
@@ -2711,7 +2704,7 @@ type
   TAvSetMmThreadCharacteristicsW = function(TaskName: PWideChar; var TaskIndex: DWORD): THandle; stdcall;
   TAvRevertMmThreadCharacteristics = function(Handle: THandle): BOOL; stdcall;
 const
-  // ---> ADDED (ObjFPC switch): the MMCSS task, explicitly UTF-16 for the W call
+  // The MMCSS task, explicitly UTF-16 for the W call
   MMCSS_TASK_NAME: UnicodeString = 'Pro Audio';
 var
   TaskIndex: DWORD;
@@ -2769,10 +2762,10 @@ begin
     end;
 
     // 4. Inner COM Block
-    // ---> CHANGED: Multi-threaded apartment, the usual mode for a WASAPI
+    // Multi-threaded apartment, the usual mode for a WASAPI
     // render thread (this thread has no message loop, which a single-threaded
     // apartment would need). CoUninitialize only after a successful start.
-    NameThisThread('play thread');   // ---> AulumicNS: for the hang report
+    NameThisThread('play thread');   // for the hang report
     HrCoInit := CoInitializeEx(nil, COINIT_MULTITHREADED);
     try
       try
@@ -2794,11 +2787,11 @@ begin
             CalculateReplayGainForFile(FFileName, FReplayGainDB, FReplayGainPeak);
           end;
           FRGFactor := CalculateRGFactor(FReplayGainDB, FReplayGainPeak);
-          // ---> AulumicNS: automatic headroom: the album's peak so far
+          // Automatic headroom: the album's peak so far
           HeadroomForTrack(CalcHeadroomKey(FConfig, FFileName, FInputSampleRate, FOutputSampleRate));
 
           try
-            RunOutput;  // ---> CHANGED (output split, step 2b): was RunWasapi
+            RunOutput;
           finally
             EnterCriticalSection(FLock);
             try
@@ -2814,11 +2807,11 @@ begin
           SetError(E.ErrorType, E.Message, E.FailedRate);
         end;
 
-        // ---> CHANGED: The user message stays the same (an access violation
+        // The user sees "device disabled" (an access violation
         // is usually a device that was switched off or removed during a COM
-        // call), but the log now also gets the exception class, its message
+        // call); the log also gets the exception class, its message
         // and the module + offset where it happened, so a real bug (e.g. in
-        // a decoder) is no longer hidden behind "device disabled".
+        // a decoder) is not hidden behind that message.
         on E: EAccessViolation do
         begin
           SetError(aeDeviceDisabled, ERR_AUDIO_DISABLED, 0,
@@ -2879,7 +2872,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX 3.2: Synchronize error state updates under FLock
+// Error state updates are synchronized under FLock
 procedure TPlayThread.SetError(ErrType: TAudioErrorType; const Msg: string;
   RateInfo: Integer = 0; const ADetail: string = '');
 begin
@@ -2894,14 +2887,14 @@ begin
   end;
 end;
 
-// ---> CHANGED (output split, step 2b): was RunWasapi. Plays FSource on the
+// Plays FSource on the
 // output device: opens it (TAudioOutput.Open) with the retries below, fills
 // its buffers (read, track switch, DSP), and reopens it for a rate switch or
 // after the device dropped out. No device API here (only the creation of the
-// TWasapiOutput when no OutputFactory is set).
+// TWasapiOutput or TAsioOutput when no OutputFactory is set).
 procedure TPlayThread.RunOutput;
 var
-  // ---> ADDED (output split, step 2a/2b): the output (TWasapiOutput) and the
+  // The output (TWasapiOutput or TAsioOutput) and the
   // format it opened; this routine only talks to it
   Output            : TAudioOutput;
   OutFmt            : TAudioOutputFormat;
@@ -2926,23 +2919,23 @@ var
   SwappedThisBuffer : boolean;
   DSPAlreadyApplied : boolean;
   RetiredSource     : TAudioSource;
-  // ---> AulumicNS: the stream ended (end of the queue, a reopen at another
+  // The stream ended (end of the queue, a reopen at another
   // rate): let the output play what it holds before Close (Output.Drain)
   DrainBeforeClose  : boolean;
-  // ---> AulumicNS: the diagnostics of this stream for the log (dropouts,
+  // The diagnostics of this stream for the log (dropouts,
   // the longest time a buffer took to fill: read, resample, DSP)
   LastDropouts      : Integer;
   WorkStartUs       : Int64;
   MaxWorkUs         : Int64;
   BuffersOut        : Int64;
-  // ---> AulumicNS: refused formats tried again (see oorFormatUnsupported)
+  // Refused formats tried again (see oorFormatUnsupported)
   FormatRetries     : Integer;
   OpenStartTick     : QWord;   // RunOutput's start (InSettle)
   CloseStartTick    : QWord;   // Output.Close's start (alOutputCloseSlow)
   TieCheckTick      : QWord;   // ASIO: when to count the driver's tied windows again
   LastTied          : Integer; // the count logged last (-1 = none yet)
 
-  // ---> AulumicNS: within FConfig.SettleMs from the start: the device was
+  // Within FConfig.SettleMs from the start: the device was
   // used by the stream before (a switch during a track) and may still be
   // changing over
   function InSettle: Boolean;
@@ -2953,7 +2946,7 @@ var
   // Device not ready (switched off, being switched on, re-enumerating):
   // may we wait and try again? Never on the first open of a Play (the user
   // gets the message at once); otherwise for up to RECOVERY_WINDOW_MS.
-  // ---> AulumicNS: on the first open while InSettle too
+  // On the first open while InSettle too.
   function DeviceRetryAllowed: Boolean;
   begin
     if FirstOpen then
@@ -2981,7 +2974,7 @@ var
 
     FDurationCache := FNextSource.GetDuration;
 
-    // ---> CHANGED (output split, step 2a): the open stream's format (OutFmt)
+    // The open stream's format (OutFmt)
     FNextSource.SetTargetBitDepth(OutFmt.Bits);
 
     if FNextSource.GetBitsPerSample <> OutFmt.Bits then
@@ -2996,7 +2989,7 @@ var
     FReplayGainPeak   := FNextReplayGainPeak;
     FRGFactor         := FNextRGFactor;
     FCurrentIsDSD     := FNextIsDSD;
-    HeadroomForTrack(FNextHeadKey);   // ---> AulumicNS: the same album keeps its level
+    HeadroomForTrack(FNextHeadKey);   // the same album keeps its level
 
     FTotalFrames := Trunc(FDurationCache * OutFmt.SampleRate);
     if FTotalFrames < 1 then
@@ -3021,7 +3014,7 @@ var
     FRGFactor            := FNextRGFactor;
 
     FCurrentIsDSD        := FNextIsDSD;
-    // ---> AulumicNS: the device opens anew: the stream starts at its gain
+    // The device opens anew: the stream starts at its gain
     HeadroomForTrack(FNextHeadKey);
     FGainCur             := -1.0;
     FDurationCache       := FSource.GetDuration;
@@ -3030,7 +3023,7 @@ var
     NeedsRateSwitch      := True;
   end;
 
-  // ---> AulumicNS: the buffers after the first one that the output wants
+  // The buffers after the first one that the output wants
   // before Start (Output.PrefillBuffers; a ring - ASIO - starts with about
   // 40 ms instead of one period). Stops at the end of the source.
   procedure PrefillMore(AUpdateProgress: Boolean);
@@ -3052,10 +3045,7 @@ var
     end;
   end;
 
-  // ---> AulumicNS: after each buffer: its time to fill, and a new dropout of
-  // the output goes to the log at once, with about where in the track it was
-  // (the count in the low 20 bits, the second in the track above them)
-  // ---> AulumicNS: windows an ASIO driver made on threads of its own that
+  // Windows an ASIO driver made on threads of its own that
   // hang on a window of another thread (ALOutputAsio.CountTiedWindows): a
   // change of the count goes to the log (tied to the main thread = an error:
   // a click may freeze the window)
@@ -3073,6 +3063,9 @@ var
     LogEvent(ord(alAsioTiedWindows), LastTied);
   end;
 
+  // After each buffer: its time to fill, and a new dropout of
+  // the output goes to the log at once, with about where in the track it was
+  // (the count in the low 20 bits, the second in the track above them)
   procedure CheckOutputHealth;
   var
     N: Integer;
@@ -3099,7 +3092,7 @@ var
     end;
   end;
 
-  // ---> AulumicNS: the stream's summary for the log before Close: dropouts
+  // The stream's summary for the log before Close: dropouts
   // (bits 0..19), the least audio buffered ahead + 1 in ms (20..39; 0 = not
   // known), the longest fill in 10 us (40..59). Outputs that cannot tell
   // (the test program's) log nothing.
@@ -3116,9 +3109,9 @@ var
       (Min(MaxWorkUs div 10, $FFFFF) shl 40));
   end;
 
-  // ---> AulumicNS: the stream ends after the buffer that is playing: an
+  // The stream ends after the buffer that is playing: an
   // output that needs it (WASAPI) gets one buffer of silence, then Drain
-  // waits before Close (was: closed at once, which cut the last buffer)
+  // waits before Close (closing at once would cut the last buffer)
   procedure EndStreamHere;
   begin
     if Output.DrainTail then
@@ -3131,10 +3124,10 @@ var
     DrainBeforeClose := True;
   end;
 
-  // ---> ADDED (output split, step 1): A forced gapless swap in this buffer
+  // A forced gapless swap in this buffer
   // (FForceGaplessSwap): the same rate continues seamlessly in it, another
   // rate reopens the device (CommitHardwareRateSwap sets NeedsRateSwitch).
-  // Moved unchanged from the loop; the caller frees RetiredSource and leaves
+  // The caller frees RetiredSource and leaves
   // the loop when NeedsRateSwitch is set.
   procedure SwitchOnForcedSwap;
   begin
@@ -3177,11 +3170,11 @@ var
     end;
   end;
 
-  // ---> ADDED (output split, step 1): The source ended inside this buffer
+  // The source ended inside this buffer
   // (BR < BTR). A next track at the same rate fills the rest of the buffer
   // (seamless gapless); another rate fades out and reopens the device once the
-  // old track has nothing left; no next track fades out. Moved unchanged from
-  // the loop; the caller frees RetiredSource and leaves the loop when
+  // old track has nothing left; no next track fades out. The caller frees
+  // RetiredSource and leaves the loop when
   // NeedsRateSwitch is set.
   procedure SwitchAtTrackEnd;
   var
@@ -3205,7 +3198,7 @@ var
 
           CommitSeamlessSwap;
 
-          // ---> AUDIT FIX: The new track's first block is read
+          // The new track's first block is read
           // below, after FLock is released (see ReadNewTrackHead)
           ReadNewTrackHead := True;
         end
@@ -3219,7 +3212,7 @@ var
           else
           begin
             CommitHardwareRateSwap;
-            EndStreamHere;  // ---> AulumicNS: the old track plays out first
+            EndStreamHere;  // the old track plays out first
           end;
         end;
       end
@@ -3232,11 +3225,11 @@ var
       LeaveCriticalSection(FLock);
     end;
 
-    // ---> AUDIT FIX: Read the first block of the new track outside
+    // Read the first block of the new track outside
     // FLock. The read can wait for the disk (a drive that sleeps or
     // a NAS that hesitates), and the UI thread takes FLock about 20
-    // times a second (HasError, GetBitDepth, ...): it no longer
-    // stalls with it. Only this thread replaces FSource, and the
+    // times a second (HasError, GetBitDepth, ...): it must not
+    // stall with it. Only this thread replaces FSource, and the
     // normal path reads FSource without FLock too.
     if ReadNewTrackHead then
     begin
@@ -3258,10 +3251,10 @@ var
     end;
   end;
 
-  // ---> FIXED: DSD to PCM: is this FULL buffer the track's last one? The end
-  // fade (FadeOutLastBlock) was only given to a buffer the source did not
-  // fill (SwitchAtTrackEnd); a track whose last sample filled a buffer
-  // exactly (about 1 in 4400 with 50 ms buffers) ended without it. The DSF
+  // DSD to PCM: is this FULL buffer the track's last one? The end
+  // fade (FadeOutLastBlock) is otherwise only given to a buffer the source did
+  // not fill (SwitchAtTrackEnd); a track whose last sample fills a buffer
+  // exactly (about 1 in 4400 with 50 ms buffers) would end without it. The DSF
   // reader's progress is 1.0 only when every DSD byte has been read, and the
   // converter keeps no samples between reads, so the next read would return
   // nothing. Not with the resampler in the chain (its output lags its input),
@@ -3348,10 +3341,10 @@ begin
 
       FLastHardwareRate := FOutputSampleRate;
 
-      // ---> CHANGED (output split, step 2b): Opening the device (the
+      // Opening the device (the
       // configured DAC only, its format, starting the stream) is the output's
-      // job (TWasapiOutput.Open). The waits and retries for each kind of
-      // failure stay here, the same as before the split:
+      // job (TAudioOutput.Open). The waits and retries for each kind of
+      // failure are here:
       //   no device         : at once a message on the first open; during a
       //                       recovery poll every DEVICE_POLL_MS (a DAC that is
       //                       switched on, a USB device re-enumerating)
@@ -3360,11 +3353,11 @@ begin
       //   in use / lost while starting: during a recovery the lost device is
       //                       waited for; otherwise three tries 1 s apart, then
       //                       a message
-      // ---> CHANGED (output split, step 3a): the output from OutputFactory
-      // when one is set (the test program), else WASAPI
+      // The output from OutputFactory
+      // when one is set (the test program), else ASIO or WASAPI
       if Assigned(FOutputFactory) then
         Output := FOutputFactory()
-      // ---> AulumicNS: ASIO (same TAudioOutput contract)
+      // ASIO (same TAudioOutput contract)
       else if FConfig.OutputApi = 1 then
         Output := TAsioOutput.Create(FConfig.AsioNativeDsd)
       else
@@ -3401,10 +3394,10 @@ begin
 
           oorFormatUnsupported:
           begin
-            // ---> AulumicNS: a DAC that has just been used another way can
+            // A DAC that has just been used another way can
             // refuse a format for a moment: asked again FORMAT_RETRIES times
             // before the message - on the first open only while InSettle (a
-            // switch during a track; else at once, as before), on a reopen
+            // switch during a track; else the message at once), on a reopen
             // during playback (another rate) always
             if (FormatRetries < FORMAT_RETRIES) and ((not FirstOpen) or InSettle) then
             begin
@@ -3448,7 +3441,7 @@ begin
           begin
             // oorFailed: a format the device refused when starting, or
             // anything else (the text names the format that was attempted)
-            // ---> AulumicNS: asked again as a refused format (see there)
+            // Asked again as a refused format (see there)
             if (FormatRetries < FORMAT_RETRIES) and ((not FirstOpen) or InSettle) then
             begin
               Inc(FormatRetries);
@@ -3463,14 +3456,14 @@ begin
         end;
       end;
 
-      // ---> AUDIT FIX 1.3: The open output is closed via try..finally even if
+      // The open output is closed via try..finally even if
       // an exception occurs below or inside the inner playback loop
       try
-        // ---> CHANGED (output split, step 2b): the format the output opened
+        // The format the output opened
         OutFmt         := Output.Format;
         LockRetries    := 0;
         FormatRetries  := 0;
-        // ---> AulumicNS: the device took a shorter buffer than asked (WASAPI
+        // The device took a shorter buffer than asked (WASAPI
         // falls back when the driver refuses the period): into the log
         if (Output.BufferedMs >= 0) and (Output.BufferedMs < (FConfig.BufferMs * 9) div 10) then
           LogEvent(ord(alOutputBufferShorter),
@@ -3491,16 +3484,16 @@ begin
           LeaveCriticalSection(FLock);
         end;
 
-        // ---> AUDIT FIX 3.3: Publish the negotiated depth for SetNextFile
+        // Publish the negotiated depth for SetNextFile
         InterlockedExchange(FNegotiatedBits, OutFmt.Bits);
         InterlockedExchange(FNegotiatedValid, OutFmt.ValidBits);
-        // ---> AulumicNS: for the signal path
+        // For the signal path
         if (Output is TAsioOutput) and TAsioOutput(Output).NativeDsd then
           InterlockedExchange(FNativeDsdOut, 1)
         else
           InterlockedExchange(FNativeDsdOut, 0);
 
-        // ---> MODIFIED: Log the full output format. The source note
+        // Log the full output format. The source note
         // (resampled / converted from DSD) is posted first; the log keeps it for
         // the "Output to DAC" line that follows.
         if FCurrentIsDSD and (not FSource.IsDoP) then
@@ -3509,8 +3502,8 @@ begin
                 (FInputSampleRate <> FOutputSampleRate) then
           LogEvent(ord(alStreamSource), HRESULT((Cardinal(FInputSampleRate) shl 2) or 1));
 
-        // ---> AulumicNS: native DSD over ASIO has a line of its own (it
-        // read "via DoP")
+        // Native DSD over ASIO has a line of its own (not the
+        // "via DoP" one)
         if FSource.IsDoP and (InterlockedCompareExchange(FNativeDsdOut, 0, 0) = 1) then
           LogEvent(ord(alOutputNativeDsd),
             PackFormatCode(OutFmt.SampleRate, OutFmt.Bits, OutFmt.ValidBits))
@@ -3536,7 +3529,7 @@ begin
         if (RecoveryStartTick <> 0) and FConfig.ResamplePCM then
           FOutputFramesWritten := Trunc(EnsureRange(FSource.GetProgress, 0.0, 1.0) * FTotalFrames);
 
-        // ---> AUDIT FIX N5: Apply a seek that was requested before WASAPI started
+        // Apply a seek that was requested before WASAPI started
         // (Play followed immediately by Seek, as in ExitMaintenance / RestartCurrent)
         // BEFORE the prefill, so the first buffer never plays from the old position.
         EnterCriticalSection(FLock);
@@ -3551,7 +3544,7 @@ begin
         if DoSeekNow then
         begin
           FSource.Seek(LocalSeekPos);
-          // ---> AUDIT FIX: If the source did not reach the target (failed FLAC
+          // If the source did not reach the target (failed FLAC
           // seek), show the position it really plays from instead of the target
           ActualSeekPos := EnsureRange(FSource.GetProgress, 0.0, 1.0);
           if Abs(ActualSeekPos - LocalSeekPos) > 0.005 then
@@ -3571,7 +3564,6 @@ begin
         end
         else
         begin
-          // ---> CHANGED (output split, step 1): FillBlock (was written out here)
           if FillBlock(PData, BTR, OutFmt.BlockAlign, True) = BTR then
           begin
             Output.ReleaseBuffer(True);
@@ -3581,12 +3573,12 @@ begin
             Output.ReleaseBuffer(True);
         end;
 
-        // ---> AUDIT FIX N5: Do not start the device when Pause arrived before the
+        // Do not start the device when Pause arrived before the
         // stream started; the pause loop below starts it on Resume.
         if (not NeedsRecovery) and (not FPaused) then
           Output.Start;
         TimeoutCount := 0;
-        // ---> AulumicNS: the driver's tied windows now and 3 s later (a
+        // The driver's tied windows now and 3 s later (a
         // driver may make its windows when the stream runs)
         CheckTiedWindows;
         TieCheckTick := GetTickCount64 + 3000;
@@ -3634,7 +3626,7 @@ begin
               Output.Reset;
               FSource.Seek(LocalSeekPos);
 
-              // ---> AUDIT FIX: If the source did not reach the target (failed
+              // If the source did not reach the target (failed
               // FLAC seek), show the position it really plays from instead
               ActualSeekPos := EnsureRange(FSource.GetProgress, 0.0, 1.0);
               if Abs(ActualSeekPos - LocalSeekPos) > 0.005 then
@@ -3660,7 +3652,7 @@ begin
               end
               else
               begin
-                // ---> CHANGED (output split, step 1): FillBlock; the progress
+                // The progress
                 // stays at the seek target (only the frames are counted)
                 if FillBlock(PData, BTR, OutFmt.BlockAlign, False) = BTR then
                 begin
@@ -3673,15 +3665,15 @@ begin
                   Output.ReleaseBuffer(True);
               end;
 
-              // ---> AUDIT FIX 3.5: Do not un-pause the device when seeking while paused!
+              // Do not un-pause the device when seeking while paused!
               if not FPaused then
                 Output.Start;
             end;
           end;
 
-          // ---> CHANGED (output split, step 2a): Output.WaitForBuffer (the
+          // Output.WaitForBuffer (the
           // stop event and the device's buffer event; a failed wait is
-          // ignored as before)
+          // ignored)
           WaitResult := Output.WaitForBuffer(FStopEvent, 500);
 
           if WaitResult = owStop then
@@ -3706,22 +3698,22 @@ begin
             end
             else
             begin
-              WorkStartUs := OutputNowUs;   // ---> AulumicNS: CheckOutputHealth
+              WorkStartUs := OutputNowUs;   // for CheckOutputHealth
               BR     := FSource.ReadData(PData, BTR);
               WasDoP := FSource.IsDoP;
 
               if FSource.CheckClipping then
                 FWasClipped := True;
 
-              // ---> CHANGED (output split, step 1): The track switch in two
-              // routines (SwitchOnForcedSwap, SwitchAtTrackEnd; moved unchanged).
+              // The track switch in two
+              // routines (SwitchOnForcedSwap, SwitchAtTrackEnd).
               // A switch to another rate reopens the device: leave the loop.
               if FForceGaplessSwap then
                 SwitchOnForcedSwap
               else if BR < BTR then
                 SwitchAtTrackEnd
               else if EndsWithThisFullBuffer then
-                FadeOutLastBlock(PData, BR, FSource.GetBitsPerSample);  // ---> FIXED: see there
+                FadeOutLastBlock(PData, BR, FSource.GetBitsPerSample);  // see there
 
               if NeedsRecovery or NeedsRateSwitch then
               begin
@@ -3732,13 +3724,12 @@ begin
 
               if BR = 0 then
               begin
-                EndStreamHere;  // ---> AulumicNS: was ReleaseBuffer(False)
+                EndStreamHere;
                 if Assigned(RetiredSource) then
                   FreeAndNil(RetiredSource);
                 Break; // End of file
               end;
 
-              // ---> CHANGED (output split, step 1): FillTail / CountOutputFrames
               if BR < BTR then
                 FillTail(PData + BR, BTR - BR, WasDoP);
 
@@ -3749,10 +3740,10 @@ begin
                 ApplyDSP(PData, BR);
 
               Output.ReleaseBuffer(True);
-              CheckOutputHealth;   // ---> AulumicNS: dropouts to the log
+              CheckOutputHealth;   // dropouts to the log
 
-              // ---> AUDIT FIX 3.3: Hand the retired source to the UI thread instead
-              // of closing files / freeing decoders on the MMCSS render thread
+              // Hand the retired source to the UI thread: no
+              // closing files / freeing decoders on the MMCSS render thread
               if Assigned(RetiredSource) then
                 DeferFreeSource(RetiredSource);
             end;
@@ -3772,22 +3763,22 @@ begin
         if Assigned(RetiredSource) then
           FreeAndNil(RetiredSource);
 
-        // ---> AulumicNS: the last buffers play before Close (see EndStreamHere)
+        // The last buffers play before Close (see EndStreamHere)
         if DrainBeforeClose and (not NeedsRecovery) then
           Output.Drain(FStopEvent)
-        // ---> AulumicNS: closed in the middle of the music (a manual switch to
+        // Closed in the middle of the music (a manual switch to
         // a track of another rate, Stop): not cut at a full sample value
         else if not NeedsRecovery then
           Output.FadeOut;
-        LogStreamSummary;   // ---> AulumicNS: dropouts, margin, time per buffer
+        LogStreamSummary;   // dropouts, margin, time per buffer
 
-        // ---> CHANGED (output split, step 2a/2b): Close stops the stream and
-        // releases the device (was: AC.Stop, CloseHandle, the interfaces)
+        // Close stops the stream and
+        // releases the device
         CloseStartTick := GetTickCount64;
         Output.Close;
         FreeAndNil(Output);
-        FClosedTick := GetTickCount64;   // ---> AulumicNS: see TAudioEngine.Stop
-        // ---> AulumicNS: a driver that takes long to let go of the device
+        FClosedTick := GetTickCount64;   // see TAudioEngine.Stop
+        // A driver that takes long to let go of the device
         // (switching back from native DSD) is on record
         if FClosedTick - CloseStartTick >= 500 then
           LogEvent(ord(alOutputCloseSlow), HRESULT(Min(FClosedTick - CloseStartTick, QWord(MaxInt))));
@@ -3833,7 +3824,7 @@ begin
   Result := InterlockedCompareExchange(FBitPerfect, 0, 0) = 1;
 end;
 
-// ---> AulumicNS: a snapshot of what the chain does, for the signal path. Only
+// A snapshot of what the chain does, for the signal path. Only
 // reads (the source chain under FLock as GetBitDepth does); the tone control's
 // state is read as the audio thread left it (a display value).
 function TPlayThread.GetSignalInfo: TSignalInfo;

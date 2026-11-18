@@ -10,8 +10,8 @@ unit uLastFmScraper;
   settings), the picture from Wikipedia (checked with Wikidata) and, when
   that finds none, from TheAudioDB.
 
-  ---> AulumicNS: copied from Aulumic; the user agent changed, and no API key
-  is built in. WinHTTP is part of Windows, so no DLL ships with the program.
+  No API key is built in. WinHTTP is part of Windows, so no DLL ships with
+  the program.
   =============================================================================}
 
 {$mode ObjFPC}{$H+}
@@ -27,8 +27,7 @@ type
 
   { TLastFmWorker (Artist Biography & Image) }
 
-  // ---> AUDIT FIX: One permanent worker thread replaces the former
-  // FreeOnTerminate TLastFmThread that was started for every artist click.
+  // One permanent worker thread (not a new thread for every artist click).
   //  * RequestArtist / Cancel are called on the UI thread. Every request gets a
   //    new generation number; a newer request (or Cancel) makes the running
   //    lookup stop at its next check and aborts its running HTTP request.
@@ -79,8 +78,8 @@ function SanitizeFolderName(const S: string): string;
 function ExtractFirstArtist(const AArtist: string): string;
 function CleanArtistSearchName(const AArtist: string): string;
 function SimpleURLEncode(const S: string): string;
-// ---> AUDIT FIX: MusicInfo folder (with trailing delimiter) of an artist, in the
-// same order the scraper uses its caches. The artist panel saves edited bios and
+// MusicInfo folder (with trailing delimiter) of an artist, in the
+// same order the scraper uses its caches. Artist Info saves edited bios and
 // own pictures there, so they end up in the folder that is shown.
 function ResolveArtistCacheDir(const AArtist: string): string;
 
@@ -90,7 +89,7 @@ uses
   uAppStrings, uAppConsts, uMetaUtils, uOSUtils;
 
 // =============================================================================
-// ---> AUDIT FIX: Minimal WinHTTP declarations (winhttp.dll is a standard
+// Minimal WinHTTP declarations (winhttp.dll is a standard
 // Windows system DLL; FPC ships no import unit for it).
 // =============================================================================
 type
@@ -135,7 +134,7 @@ const
   MAX_JSON_BYTES  = 4 * BYTES_PER_MB;
   MAX_IMAGE_BYTES = 25 * BYTES_PER_MB;
 
-  HTTP_USER_AGENT = 'Aulumic (Windows audio player)';  // ---> AulumicNS: own name
+  HTTP_USER_AGENT = 'Aulumic (Windows audio player)';  // the program's name
 
 function AL_WinHttpOpen(pszAgentW: PWideChar; dwAccessType: DWORD; pszProxyW,
   pszProxyBypassW: PWideChar; dwFlags: DWORD): HINTERNET; stdcall;
@@ -255,9 +254,9 @@ begin
   end;
 
   // 2. Strip '- <instrument>' suffix after the name
-  // ---> AUDIT FIX: Only a spaced dash separates a suffix ("Jean-Luc Ponty -
-  // Violin"). The former fallback to an unspaced '-' cut hyphenated names
-  // ("Jay-Z" -> "Jay", "a-ha" -> "a", "Wu-Tang Clan" -> "Wu"), so they were
+  // Only a spaced dash separates a suffix ("Jean-Luc Ponty -
+  // Violin"). An unspaced '-' would cut hyphenated names
+  // ("Jay-Z" -> "Jay", "a-ha" -> "a", "Wu-Tang Clan" -> "Wu"), so they would be
   // looked up and cached as another artist.
   DashPos := Pos(' -', Result);
   if DashPos = 0 then
@@ -369,9 +368,8 @@ begin
   if Result = '' then
     Result := '_';
 
-  // ---> AUDIT FIX: Windows cannot create a folder named after a device
-  // ("Nul", "Aux", "Con.Funk", ...). A leading underscore makes the name legal;
-  // such folders could never be created before, so no existing cache is lost.
+  // Windows cannot create a folder named after a device
+  // ("Nul", "Aux", "Con.Funk", ...). A leading underscore makes the name legal.
   if IsReservedDeviceName(Result) then
     Result := '_' + Result;
 end;
@@ -791,10 +789,9 @@ begin
   end;
 end;
 
-// Worker thread. The lookup logic is unchanged from the former
-// TLastFmThread.Execute; only cancellation (IsCancelled instead of
-// Terminated), result delivery (PostResult instead of Synchronize) and the
-// HTTP transport (WinHTTP instead of UrlMon / fphttpclient) differ.
+// Worker thread: one lookup. It is cancelled through IsCancelled (not
+// Terminated), delivers its result with PostResult (never Synchronize) and
+// uses WinHTTP for the transport.
 procedure TLastFmWorker.ProcessJob(const AArtistName: string; AForceRefresh: Boolean;
   const AApiKey: string; AGeneration: Integer);
 var
@@ -940,8 +937,8 @@ var
         if Assigned(JSONData) then
         begin
           TempNode := JSONData.FindPath('error');
-          // ---> ADDED: 10 = invalid API key, 26 = suspended (blocked) key:
-          // a fixed Aulumic text, recognised (and logged once) by the panel
+          // 10 = invalid API key, 26 = suspended (blocked) key:
+          // a fixed text, recognised (and logged once) by Artist Info
           if Assigned(TempNode) and (TempNode.JSONType = jtNumber) and
              ((TempNode.AsInteger = 10) or (TempNode.AsInteger = 26)) then
             AErrorMsg := ERR_LASTFM_KEY_REJECTED
@@ -1131,7 +1128,7 @@ var
     end;
   end;
 
-  // ---> AUDIT FIX: Asks Wikidata whether an entry is a music artist, by the
+  // Asks Wikidata whether an entry is a music artist, by the
   // presence of a MusicBrainz artist ID (property P434). Language independent:
   // "Biosphere" (the ecological term) has none, Biosphere the musician has one.
   // Returns 1 = music artist, 0 = not a music artist, -1 = unknown (no answer).
@@ -1240,10 +1237,10 @@ var
     if (ImgUrl = '') or Cancelled then
       Exit(False);
 
-    // ---> AUDIT FIX: A page that is not about a music artist (e.g. the word
+    // A page that is not about a music artist (e.g. the word
     // "Biosphere") is treated like a disambiguation page, so the caller tries
     // "<name> (musician)" / "<name> (band)" and TheAudioDB. When Wikidata gives
-    // no answer, the picture is accepted as before.
+    // no answer, the picture is accepted.
     if (ItemID <> '') and (WikidataIsMusicArtist(ItemID) = 0) then
     begin
       IsDisambiguation := True;
@@ -1254,7 +1251,7 @@ var
 
     Result := DownloadAndProcessImage(ImgUrl);
 
-    // ---> AUDIT FIX: The full-size image can be too large to decode
+    // The full-size image can be too large to decode
     // (> 8192 px); Wikipedia's smaller version is tried next
     if (not Result) and (not Cancelled) and (ThumbUrl <> '') and (ThumbUrl <> ImgUrl) then
       Result := DownloadAndProcessImage(ThumbUrl);
@@ -1362,7 +1359,7 @@ begin
   // ===========================================================================
   // 1. ISOLATED BIO EXTRACTION (PrimaryArtist -> FallbackArtist)
   // ===========================================================================
-  // ---> AUDIT FIX: Refresh keeps a biography the user edited
+  // Refresh keeps a biography the user edited
   KeepUserBio := AForceRefresh and
                  FileExists(ResolveArtistCacheDir(AArtistName) + FILE_ARTIST_BIO_USER);
 
@@ -1395,7 +1392,7 @@ begin
   // 2. PROGRESSIVE UI UPDATE + ISOLATED IMAGE EXTRACTION
   // Push the biography text to the UI immediately before fetching images!
   // ===========================================================================
-  // ---> AUDIT FIX: Refresh keeps a picture the user chose
+  // Refresh keeps a picture the user chose
   UserImage := (ResultImagePath <> '') and FileExists(ResultImagePath) and
                FileExists(ExtractFilePath(ResultImagePath) + FILE_ARTIST_IMAGE_USER);
 

@@ -128,7 +128,7 @@ const
     (FriendlyName: 'Output device'; TagStr: 'device'; DataType: dtString; IsQueryable: False),
 
     (FriendlyName: 'Phase response'; TagStr: 'phase'; DataType: dtString; IsQueryable: False),
-    // ---> ADDED: 'Bit-Perfect' while nothing touches the signal, else empty
+    // 'Bit-Perfect' while nothing touches the signal, else empty
     (FriendlyName: 'Bit-Perfect'; TagStr: 'bitperfect'; DataType: dtNone; IsQueryable: False)
   );
 
@@ -170,7 +170,7 @@ var
   ID: TTagID;
   Count: Integer;
 begin
-  // ---> AUDIT FIX: Initialize out parameter to nil to silence Hint 5057
+  // The out parameter starts as nil (silences hint 5057)
   TagList := nil;
   Count   := 0;
   for ID := Low(TTagID) to High(TTagID) do
@@ -199,7 +199,7 @@ var
   S, Token, OpStr, ValStr, RemVal, SubStr: string;
   Cond: TQueryCondition;
 begin
-  // ---> AUDIT FIX: Initialize managed Result to nil to silence Warning 5093
+  // The managed Result starts as nil (silences warning 5093)
   Result := nil;
   if Trim(Query) = '' then
     Exit;
@@ -290,9 +290,9 @@ begin
         end
         else if Cond.DataType = dtDate then
         begin
-          // ---> AUDIT FIX T1: Clamp date lookback ranges (up to 100 years) so
-          // extreme user inputs never raise EConvertError in IncMonth/IncYear
-          // or overflow 64-bit multiplication!
+          // Clamps date lookback ranges (up to 100 years), so extreme
+          // inputs never raise EConvertError in IncMonth/IncYear or
+          // overflow the 64-bit multiplication
           if EndsText('d', ValStr) then
           begin
             ClampedInt64 := EnsureRange(StrToInt64Def(Copy(ValStr, 1, Length(ValStr) - 1), 0), 0, 36500);

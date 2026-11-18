@@ -5,13 +5,13 @@ unit AuPlaylistEditor;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Playlist Editor (Aulumic's uFormPlaylistEditor) in the Aulos layout:
+  The Playlist Editor:
   the name, the grouping and the two formats of a playlist ("Use Global
   Preferences" = the defaults of Preferences > Playlists); for an
   auto-playlist also the rules: a ready-made template or own rules made
   with the query builder (tag, operator, value; a track must match all
   rules, OR in a value gives alternatives).
-  AulumicNS: the playlists are kept in uPlaylistStore, so a name only has to
+  The playlists are kept in uPlaylistStore, so a name only has to
   be new and not "Default" (no file name rules).
   =============================================================================}
 
@@ -23,7 +23,7 @@ uses
   Classes, SysUtils, StrUtils, Math, Controls, Forms, LCLType,
   AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, uPlaylistStore;
 
-{ Aulumic's TfrmPlayListEditor.ExecuteDialog: AGroupMode -1 and '' formats
+{ The dialog, shown modal: AGroupMode -1 and '' formats
   are the defaults; AAuto shows the rules (AQuery: rules separated by ';').
   AStore checks that the name is free (AEditing: the old name may stay). }
 function EditPlaylistDialog(AOwner: TComponent; AStore: TPlaylistStore; var AName: string;
@@ -55,7 +55,7 @@ type
     FValue: TAuEdit;
     FRuleList: TAuListView;
     FBtnAdd, FBtnRemove, FBtnHelp, FBtnOk: TAuButton;
-    // ---> AulumicNS: the parent of the content: the body, or for an
+    // the parent of the content: the body, or for an
     // auto-playlist a scroll box (the editor is ~726 high: too much for
     // 1920 x 1080 at 150 % or 1366 x 768); OK / Cancel stay below it
     FContent: TWinControl;
@@ -410,7 +410,7 @@ begin
   UpdateButtons;
 end;
 
-{ the operators of the tag's kind (as Aulumic) }
+{ the operators of the tag's kind }
 procedure TPlaylistEditorForm.FieldChange(Sender: TObject);
 var
   DType: TTagDataType;
@@ -529,7 +529,7 @@ begin
   UpdateButtons;
 end;
 
-{ the rule of the builder into the list (Aulumic's TryAddRule): False when
+{ the rule of the builder into the list: False when
   the value is not valid for the tag; True also when there is nothing to add }
 function TPlaylistEditorForm.TryAddRule: Boolean;
 var
@@ -652,7 +652,7 @@ begin
     amInfo, abOK, 'Auto-playlist rules');
 end;
 
-{ Aulumic's ValidateInput: a name, not "Default", not taken; a rule still
+{ a name, not "Default", not taken; a rule still
   in the builder is added; own rules need at least one }
 function TPlaylistEditorForm.ValidateInput: Boolean;
 var

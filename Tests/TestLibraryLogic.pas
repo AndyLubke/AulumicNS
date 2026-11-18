@@ -11,14 +11,14 @@ unit TestLibraryLogic;
   Tests for the library's pure logic (no files, no threads):
     TTestTrackSorting : NaturalCompareText, SmartTrackCompare and the
                         SortTracks_By... list sorts (library / playlist order);
-                        ---> ADDED: names sort as in the library pane
+                        names sort as in the library pane
                         (accents, Japanese, punctuation), SortTracksFast gives
                         the exact order, TTrackList.Sort takes the fast path;
                         the library order (CompareTrackInfo) is language- and
                         number-aware
     TTestTrackQuery   : the auto-playlist filter (ParseQuery + EvaluateTrack)
-    TTestDatabaseLines: the Library.db field encoding and track line format
-                        (uLibraryDatabase)
+    TTestDatabaseLines: the field encoding and track line format of the
+                        tests' text library (uLibraryDatabase)
     TTestTagReaders   : ALMetadata links a real AulumicTag reader for every
                         format AulumicNS plays (FILE_VALID_EXTS); without
                         one, files silently read as untagged
@@ -86,11 +86,11 @@ type
   published
     procedure EveryAulumicFormatHasARealReader;
     procedure WavFileIsReadWithItsFormat;
-    // ---> AulumicNS: the new DFF reader (file_dff)
+    // The DFF reader (file_dff)
     procedure DffFileIsReadWithItsFormat;
   end;
 
-  // ---> ADDED (phase 4): the list that owns copies of track records
+  // The list that owns copies of track records
   TTestTrackList = class(TTestCase)
   published
     procedure AddStoresACopy;
@@ -240,7 +240,7 @@ begin
     ], @SortTracks_ByFolder));
 end;
 
-// ---> ADDED: Names with accents, a Japanese name, punctuation and digits,
+// Names with accents, a Japanese name, punctuation and digits,
 // each different from the others also when the case is ignored
 const
   PANE_NAMES: array[0..21] of string = ('Zappa', 'Bach', 'Elvis', 'Édith', 'Ánimals',
@@ -348,7 +348,7 @@ begin
     CompareLibraryNames('ÉDITH PIAF', 'édith piaf'));
 end;
 
-// ---> ADDED: Many tracks of a pool of names (with case variants), several per
+// Many tracks of a pool of names (with case variants), several per
 // folder; every file name is different, so the order is strict
 function ManyTracks(ACount: Integer): TTrackInfoArray;
 const
@@ -432,11 +432,11 @@ begin
   end;
 end;
 
-// ---> ADDED: TTrackList.Sort takes the fast path for the library orders:
+// TTrackList.Sort takes the fast path for the library orders:
 // a Windows comparison per step is several times slower (about 6x measured)
 procedure TTestTrackSorting.TrackListSortTakesTheFastPath;
 const
-  // ---> ADDED: also the library order (CompareTrackInfo)
+  // Also the library order (CompareTrackInfo)
   SORTS: array[0..1] of TListSortCompare = (@SortTracks_ByArtist, @CompareTrackInfo);
   WHAT: array[0..1] of string = ('by artist', 'library order');
 var
@@ -480,7 +480,7 @@ begin
   end;
 end;
 
-// ---> ADDED: The library order (CompareTrackInfo: auto-playlists): accented
+// The library order (CompareTrackInfo: auto-playlists): accented
 // names with their letter, numbers by value, case ignored; the compare
 // function and TTrackList.Sort (the fast path) alike
 procedure TTestTrackSorting.LibraryOrderIsLanguageAndNumberAware;
@@ -708,7 +708,7 @@ procedure TTestDatabaseLines.ParseReadsOldSevenFieldLines;
 var
   P: TTrackInfo;
 begin
-  // The oldest format: '|' separated, 7 fields
+  // The shortest line: '|' separated, 7 fields
   AssertTrue('Parsed', ParseTrackLine('D:\M\A\01.wav|D:\M\A|Title|Artist|Album|Genre|5', P));
   AssertEquals('Title', 'Title', P.Title);
   AssertEquals('TrackNumber', 5, P.TrackNumber);
@@ -723,7 +723,7 @@ var
   P: TTrackInfo;
   FileDate: LongInt;
 begin
-  // Older files stored DateAdded as a small file-date value: it is replaced
+  // A DateAdded that is a small file-date value is replaced
   // by the Unix time of LastModified
   FileDate := DateTimeToFileDate(EncodeDate(2020, 1, 2));
   AssertTrue('Parsed', ParseTrackLine(

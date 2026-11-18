@@ -5,16 +5,16 @@ unit AuLogForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Log window (Aulumic's frmAppLog, Main menu > Tools > Show Log...,
+  The Log window (Main menu > Tools > Show Log...,
   Ctrl+L): the lines of AuLog in a list with a fixed-width font; the time
   is dimmed, warnings and errors are shown in their colours. Not modal, one
   window; while it is open it follows the log (it stays at the end when it
   was at the end).
     - select lines and copy them: Ctrl+C or Copy (nothing selected: all),
       Ctrl+A selects all
-    - Save to File... (Ctrl+S): the log and the error history, as Aulumic
-    - Clear: the lines (the error history stays, as in Aulumic)
-  AulumicNS: the lines are a list (Aulumic: a memo), so they keep the
+    - Save to File... (Ctrl+S): the log and the error history
+    - Clear: the lines (the error history stays)
+  The lines are a list, not a memo, so they keep the
   colours and the window stays fast with the 5000 lines of a long session.
   =============================================================================}
 
@@ -103,7 +103,7 @@ begin
   Position := poOwnerFormCenter;
   Constraints.MinWidth := S(FORM_APPLOG_MINWIDTH);
   Constraints.MinHeight := S(FORM_APPLOG_MINHEIGHT);
-  FitToWorkArea;          // ---> AulumicNS: a small screen at a large scaling
+  FitToWorkArea;          // a small screen at a large scaling
 
   FList := TAuListView.Create(Self);
   FList.Parent := Body;

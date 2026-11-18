@@ -19,7 +19,7 @@ const
   EXT_WAV     = '.wav';
   EXT_FLAC    = '.flac';
   EXT_DSF     = '.dsf';
-  EXT_DFF     = '.dff';   // ---> AulumicNS: DSDIFF
+  EXT_DFF     = '.dff';   // DSDIFF
   EXT_AULLINK = '.aullink';
 
 type
@@ -31,10 +31,10 @@ type
     OutputRate        : Integer;
     BufferSizeMs      : Integer;
     AppliedReplayGain : Double;
-    IsBitPerfect      : Boolean;  // ---> ADDED: nothing touches the signal
+    IsBitPerfect      : Boolean;  // nothing touches the signal
   end;
 
-  // ---> AulumicNS: the stages of the signal path (the badge's popup), read
+  // The stages of the signal path (the badge's popup), read
   // from the play thread by TPlaybackManager.GetSignalInfo. Valid = a stream
   // is open.
   TSignalInfo = record
@@ -54,35 +54,35 @@ type
     VolumeDisabled : Boolean;   // Preferences: volume fixed at 100 %
     Volume         : Integer;   // 0 .. 1000 (1000 = 100 %)
     RGFactor       : Double;    // the linear ReplayGain factor applied (1 = none)
-    PreampDB       : Double;    // ---> AulumicNS: the preamp in RGFactor (also without ReplayGain)
+    PreampDB       : Double;    // the preamp in RGFactor (also without ReplayGain)
     SoftClip       : Boolean;
     OutputApi      : Integer;   // 0 WASAPI exclusive, 1 ASIO
     ResampleQuality: Integer;
     Phase          : Integer;   // of the resampler in use (up or down)
     BitPerfect     : Boolean;
     Clipped        : Boolean;
-    // ---> AulumicNS: automatic headroom (TPlayThread.RunGain): switched on,
+    // Automatic headroom (TPlayThread.RunGain): switched on,
     // and what it takes off at the moment (0 or negative, dB)
     HeadroomOn     : Boolean;
     HeadroomDB     : Double;
   end;
 
-  TRateArray = array of Integer;  // ---> ADDED: sample rates (TargetRateChoices)
+  TRateArray = array of Integer;  // sample rates (TargetRateChoices)
 
-// Check for valid music file (wav, flac, dsf)
+// Check for valid music file (wav, flac, dsf, dff)
 function IsValidMusicFile(const FileName: string): boolean; inline;
 
 // Check for dsd file
 function IsDSDFile(const FileName: string): boolean; inline;
 
-// ---> AulumicNS: the DSD multiple of a DSD bit rate in Hz: 64 for DSD64 of
+// The DSD multiple of a DSD bit rate in Hz: 64 for DSD64 of
 // both families (2.8224 MHz = 64 x 44.1 kHz, 3.072 MHz = 64 x 48 kHz; a
-// plain div 44100 made DSD69 of the second); 0 for no rate. DsdRateName:
+// plain div 44100 would make DSD69 of the second); 0 for no rate. DsdRateName:
 // 'DSD64'. A DoP carrier rate is the DSD rate / 16.
 function DsdMultiple(ADsdRate: Integer): Integer;
 function DsdRateName(ADsdRate: Integer): string;
 
-{ ---> AulumicNS: names the calling thread for the hang report (Windows'
+{ Names the calling thread for the hang report (Windows'
   SetThreadDescription, Windows 10 1607 and later; nothing on older ones) }
 procedure NameThisThread(const AName: string);
 
@@ -104,18 +104,18 @@ function CleanDeviceName(const OriginalString: string): string;
 function ParseAulLinkFile(const AulLinkPath: string; OutPaths: TStringList;
   ACheckExists: Boolean = True): Boolean;
 
-// ---> ADDED: Sample rate as text for the log, always with a dot:
+// Sample rate as text for the log, always with a dot:
 // 44100 -> '44.1 kHz', 48000 -> '48 kHz', 11025 -> '11.025 kHz'
 function FormatRateKHz(ARate: Cardinal): string;
 
-// ---> ADDED: The family of a sample rate, as the resampler's rate map
+// The family of a sample rate, as the resampler's rate map
 // (TPlaybackManager.PrepareEngineForTrack) groups them: RATE_FAMILY_48K for a
 // multiple of 48 kHz (48, 96, ... 3072 kHz), otherwise RATE_FAMILY_44K (also
 // for 0 and rates of neither family). It decides which target rate setting
 // (TargetSampleRate44 / 48) a rate belongs to.
 function SampleRateFamily(ARate: Integer): Integer;
 
-// ---> ADDED: The target rates a family can be resampled to, ascending: the
+// The target rates a family can be resampled to, ascending: the
 // same list the preferences offer (TARGET_RATE_44_OPTIONS / _48_OPTIONS), so
 // the rate menu of the main window and the "choose another rate" dialog never
 // offer a rate the settings do not take. AFamily: any rate of the family
@@ -128,7 +128,7 @@ uses
   AuAudioTypes, Windows;
 
 // =========================================================================
-// ---> OPTIMIZED: Inlined case-insensitive extension checks for fast UI/Tree loops
+// Inlined case-insensitive extension checks for fast UI/Tree loops
 // =========================================================================
 function IsValidMusicFile(const FileName: string): boolean; inline;
 begin
@@ -215,7 +215,7 @@ begin
   end;
 
   // 3. Extract everything between them if valid bounds are found
-  // ---> AUDIT FIX: Slice from TrimmedStr (not OriginalString) so leading
+  // Slice from TrimmedStr (not OriginalString) so leading
   // whitespace never shifts PosL/PosR!
   if (PosL > 0) and (PosR > PosL) then
   begin
@@ -258,7 +258,7 @@ begin
         // Clean up the path so ExtractFileName gets the actual folder name
         TargetPath := ExcludeTrailingPathDelimiter(TargetPath);
 
-        // ---> AUDIT FIX: Avoid adding duplicate directories from the same .aullink file
+        // Avoid adding duplicate directories from the same .aullink file
         if ((not ACheckExists) or DirectoryExists(LongPath(TargetPath))) and
            (OutPaths.IndexOf(TargetPath) < 0) then
           OutPaths.Add(TargetPath);

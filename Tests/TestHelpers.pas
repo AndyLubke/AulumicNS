@@ -8,7 +8,7 @@ unit TestHelpers;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Small helpers shared by the test units: a temporary folder per test (under
-  %TEMP%\AulumicTests, never inside the project or the user's data) and
+  %TEMP%\AulumicTests, never inside the project or the program's data) and
   reading / writing raw file bytes for the "damaged file" tests.
   =============================================================================}
 
@@ -21,7 +21,7 @@ uses
 function  CreateTestDir: string;
 // Deletes the files in ADir and the folder itself (tests use no subfolders)
 procedure RemoveTestDir(const ADir: string);
-// ---> ADDED: Deletes ADir with all its files and subfolders (also hidden
+// Deletes ADir with all its files and subfolders (also hidden
 // ones); for tests that build a folder tree
 procedure RemoveTestTree(const ADir: string);
 
@@ -42,13 +42,13 @@ procedure WriteTestWav(const APath: string; AFrames: Integer = 4410;
 procedure WriteWavData(const APath: string; ASampleRate, ABits, AChannels: Integer;
   const AData: TBytes);
 
-// ---> ADDED (phase 6b): A 16-bit stereo PCM WAV file of a sine tone, the same
+// A 16-bit stereo PCM WAV file of a sine tone, the same
 // in both channels: AFreqHz, peak level APeakDbfs (dB below full scale),
 // ASeconds long. EBU Tech 3341 test 1: 1000 Hz at -23 dBFS = -23 LUFS.
 procedure WriteToneWav(const APath: string; AFreqHz, APeakDbfs, ASeconds: Double;
   ASampleRate: Integer = 48000);
 
-// ---> ADDED (output split, step 3a/3b): The counting pattern of the playback
+// The counting pattern of the playback
 // tests. Frame N holds N: the left sample the low 15 bits (positive), the
 // right sample the next 15 bits complemented (negative, so a wrong sign
 // extension shows). In 24 bit the 15 bits sit above a low byte that holds
@@ -63,11 +63,11 @@ function  PatternFrameOf(ALeft, ARight, ABits: Integer): Integer;
 // A stereo PCM WAV file (16 or 24 bit) of the pattern
 procedure WritePatternWav(const APath: string; AFrames: Integer;
   ASampleRate: Integer = 44100; AFirstFrame: Integer = 0; ABits: Integer = 16);
-// ---> ADDED (step 3b): A stereo FLAC file (16 or 24 bit) of the pattern,
-// written by hand (libFLAC only decodes in Aulumic): STREAMINFO, then frames
+// A stereo FLAC file (16 or 24 bit) of the pattern,
+// written by hand (the program only decodes FLAC): STREAMINFO, then frames
 // of ABlockSize samples (the last one shorter) with VERBATIM subframes
 // (uncompressed), CRC-8 / CRC-16 as the format asks. No MD5 (zero = not
-// checked), no seek table (libFLAC seeks by searching the frames).
+// checked), no seek table (the decoder seeks by searching the frames).
 procedure WritePatternFlac(const APath: string; AFrames: Integer;
   ASampleRate: Integer = 44100; AFirstFrame: Integer = 0; ABits: Integer = 16;
   ABlockSize: Integer = 4096);
@@ -82,14 +82,14 @@ type
 const
   DSF_BLOCK_SIZE = 4096;   // bytes per channel and block (the DSF standard)
 
-// ---> ADDED (step 3b): A stereo DSF file (DSD64 = 2822400 Hz by default) of
+// A stereo DSF file (DSD64 = 2822400 Hz by default) of
 // ABytesPerChannel DSD bytes per channel, in DSF_BLOCK_SIZE blocks per channel
 // (the last block padded with DSD silence $69); byte J of a channel is
 // DsfPatternByte(AFirstByte + J, ...).
 procedure WriteTestDsf(const APath: string; ABytesPerChannel: Integer;
   APattern: TDsdPattern = dpCount; AFirstByte: Integer = 0; ADsdRate: Integer = 2822400);
 // Byte AIndex of channel AChannel (0 / 1) as the file stores it (LSB first)
-// ---> AulumicNS: The same DSD as WriteTestDsf in a DSDIFF (.dff) file: MSB
+// The same DSD as WriteTestDsf in a DSDIFF (.dff) file: MSB
 // first, the channels interleaved byte by byte, no padding after the end
 // (a DFF file has no blocks), so it plays exactly like the DSF file
 procedure WriteTestDff(const APath: string; ABytesPerChannel: Integer;
@@ -98,17 +98,17 @@ function  DsfPatternByte(AIndex, AChannel: Integer; APattern: TDsdPattern): Byte
 // The byte with its bits in reverse order (DSF stores LSB first, DoP MSB first)
 function  ReverseBits(AByte: Byte): Byte;
 
-// ---> ADDED (phase 5c-3): Adds an 'id3 ' chunk (an ID3v2.3 tag) to a WAV file
+// Adds an 'id3 ' chunk (an ID3v2.3 tag) to a WAV file
 // of WriteTestWav. AFrames: frame ID and text in pairs, e.g. ['TIT2', 'Title',
 // 'TPE1', 'Artist'] (plain ASCII text)
 procedure AddWavId3Tag(const APath: string; const AFrames: array of string);
 
 const
-  // ---> ADDED: The lengths of NonAsciiName
+  // The lengths of NonAsciiName
   NON_ASCII_UTF8_BYTES  = 28;   // bytes in UTF-8
   NON_ASCII_UTF16_CHARS = 17;   // UTF-16 code units (the emoji counts 2)
 
-// ---> ADDED: A file name part (UTF-8) with characters outside ASCII: accented
+// A file name part (UTF-8) with characters outside ASCII: accented
 // Latin letters (2 UTF-8 bytes each), Japanese (3 bytes each) and an emoji
 // outside the Basic Multilingual Plane (4 bytes; a UTF-16 surrogate pair):
 // 'Café Müßig 日本語 🎵'. Built from the code points, so it does not depend
@@ -191,7 +191,7 @@ var
   FS: TFileStream;
 begin
   Result := nil;
-  // ---> AulumicNS: also a file another handle writes (a library journal)
+  // Also a file another handle writes (a library journal)
   FS := TFileStream.Create(APath, fmOpenRead or fmShareDenyNone);
   try
     SetLength(Result, FS.Size);
@@ -362,7 +362,7 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// FLAC writer (step 3b)
+// FLAC writer
 // ---------------------------------------------------------------------------
 
 type
@@ -578,7 +578,7 @@ begin
 end;
 
 // ---------------------------------------------------------------------------
-// DSF writer (step 3b)
+// DSF writer
 // ---------------------------------------------------------------------------
 
 function ReverseBits(AByte: Byte): Byte;

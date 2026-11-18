@@ -17,11 +17,8 @@ unit uPlaylistImport;
                                    library scanner's skip rules
     TrackFromM3UEntry              the track of an M3U entry (M3U import)
   The main window does the rest (the progress window, the import question,
-  the rows). Covered by Tests\TestPlaylistImport.pas.
-
-  ---> AulumicNS: TrackFromMusicFile (the track of an added file outside the
-  library) was removed on 2026-11-12 with its tests: the playlist pane reads
-  such a file itself (TPlaylistPane.ReadEntry).
+  the rows); an added file outside the library is read by the playlist pane
+  itself (TPlaylistPane.ReadEntry). Covered by Tests\TestPlaylistImport.pas.
   =============================================================================}
 
 interface
@@ -44,7 +41,7 @@ type
     msFile,      // not in the library: the file's tags
     msNotFound,  // not in the library, file not readable: the #EXTINF info only
     msLeftOut,   // not in the library and only library tracks are imported
-    // ---> ADDED: not in the library and on a network drive that does not
+    // not in the library and on a network drive that does not
     // answer: left out, its file is not read
     msDriveNotAnswering
   );
@@ -74,7 +71,7 @@ procedure CollectMusicFiles(APaths, AFiles: TStrings);
 // nil) then takes the library's tags, any other one the file's tags (reads
 // the file; a missing title keeps the one before, no album artist: the
 // artist). AOnlyLibrary: a track outside the library is left out (msLeftOut,
-// ATrack empty) and its file is not read. ---> ADDED: ADriveAnswers = False
+// ATrack empty) and its file is not read. ADriveAnswers = False
 // (the file is on a network drive whose server does not answer): a track
 // outside the library is left out as well (msDriveNotAnswering, ATrack
 // empty) and its file is not read; a library track is kept as always.
@@ -127,8 +124,8 @@ begin
   Result := True;
 end;
 
-// ---> AUDIT FIX: Before, ANSI files lost their accented characters, so those
-// paths were not found.
+// A file that is not valid UTF-8 is read as ANSI, so its accented characters
+// (and with them the paths) stay intact.
 procedure LoadM3UText(const AFileName: string; AList: TStrings);
 var
   FS: TFileStream;
@@ -216,18 +213,16 @@ begin
   end;
 end;
 
-// ---> MOVED from TFramePlaylist.InjectPathsToPlaylist (NewSortedList and the
-// nested DigDirectory), unchanged
 function NewSortedList: TStringList;
 begin
   Result               := TStringList.Create;
   Result.CaseSensitive := False;
 end;
 
-// ---> AUDIT FIX: Same rules as the library scanner: hidden and system
+// Same rules as the library scanner: hidden and system
 // entries (macOS "._" files, $RECYCLE.BIN, System Volume Information),
 // names starting with '.' or '$' and '.~.' temporary files are skipped.
-// ---> Sorted per folder (files first, then the subfolders), so a dropped
+// Sorted per folder (files first, then the subfolders), so a dropped
 // folder plays in name order also on exFAT drives and network shares,
 // which list their entries in no particular order.
 procedure DigDirectory(const Dir: string; AFiles: TStrings);
@@ -245,7 +240,7 @@ begin
         repeat
           if (SR.Name = '.') or (SR.Name = '..') then
             Continue;
-          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is Aulumic)
+          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is AulumicNS)
           if ((SR.Attr and faHidden) <> 0) or ((SR.Attr and faSysFile) <> 0) then
             Continue;
           if StartsText('.', SR.Name) or StartsText('$', SR.Name) or (Pos('.~.', SR.Name) > 0) then
@@ -286,12 +281,12 @@ begin
 
   TopPaths := NewSortedList;
   try
-    // ---> The dropped / chosen items in name order too (Windows passes a
+    // The dropped / chosen items in name order too (Windows passes a
     // drop in no particular order)
     TopPaths.Assign(APaths);
     TopPaths.Sort;
 
-    // ---> One list of supported formats: IsValidMusicFile (uAudioUtils), as
+    // One list of supported formats: IsValidMusicFile (uAudioUtils), as
     // the library scanner uses
     for I := 0 to TopPaths.Count - 1 do
     begin
@@ -308,7 +303,6 @@ begin
   end;
 end;
 
-// ---> MOVED (phase 5c-3) from TFramePlaylist.ConvertM3UtoPDB, unchanged
 function TrackFromM3UEntry(const AEntry: TM3UEntry; ALibrary: TLibraryManager;
   AOnlyLibrary: Boolean; out ATrack: TTrackInfo;
   ADriveAnswers: Boolean): TM3UTrackSource;

@@ -14,7 +14,7 @@
     BeginBusy / EndBusy (the hourglass around work on a large playlist).
   The playlists are in uPlaylistStore (playlists.adb + journal); the pane
   shows one of them (FShownPl). The play queue belongs to the playlist that
-  was played from (FPlayingPl), as in Aulumic.
+  was played from (FPlayingPl).
   =============================================================================}
 
 const
@@ -30,7 +30,7 @@ begin
   ForceDirectories(AppPlaylistsDir);
   FPlaylists := TPlaylistStore.Create(AppPlaylistsDir + FILE_PLAYLISTS, LBL_DEFAULT_PLAYLIST);
   FPlaylists.Load;
-  { the play list of milestones 2 and 3 becomes the Default playlist (once) }
+  { a NowPlaying.m3u8 in the data folder becomes the Default playlist (once) }
   Old := AppDataDir + 'NowPlaying.m3u8';
   P := FPlaylists.Find(LBL_DEFAULT_PLAYLIST);
   if FileExists(LongPath(Old)) and (Length(P^.Entries) = 0) then
@@ -117,7 +117,7 @@ begin
   try
     if P^.Kind = pkAuto then
     begin
-      { the tracks of the query, from the library (Aulumic's LoadFromAPQ) }
+      { the tracks of the query, from the library }
       Suffix := '';
       L := TTrackList.Create;
       try
@@ -145,9 +145,9 @@ begin
     E := FPl.IndexOfFile(FPlayingPath);
     FPl.PlayingEntry := E;
     if E >= 0 then FPlayingId := FPl.Entry(E).Id;
-    { ---> AulumicNS: a tag edit can take the playing track out of an
-      auto-playlist (its genre no longer fits): it plays on, then the list
-      goes on from where it was (was: the music stopped) }
+    { a tag edit can take the playing track out of an
+      auto-playlist (its genre does not fit any more): it plays on, then the
+      list goes on from where it was }
     SyncQueueWithList(True);
   end
   else
@@ -156,8 +156,7 @@ begin
   if P^.LastFile <> '' then
   begin
     E := FPl.IndexOfFile(P^.LastFile);
-    { the selected track left the list: the one that is at its place now
-      (was: nothing selected, the list at its top) }
+    { the selected track left the list: the one that is at its place now }
     if (E < 0) and (OldSel >= 0) and (FPl.EntryCount > 0) then
       E := Min(OldSel, FPl.EntryCount - 1);
     if E >= 0 then FPl.SelectEntry(E, False, True);
@@ -280,7 +279,7 @@ begin
   finally
     Names.Free;
   end;
-  { ---> AulumicNS (2026-11-13, the user): the selector lists the playlists
+  { the selector lists the playlists
     and auto-playlists, nothing else. New / edit / rename / delete are in
     the Playlist Manager (the pencil beside the selector, Alt+P, the
     playlist's context menu). }
@@ -304,11 +303,11 @@ begin
   end;
 end;
 
-{ ---> AulumicNS (the user, 2026-11-17): work on the playlist that takes a
+{ work on the playlist that takes a
   moment on this thread - another grouping or format, another playlist: all
   rows are built again. The hourglass shows meanwhile, and the clicks and keys
   of that time are dropped at the end (uInputBlock.DiscardPendingInput): they
-  would run afterwards, on rows that are no longer where they were clicked. }
+  would run afterwards, on rows that are not where they were clicked. }
 procedure TMainForm.BeginBusy;
 begin
   Inc(FBusyDepth);
@@ -369,8 +368,7 @@ begin
     It.Checked := P^.GroupMode = I;
   end;
   Sub := FViewMenu.AddSub('Album header format', icAlbum);
-  { ---> AulumicNS: only headers of albums have a format (Aulumic:
-    HeaderMenu.Enabled := FGroupingMode = gmAlbum) - by the grouping in
+  { only headers of albums have a format - by the grouping in
     effect, the playlist's own or the default }
   FViewMenu.Item(FViewMenu.Count - 1).Enabled := PlGroupMode(P) = gmAlbum;
   It := Sub.Add('Use global preferences', @MnViewHeader);
@@ -594,7 +592,7 @@ begin
   end;
 end;
 
-{ ---- the playlist context menu (Aulumic's) ---- }
+{ ---- the playlist context menu ---- }
 
 procedure TMainForm.PlContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
 var
@@ -649,7 +647,7 @@ begin
   RateSelection(TAuMenuItem(Sender).Tag);
 end;
 
-{ ---> AulumicNS: the rating menu and Ctrl+0 .. Ctrl+5: the selected rows of
+{ the rating menu and Ctrl+0 .. Ctrl+5: the selected rows of
   the playlist (a header stands for its whole group) }
 procedure TMainForm.RateSelection(ARating: Integer);
 var
@@ -691,16 +689,15 @@ begin
   Result := FileExists(LongPath(APath));
 end;
 
-{ Aulumic's "Remove dead items": a file that is gone from a drive that is
+{ "Remove dead items": a file that is gone from a drive that is
   there; a file on a drive that is not connected stays.
-  ---> AulumicNS (2026-11-12): as Aulumic did it. First the drives and shares
+  First the drives and shares
   of the playlist are checked on a worker thread (FindOfflineDrives; the
   "Waiting for drive..." window with Cancel when it takes a moment: a USB disk
   that spins up, a NAS that does not answer). Files on a drive that cannot be
-  reached are not touched and stay in the playlist (RowFileState). Before,
-  every file was checked from the window's own thread, and only the library's
-  folders were known to be offline: a playlist with files on a NAS that was
-  down made the window wait for each of them. }
+  reached are not touched and stay in the playlist (RowFileState). Checking
+  every file from the window's own thread would make the window wait for
+  each file of a playlist on a NAS that is down. }
 procedure TMainForm.MnRemoveDead(Sender: TObject);
 var
   Dead: TIntArray;
@@ -782,7 +779,7 @@ begin
   FPl.List.SetDropMarker(-1, False);
   if FPl.ReadOnly then Exit;
   At := FPl.InsertIndexAt(Y, MarkRow, MarkAbove);
-  { ---> AulumicNS: a large selection moved, or a whole part of the library
+  { a large selection moved, or a whole part of the library
     dropped: busy until the list is built again }
   BeginBusy;
   try
@@ -994,9 +991,9 @@ begin
   end;
 end;
 
-{ ---- the Playlist Manager and the Playlist Editor (milestone 5) ---- }
+{ ---- the Playlist Manager and the Playlist Editor ---- }
 
-{ Aulumic's Playlist Manager; afterwards the renames reach the shown and
+{ the Playlist Manager; afterwards the renames reach the shown and
   the playing playlist, a deleted shown playlist gives way to Default, a
   changed one is shown again, a double clicked one is shown }
 procedure TMainForm.MnPlaylistManager(Sender: TObject);

@@ -5,17 +5,15 @@ unit uPlaylistStore;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  All playlists and auto-playlists of AulumicNS in the Aulos format
-  (uDbStore, as the library): Data\Playlists\playlists.adb (snapshot) and
-  playlists.jnl (journal). Aulumic kept one file per playlist (.pdb, .apq);
-  AulumicNS does not read those (it has no import).
+  All playlists and auto-playlists of AulumicNS in the format of uDbStore
+  (as the library): Data\Playlists\playlists.adb (snapshot) and
+  playlists.jnl (journal).
 
   One record per playlist (TStoredPlaylist): the name, the kind (normal /
-  auto), Aulumic's per-playlist view (grouping, header and track format, the
+  auto), the per-playlist view (grouping, header and track format, the
   collapsed groups), the auto-playlist's query, the entries (path and the
   cached tags of uPlaylistFile.TPlaylistEntry, so a track outside the
-  library is shown without reading its file) and the last selected file
-  (Aulumic's playlist state).
+  library is shown without reading its file) and the last selected file.
 
   Every change journals the whole record at once (PUT) or its removal (DEL),
   so a crash loses no playlist edit; Save writes a new snapshot (at exit and

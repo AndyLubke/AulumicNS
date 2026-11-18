@@ -13,7 +13,7 @@
   =============================================================================}
 
 const
-  { ---> AulumicNS: after the tag writer's batch the folder changes are its own
+  { after the tag writer's batch the folder changes are its own
     writes for this long (CheckWatcher) }
   OWN_WRITES_GRACE_MS = 3000;
 
@@ -25,7 +25,7 @@ begin
   ForceDirectories(AppLibraryDir);
   UserStatsManager := TUserStatsManager.Create(AppLibraryDir + FILE_USER_STATS);
   UserStatsManager.LoadFromFile;
-  { ---> AulumicNS: the peaks the automatic headroom has learned (a damaged
+  { the peaks the automatic headroom has learned (a damaged
     file: they are learned again) }
   HeadroomBook := THeadroomBook.Create(AppLibraryDir + HEADROOM_FILE);
   if not HeadroomBook.Load(Err) then
@@ -67,7 +67,7 @@ begin
   SaveHeadroom;
 end;
 
-{ ---> AulumicNS: the peaks the automatic headroom learned since the last
+{ the peaks the automatic headroom learned since the last
   save (ALHeadroom; at a track change, a stop and at exit). A few KB, and
   only when something was learned. }
 procedure TMainForm.SaveHeadroom;
@@ -84,7 +84,7 @@ begin
   Result := (FLibrary <> nil) and FLibrary.TryGetTrack(APath, ATrack);
 end;
 
-{ Aulumic's RequestLibraryScan: SilentQueue = no message when a scan is
+{ starts or queues a library scan: SilentQueue = no message when a scan is
   already running (it is queued) }
 procedure TMainForm.RequestLibraryScan(FullRebuild, SilentQueue: Boolean);
 begin
@@ -128,15 +128,15 @@ begin
   FStatus.Progress := -1;
   if FPlayback.State = psStopped then FStatus.StatusText := STATUS_IDLE
   else FStatus.StatusText := '';
-  { also when folders were shown while their drive was missing (Aulumic) }
+  { also when folders were shown while their drive was missing }
   if HasChanges or FLib.HasOfflineFolders or FLibrary.LastScanHadUnavailableRoots or
      (FLib.Tree.RootCount = 0) then
     FLib.RefreshLibrary;
   { the scan may have made covers that were missing }
   FPl.ClearThumbCache;
-  { ---> AulumicNS: the playlist's texts (date added, statistics) again only
-    when the library changed (was: after every scan; with a very large
-    playlist that is a pause of 0.1 .. 0.2 s for nothing) }
+  { the playlist's texts (date added, statistics) again only
+    when the library changed (after every scan it would be, with a very
+    large playlist, a pause of 0.1 .. 0.2 s for nothing) }
   if HasChanges then FPl.RefreshRatings;
   { a new library folder may be reachable now }
   if HasChanges then RestartWatcher;
@@ -238,7 +238,7 @@ const
   WATCH_QUIET_MS = 4000;     // the files are copied, then the refresh starts
 begin
   if (FWatcher = nil) or (FLibrary = nil) or FLibrary.IsScanning then Exit;
-  { ---> AulumicNS: FIX the program's own tag / ReplayGain writes started a
+  { the program's own tag / ReplayGain writes must not start a
     library scan after every save: while the tag writer works and for
     OWN_WRITES_GRACE_MS after its batch (BackgroundIOBatchFinished) the
     changes are forgotten; the writer updates the library records itself }
@@ -256,7 +256,7 @@ begin
   end;
 end;
 
-{ ---- tree actions (Aulumic: Play, Add to / Send to current Playlist) ---- }
+{ ---- tree actions (Play, Add to / Send to current Playlist) ---- }
 
 { the tracks of the nodes replace the play list and play from the first }
 procedure TMainForm.LibPlay(const ANodes: TAuTreeNodeArray);
@@ -269,7 +269,7 @@ begin
     FLib.CollectTracks(ANodes, L);
     if L.Count = 0 then Exit;
     if FPlayback <> nil then FPlayback.Stop;
-    { Aulumic's PlayImmediatelyFromLibrary: in the Default playlist }
+    { played from the library at once: in the Default playlist }
     ShowPlaylist(LBL_DEFAULT_PLAYLIST);
     FPl.Clear;
     FPl.AddTracks(L);
@@ -287,7 +287,7 @@ var
   L: TTrackList;
   First: Integer;
 begin
-  if FPl.ReadOnly then Exit;       // an auto-playlist on screen (Aulumic: disabled)
+  if FPl.ReadOnly then Exit;       // an auto-playlist on screen
   L := TTrackList.Create;
   BeginBusy;
   try
@@ -424,7 +424,7 @@ begin
   else RevealPath(IncludeTrailingPathDelimiter(FCtxNode.Path));
 end;
 
-{ Create / Edit Virtual Folder (Aulumic's popManageVirtualLinkClick): a
+{ Create / Edit Virtual Folder: a
   .aullink file in the folder (create) or the link itself (edit) }
 procedure TMainForm.MnVirtualFolder(Sender: TObject);
 var
@@ -478,7 +478,7 @@ begin
   end;
 end;
 
-{ Aulumic's popDeleteVirtualLinkClick: the .aullink file goes (the folders
+{ Remove Virtual Folder: the .aullink file goes (the folders
   it shows are not touched) }
 procedure TMainForm.MnRemoveVirtualFolder(Sender: TObject);
 var
@@ -504,7 +504,7 @@ end;
 
 { ---- the library menu ---- }
 
-{ the Library Folders dialog of milestone 3 is now Preferences > Library }
+{ the library folders are a page of Preferences (Preferences > Library) }
 procedure TMainForm.MnLibraryFolders(Sender: TObject);
 begin
   ShowPrefsPage(PREFS_LIBRARY);
@@ -541,15 +541,15 @@ begin
   RequestLibraryScan(FullRebuild, False);
 end;
 
-{ F5: the focused folder again from the library (Aulumic: and the playlist
-  synced with the library - milestone 4) }
+{ F5: the focused folder again from the library, and the playlist
+  synced with the library }
 procedure TMainForm.MnRefresh(Sender: TObject);
 begin
   if FShuttingDown then Exit;
   BeginBusy;
   try
     FLib.RefreshCurrentFolder;
-    { Aulumic's AutoSyncWithLibrary: the tags from the library; an
+    { the playlist takes the tags from the library; an
       auto-playlist runs its query again }
     if FPl.ReadOnly then ShowPlaylist(FShownPl, True)
     else FPl.SyncWithLibrary;
@@ -565,7 +565,7 @@ begin
   RequestLibraryScan(False, False);
 end;
 
-{ ---- play counts (Aulumic's scrobble: 30 s or half the track) ---- }
+{ ---- play counts (after 30 s or half the track) ---- }
 
 procedure TMainForm.CountPlay(DeltaSec: Double);
 var
@@ -596,11 +596,11 @@ begin
   FActivePlaySeconds := 0;
   FScrobblePath := '';
   FScrobbleMeta := Default(TAudioMetadata);
-  { ---> AulumicNS: a track is over: what the automatic headroom learned }
+  { a track is over: what the automatic headroom learned }
   SaveHeadroom;
 end;
 
-{ Aulumic's TrackStatsFingerprint: the library's identity of the track, else
+{ the key of a track's statistics: the library's identity of the track, else
   the file's tag values }
 function TMainForm.TrackStatsFingerprint(const APath: string; const AMeta: TAudioMetadata): string;
 var
@@ -613,7 +613,7 @@ begin
     Result := UserStatsManager.GenerateFingerprint(AMeta.AlbumArtist, AMeta.Album, AMeta.Title);
 end;
 
-{ Aulumic's FindTrackStats: primary, fallback, then the tag values }
+{ a track's statistics: primary, fallback, then the tag values }
 function TMainForm.TrackStats(const APath: string; const AMeta: TAudioMetadata): PUserTrackStats;
 var
   T: TTrackInfo;

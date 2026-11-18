@@ -5,12 +5,12 @@ unit AuLibraryPane;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The library pane on the left of the main window - Aulumic's library frame
-  (uFrameLibrary) on the AulumicNS tree control: a search box and the rescan
+  The library pane on the left of the main window, on the tree control
+  (TAuTreeView): a search box and the rescan
   button above the library tree with the categories Folders, Artists,
   Albums and Genres (Artists / Albums / Genres as set in the preferences).
 
-  As in Aulumic:
+  How it works:
   - the children of a node are read from the library when it is opened
     (OnExpanding), never from the disk: a sleeping drive is not woken, an
     unplugged drive still shows its folders (a library folder that cannot be
@@ -20,7 +20,7 @@ unit AuLibraryPane;
     shows the matching folders, artists, albums, genres and tracks;
   - a refresh keeps the opened nodes, the selection and the scroll position.
 
-  The node data that Aulumic kept in a record is in the tree node itself:
+  The node data is in the tree node itself:
   Kind = TLibNodeType, Tag = TLibCategory for a category node, Text = the
   name it stands for (artist, album, genre), Path = folder / file / link,
   Filter = the artist or genre of an album below it, Data = flag bits
@@ -73,7 +73,7 @@ type
     Tree: TAuTreeView;
     constructor Create(AOwner: TComponent); override;
     procedure Init(ALib: TLibraryManager);
-    { the four categories, all closed (Aulumic's PopulateLibraryTree) }
+    { the four categories, all closed }
     procedure Populate;
     { rebuilds the tree from the library, keeping the opened nodes, the
       selection and the scroll position; ends a search }
@@ -114,7 +114,7 @@ implementation
 uses
   uAppConsts, uAppStrings, uAudioUtils, uSettingsManager;
 
-{ Aulumic's CleanNodeText: multi-line tags flattened }
+{ multi-line tags flattened }
 function CleanNodeText(const S: string): string;
 begin
   Result := Trim(S);
@@ -715,7 +715,7 @@ begin
         lntTrack:
           if FLib.TryGetTrack(N.Path, T) then Part.Add(T);
       else
-        ;   // a category: never the whole library at once (as Aulumic)
+        ;   // a category: never the whole library at once
       end;
       if NodeType(N) in [lntArtist, lntGenre] then Part.Sort(@SortTracks_ByArtist)
       else if NodeType(N) in [lntAlbum, lntArtistAlbum, lntGenreAlbum] then Part.Sort(@SortTracks_ByAlbum);

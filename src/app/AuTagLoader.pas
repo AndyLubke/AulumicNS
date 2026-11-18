@@ -5,7 +5,7 @@ unit AuTagLoader;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Reads the tags for the Properties dialog (Aulumic's uTagLoader): a small
+  Reads the tags for the Properties dialog: a small
   progress window with Cancel (Esc) while the files are read on the UI
   thread. The drives are woken first on a worker thread (WakeDrives, also
   for other callers: WakeDrivesWithWindow). During that wait the program
@@ -13,7 +13,7 @@ unit AuTagLoader;
   lasts longer than DRIVE_WAIT_SHOW_DELAY_MS the "Waiting for drive..."
   window appears, and Escape or its Cancel stops the wait. A
   network drive that does not answer and a missing file stop the loading
-  (a missing file offers a rescan of the library, as Aulumic).
+  (a missing file offers a rescan of the library).
   The records (TTagEditNodeData) are the editor's working copies: Original
   as read, Current as edited.
   =============================================================================}
@@ -47,19 +47,19 @@ procedure DisposeTagData(var AData: TList);
 { the record of one existing file (tags, whether it has a cover); a file whose
   tag cannot be read is marked ReadFailed }
 function ReadTagRecord(const APath: string): PTagEditNodeData;
-{ Aulumic's WakeDrivesWithWindow: wakes the drives of APaths on a worker
+{ Wakes the drives of APaths on a worker
   thread; when that takes a moment, a small "Waiting for drive..." window with
-  Cancel (the other windows are disabled meanwhile). False = cancelled;
+  Cancel (the program takes no other input meanwhile). False = cancelled;
   AUnreachable gets the network drives that do not answer. }
 function WakeDrivesWithWindow(AOwner: TComponent; APaths: TStrings; const ACaption: string;
   AUnreachable: TStrings = nil): Boolean;
-{ ---> AulumicNS: the same window while the drives of APaths are checked on a
+{ The same window while the drives of APaths are checked on a
   worker thread (uDriveKeepAlive.FindOfflineDrives): AOffline gets the drives
   and shares that cannot be reached ('E:', '\\NAS\Music'). False = cancelled
   (AOffline is then empty). }
 function FindOfflineDrivesWithWindow(AOwner: TComponent; APaths, AOffline: TStrings;
   const ACaption: string): Boolean;
-{ ---> AulumicNS: True while a wait of WakeDrivesWithWindow /
+{ True while a wait of WakeDrivesWithWindow /
   FindOfflineDrivesWithWindow holds the input and the busy cursor (the window
   itself comes later, or not at all); its busy cursor is not left behind, see
   TMainForm.UiTimerTick }
@@ -111,15 +111,14 @@ type
   end;
 
   { TDriveWaiter: a wait for a drive, seen from the UI thread.
-    ---> AulumicNS 2026-11-14 (the user: "the normal GUI freeze, but without
-    the turning white"): from the first call of OnWait (20 ms into the wait)
+    From the first call of OnWait (20 ms into the wait)
     the program takes no input (uInputBlock) and shows the busy cursor, while
     its windows go on painting. Only after DRIVE_WAIT_SHOW_DELAY_MS the
     "Waiting for drive..." window comes, the one window that takes input
     (Cancel). Escape stops the wait at any time. A wait that is over within
     20 ms does none of this.
-    Before: the window after 1.2 s, the other forms disabled from then on
-    (arrow cursor, a beep per click) and free to take input until then. }
+    The other forms are never disabled for this (that would give an arrow
+    cursor and a beep per click). }
 
   TDriveWaiter = class
   private
@@ -355,7 +354,7 @@ begin
   FPaths := TStringList.Create;
   FPaths.Assign(APaths);
   FData := TList.Create;
-  { ---> AulumicNS: not "Waiting for drive..." from the start (it stood there
+  { not "Waiting for drive..." from the start (it would stand there
     for a moment at every opening): that text comes when a drive really
     takes its time (WaitForDrive) }
   FStatus := AddLabel(Self, SafeFormat(FMT_STATUS_SCANNING_TRACK, [0, APaths.Count]), 24, 18, 392, False);

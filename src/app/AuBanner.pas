@@ -5,19 +5,19 @@ unit AuBanner;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The "Now Playing" banner at the top of the main window (Aulumic layout):
+  The "Now Playing" banner at the top of the main window:
     cover  Title                               FLAC        |peak |
            Album (link)                        24 bit/96   |meter|
            Genre                               Stereo      |     |
            Artist • Performer • Composer (...)  Rate (link) |     |
            Track 1 of 8 • 4:33 / 47:17  [badge] [book] [heart]
-  ---> AulumicNS: the main menu and Preferences buttons are in the title bar
-  (TAuTitleBar.AddButton); the sun / moon theme button was removed (2026-11-11).
+  The main menu and Preferences buttons are in the title bar
+  (TAuTitleBar.AddButton), not here.
   Everything is painted by this one control (clickable parts are hot
   spots), so the banner never flickers; only the peak meter is an own
   child control (it repaints up to 20 times a second).
   When the banner is made lower (the splitter below it) the fonts shrink
-  and the rows disappear one by one, like in Aulumic. The background is a
+  and the rows disappear one by one. The background is a
   vertical gradient tinted with the main colour of the cover.
   =============================================================================}
 
@@ -120,11 +120,11 @@ type
   end;
 
 const
-  BannerDefaultHeight = 200;    // unscaled, like Aulumic
+  BannerDefaultHeight = 200;    // unscaled
   BannerMinHeight = 60;
   BannerMaxHeight = 400;
 
-{ the main colour of a cover for the tint of the banner (Aulumic's ambient
+{ the main colour of a cover for the tint of the banner (the ambient
   colour): the average of about 48 x 48 sampled pixels, colourful pixels
   weighted more than grey, near black or near white ones; 0 = none }
 function CoverAmbientColor(B: TGfxBitmap): TARGB;
@@ -178,10 +178,10 @@ begin
 end;
 
 const
-  EdgeW = 20;         // ---> AulumicNS: margin left / right (was an icon column of 30 + 10)
+  EdgeW = 20;         // margin left / right
   InfoW = 180;        // the source information column (at least; wider when its text needs it)
-  TextMinW = 160;     // ---> AulumicNS: what the title column keeps at the least
-  MeterW = 22;        // ---> AulumicNS (test list 2): narrower bars (was 32)
+  TextMinW = 160;     // what the title column keeps at the least
+  MeterW = 22;        // the width of the peak meter
 
 constructor TNowPlayingBanner.Create(AOwner: TComponent);
 begin
@@ -318,7 +318,7 @@ end;
 
 function TNowPlayingBanner.FontPx(Pt: Single): Single;
 begin
-  { Aulumic's sizes are in points; the GUI fonts are in pixels at 96 dpi }
+  { the banner's sizes are in points; the GUI fonts are in pixels at 96 dpi }
   Result := Pt * 4 / 3;
 end;
 
@@ -349,10 +349,9 @@ begin
   PaintBackground(G, FMeter.Left, FMeter.Top, FMeter.Width, FMeter.Height);
 end;
 
-{ ---> AulumicNS (test list 2): the width of the source column - InfoW, or
-  what its widest row needs at the text size in use ("DSD to PCM: 705.6 kHz"
-  was cut at Larger), but the title column keeps TextMinW. Layout and
-  DoPaint use it alike. }
+{ The width of the source column - InfoW, or what its widest row needs at
+  the text size in use ("DSD to PCM: 705.6 kHz" at Larger), but the title
+  column keeps TextMinW. Layout and DoPaint use it alike. }
 function TNowPlayingBanner.InfoColumnW(R: Single; InfoR, TextL: Integer): Integer;
 var
   F, FB: TGfxFont;
@@ -392,7 +391,7 @@ begin
   Step := (MaxH - MinH) div 4;
   TopY := S(20);
   BotY := H - S(10);
-  { cover (---> AulumicNS: no icon column on the left any more) }
+  { cover }
   CoverSz := Math.Max(S(24), BotY - TopY);
   X := S(EdgeW);
   FRects[bhCover] := Rect(X, TopY, X + CoverSz, TopY + CoverSz);

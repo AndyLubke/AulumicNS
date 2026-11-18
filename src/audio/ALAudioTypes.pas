@@ -17,7 +17,7 @@ uses
 
 const
   // =========================================================================
-  // ---> Default Audio values
+  // Default Audio values
   // =========================================================================
   // Core Defaults
   VAL_DEF_VOLUME          = 1000;
@@ -52,7 +52,7 @@ const
   VAL_DEF_TONE_DB         = 0;     // 0 dB (Flat EQ)
   VAL_DEF_TONE_DIRECT     = True;  // Direct Mode enabled by default
   VAL_DEF_BASSHZ          = 150;
-  VAL_DEF_LOWMIDHZ        = 400;   // ---> AulumicNS: five bands (2026-11-14)
+  VAL_DEF_LOWMIDHZ        = 400;   // five bands
   VAL_DEF_MIDHZ           = 1000;
   VAL_DEF_HIGHMIDHZ       = 4000;
   VAL_DEF_TREBLEHZ        = 6000;
@@ -70,14 +70,14 @@ const
 
 
 const
-  // ---> ADDED: Peak meter slices. The audio thread measures the peak of every
+  // Peak meter slices. The audio thread measures the peak of every
   // METER_SLICE_MS of output and keeps the last METER_RING_SIZE slices
   // (power of 2) for the UI.
   METER_SLICE_MS  = 20;
   METER_RING_SIZE = 256;
 
 type
-  // ---> ADDED: Peak of one meter slice, 0.0 .. 1.0 (1.0 = full scale)
+  // Peak of one meter slice, 0.0 .. 1.0 (1.0 = full scale)
   TMeterSlice = record
     PeakL: Single;
     PeakR: Single;
@@ -106,7 +106,7 @@ type
     aeMultiChannel
   );
 
-  // ---> AulumicNS: five bands (2026-11-14) - bass (low shelf), low mid, mid,
+  // Five bands - bass (low shelf), low mid, mid,
   // high mid (peaking), treble (high shelf); in this order in every array
   // of bands (TToneInts). Gains in tenths of a dB.
   TToneState = record

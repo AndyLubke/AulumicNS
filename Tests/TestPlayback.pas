@@ -7,19 +7,15 @@ unit TestPlayback;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: FLAC is decoded by the built-in decoder (AuDecFlac), so the
-  FLAC tests always run; the libsoxr / libFLAC record layouts and the plugin
-  DLL loading tests are gone with the DLLs. TTestPlaybackDsd also plays DFF.
-
-  ---> ADDED (output split, step 3a): Playback tests. A real TPlayThread plays
-  generated files into the memory output of TestMemoryOutput
-  (TPlayThread.OutputFactory) instead of a sound device: what reaches the
-  "device" is checked sample by sample. The PCM files count their frames
-  (TestHelpers.PatternSample), so a missing, doubled or changed frame shows.
+  Playback tests. A real TPlayThread plays generated files into the memory
+  output of TestMemoryOutput (TPlayThread.OutputFactory) instead of a sound
+  device: what reaches the "device" is checked sample by sample. The PCM
+  files count their frames (TestHelpers.PatternSample), so a missing, doubled
+  or changed frame shows.
     TTestPlayback (WAV):
     - a whole track: bit-perfect, padded to the device's container (32, 24,
       16 bits), silence after the last frame, the thread ends by itself;
-      ---> ADDED (3b): 24-bit files on 32 / 24-bit devices
+      24-bit files on 32 / 24-bit devices
     - gapless at the same rate: no frame missing between the tracks, the
       device is not reopened; at another rate: reopened at the new rate, the
       new track from its first frame
@@ -28,27 +24,28 @@ unit TestPlayback;
       message at once), a device in use (three more tries 1 s apart)
     - a buffer the device loses: reopened after 1 s, nothing lost or doubled
     - stop: the thread ends at once, every output is closed and freed
-    - ---> ADDED (3b): pause hands over no buffers, resume goes on without a gap
-    ---> ADDED (3b) TTestPlaybackFlac: hand-written FLAC files (16 / 24 bit,
-    uncompressed frames): bit-perfect, gapless, seek to the exact frame.
-    ---> ADDED (3b) TTestPlaybackDsd: DSF files. DoP: every DSD byte arrives
+    - pause hands over no buffers, resume goes on without a gap
+    - a DAC with 24 valid bits in a 32-bit container: bit-perfect at full
+      volume; turned down, rounded to 24 bits with dither (the lowest 8 bits
+      0, within 1.5 steps, no bias); a full 32-bit DAC gets the exact values
+    - file names that are not plain ASCII (TestHelpers.NonAsciiName: accents,
+      Japanese, an emoji) play, also as the gapless next track; a missing one
+      is named intact in the error
+    - a new volume and mute glide, without a step
+    TTestPlaybackFlac: hand-written FLAC files (16 / 24 bit, uncompressed
+    frames), decoded by AuDecFlac: bit-perfect, gapless, seek to the exact
+    frame, dithered on a 24-in-32 DAC, a non-ASCII name.
+    TTestPlaybackDsd: DSF and DFF files. DoP: every DSD byte arrives
     bit-reversed in its place with the 05 / FA markers alternating over the
     whole stream (also across a gapless change and a seek, and in the DSD
-    silence after the end), on 32 / 24-bit devices; a 16-bit device refuses
-    DoP; a seek starts at a DSF block. DSD to PCM: opened at a 32nd of the DSD
-    rate, fades in over 100 ms and out at the end.
-    ---> ADDED: A DAC with 24 valid bits in a 32-bit container: at full volume
-    bit-perfect; turned down (WAV, FLAC) and DSD to PCM rounded to 24 bits
-    with dither (the lowest 8 bits 0, within 1.5 steps, no bias); DoP never
-    touched; the same volume on a full 32-bit DAC exactly as before.
+    silence after the end), on 32 / 24-bit devices, never touched on a
+    24-in-32 DAC; a 16-bit device refuses DoP; a seek starts at a DSF block.
+    DSD to PCM: opened at a 32nd of the DSD rate, fades in over 100 ms and
+    out at the end, dithered on a 24-in-32 DAC. A non-ASCII name plays.
     TTestValidBitsRounding: the rounding itself (RoundSamplesToValidBits):
     the grid, full scale, the dither's shape and bias, other valid bits, the
     seed across buffers.
-    ---> ADDED: File names that are not plain ASCII (TestHelpers.NonAsciiName:
-    accents, Japanese, an emoji): WAV, FLAC and DSF (DoP, PCM) play, a gapless
-    change to such a file, a missing one is named intact in the error.
-    ---> ADDED: TTestNativeLayouts: sizes and field offsets of the records
-    WASAPI reads (unchanged by a compiler mode switch).
+    TTestNativeLayouts: sizes and field offsets of the records WASAPI reads.
     TTestDeviceNames: the real device list and the name lookup by id agree
     (reading only, nothing is played).
   The device itself (WASAPI) and the sound are tested by ear. The "device in
@@ -69,15 +66,15 @@ type
     FDir      : string;
     FRecorder : TMemoryOutputRecorder;
     FThread   : TPlayThread;
-    FSettleMs : Integer;   // ---> AulumicNS: TPlayThreadConfig.SettleMs of Play (0 = a normal start)
-    FResample44To: Integer; // ---> AulumicNS: > 0 = Play resamples 44.1 kHz files to this rate
-    FHeadroom : Boolean;    // ---> AulumicNS: TPlayThreadConfig.AutoHeadroom of Play
-    FTrackGain: Boolean;    // ---> AulumicNS: Play applies the ReplayGain track gain of the file
-    FTrebleDB : Integer;    // ---> AulumicNS: the tone control's treble of Play, in 0.1 dB (0 = off)
+    FSettleMs : Integer;   // TPlayThreadConfig.SettleMs of Play (0 = a normal start)
+    FResample44To: Integer; // > 0 = Play resamples 44.1 kHz files to this rate
+    FHeadroom : Boolean;    // TPlayThreadConfig.AutoHeadroom of Play
+    FTrackGain: Boolean;    // Play applies the ReplayGain track gain of the file
+    FTrebleDB : Integer;    // the tone control's treble of Play, in 0.1 dB (0 = off)
     procedure SetUp; override;
     procedure TearDown; override;
     // Starts a play thread on AFile that plays into FRecorder's output
-    // ---> CHANGED: AVolume 0..1000 (1000 = full: nothing touches the samples)
+    // AVolume 0..1000 (1000 = full: nothing touches the samples)
     procedure Play(const AFile: string; AUseDoP: Boolean = False; AVolume: Integer = 1000);
     // True when the play thread has ended within ATimeoutMs
     function  WaitForEnd(ATimeoutMs: Cardinal): Boolean;
@@ -91,7 +88,7 @@ type
       ADeviceBits, ASourceBits: Integer; AStartFrame, AFirstNumber, ACount: Integer);
     // AData[AFrom .. ATo - 1] is digital silence
     procedure CheckSilence(const AMsg: string; const AData: TBytes; AFrom, ATo: Int64);
-    // ---> ADDED: AData (32-bit stereo) from frame 0 on holds ACount pattern
+    // AData (32-bit stereo) from frame 0 on holds ACount pattern
     // frames of ASourceBits, padded to 32 bits and times AFactor. AValidBits =
     // 32: exactly that, rounded; 24: rounded to 24 bits with dither (the lowest
     // 8 bits 0, at most 1.5 steps of 24 bits off, no bias, the dither there)
@@ -125,7 +122,7 @@ type
     procedure MuteGlidesToSilence;
   end;
 
-  { TTestPlaybackFlac: FLAC files through libFLAC }
+  { TTestPlaybackFlac: FLAC files through AuDecFlac }
   TTestPlaybackFlac = class(TPlaybackTestBase)
   published
     procedure Flac16BitPlaysBitPerfect;
@@ -178,10 +175,9 @@ type
     procedure TheDitherGoesOnAcrossBuffers;
   end;
 
-  { ---> ADDED (ObjFPC switch, step 1): TTestNativeLayouts: the records that
-    Windows (WASAPI) reads keep the sizes and field
-    offsets the C side expects. A change of a unit's compiler mode must not move them, and
-    the compiler cannot see it. }
+  { TTestNativeLayouts: the records that Windows (WASAPI) reads keep the
+    sizes and field offsets the C side expects. A change of a unit's compiler
+    mode must not move them, and the compiler cannot see it. }
   TTestNativeLayouts = class(TTestCase)
   private
     procedure CheckOffset(const AName: string; ABase, AField: Pointer; AExpected: PtrUInt);
@@ -189,7 +185,7 @@ type
     procedure WasapiRecordsMatchWindows;
   end;
 
-  { ---> ADDED (ObjFPC switch, step 2): TTestDeviceNames: the real Windows
+  { TTestDeviceNames: the real Windows
     device list (TAudioEngine.EnumerateDevices; reading only, nothing is
     played) and the name looked up by a device's id (GetDeviceFriendlyName)
     agree, so names and ids pass both ways intact. Skipped without devices. }
@@ -202,8 +198,8 @@ implementation
 
 uses
   Math, uAppConsts, TestHelpers,
-  ALWasapiApi,                   // ---> ADDED: TTestNativeLayouts
-  ALAudioEngine;                 // ---> ADDED: TTestDeviceNames
+  ALWasapiApi,                   // TTestNativeLayouts
+  ALAudioEngine;                 // TTestDeviceNames
 
 const
   BUFFER_MS     = 50;     // the smallest buffer the play thread allows
@@ -211,7 +207,7 @@ const
   END_WAIT_MS   = 10000;  // a play that does not end within this has hung
   DOP64_RATE    = 176400; // the DoP rate of DSD64 (2822400 / 16)
   PCM_BUFFER    = 4410;   // frames of one buffer of DSD64 as PCM (50 ms at 88.2 kHz)
-  // ---> ADDED: 24 valid bits in a 32-bit container
+  // 24 valid bits in a 32-bit container
   STEP_24       = 256;    // one step of 24 bits
   MAX_ERROR_24  = 383;    // the most TPDF dither of +-1 step and the rounding add up to
   VOLUME_12DB   = 500;    // the volume position of a factor of 0.25 (-12 dB)
@@ -631,7 +627,7 @@ begin
   AssertEquals('Nothing played', 0, Length(FRecorder.Data));
   AssertEquals('Every output freed', 0, FRecorder.OutputsAlive);
 
-  // ---> AulumicNS: right after another stream (SettleMs): asked again four
+  // Right after another stream (SettleMs): asked again four
   // times, 500 ms apart, then reported
   Restart;
   FSettleMs := 3000;
@@ -642,8 +638,8 @@ begin
   AssertEquals('Settling: opened five times', 5, FRecorder.OpenCount);
 end;
 
-// ---> AulumicNS: right after another stream (a switch of the output during
-// a track) the device may be gone for a moment (a FiiO K11's WASAPI endpoint
+// Right after another stream (a switch of the output during
+// a track) the device may be gone for a moment (some DACs' WASAPI endpoint
 // after native DSD over ASIO: 0.5 - 0.7 s) or refuse a format: it plays once
 // it is there
 procedure TTestPlayback.FormatRefusedForAMomentPlays;
@@ -750,7 +746,7 @@ begin
   AssertEquals('Every output freed', 0, FRecorder.OutputsAlive);
 end;
 
-// ---> ADDED: A DAC with 24 valid bits in a 32-bit container, full volume:
+// A DAC with 24 valid bits in a 32-bit container, full volume:
 // the padded samples are already on the 24-bit grid, nothing is rounded
 procedure TTestPlayback.FullVolumeOn24In32StaysBitPerfect;
 const
@@ -783,7 +779,7 @@ begin
   AssertTrue('24 bit: bit-perfect', FThread.IsBitPerfect);
 end;
 
-// ---> ADDED: Turned down on a DAC with 24 valid bits in a 32-bit container:
+// Turned down on a DAC with 24 valid bits in a 32-bit container:
 // every sample is rounded to 24 bits with dither
 procedure TTestPlayback.LowerVolumeOn24In32IsDithered;
 const
@@ -803,8 +799,8 @@ begin
   AssertFalse('Not bit-perfect (turned down)', FThread.IsBitPerfect);
 end;
 
-// ---> ADDED: The same volume on a DAC that takes all 32 bits: exactly the
-// scaled samples, nothing rounded to 24 bits (unchanged)
+// The same volume on a DAC that takes all 32 bits: exactly the
+// scaled samples, nothing rounded to 24 bits
 procedure TTestPlayback.LowerVolumeOn32BitIsExact;
 const
   FRAMES = 20000;
@@ -822,7 +818,7 @@ begin
   CheckSilence('After the last frame', D, FRAMES * 8, Length(D));
 end;
 
-// ---> ADDED: Files whose names are not plain ASCII: played bit-perfect, and
+// Files whose names are not plain ASCII: played bit-perfect, and
 // the next one follows gapless
 procedure TTestPlayback.NonAsciiNamesPlayAndGoOnGapless;
 const
@@ -851,7 +847,7 @@ begin
   CheckSilence('After the second track', D, 2 * FRAMES * 8, Length(D));
 end;
 
-// ---> ADDED: A missing file whose name is not plain ASCII: the error names it
+// A missing file whose name is not plain ASCII: the error names it
 // intact (the WAV, FLAC and DSF readers each build that message)
 procedure TTestPlayback.MissingFileNamesTheFile;
 const
@@ -874,7 +870,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: a new volume is not applied in one step. Two buffers at
+// A new volume is not applied in one step. Two buffers at
 // full volume (untouched), then -12 dB: the gain glides there over 10 ms (441
 // frames at 44.1 kHz) from the first frame of the next buffer, then stays.
 procedure TTestPlayback.VolumeChangeGlidesWithoutAStep;
@@ -1121,12 +1117,12 @@ begin
   D       := FRecorder.Data;
   ResetAt := FRecorder.ResetDataPos;
   CheckPattern('Before the seek', D, 32, 16, 0, 0, ResetAt div 8);
-  // libFLAC's seek lands on the exact sample (inside a FLAC frame)
+  // The seek lands on the exact sample (inside a FLAC frame)
   CheckPattern('From the target on', D, 32, 16, ResetAt div 8, TARGET, FRAMES - TARGET);
   CheckSilence('After the last frame', D, ResetAt + (FRAMES - TARGET) * 8, Length(D));
 end;
 
-// ---> ADDED: A 16-bit FLAC turned down on a DAC with 24 valid bits in a
+// A 16-bit FLAC turned down on a DAC with 24 valid bits in a
 // 32-bit container: rounded to 24 bits with dither, as a WAV
 procedure TTestPlaybackFlac.FlacLowerVolumeOn24In32IsDithered;
 const
@@ -1146,7 +1142,7 @@ begin
   AssertFalse('Not bit-perfect (turned down)', FThread.IsBitPerfect);
 end;
 
-// ---> ADDED: A FLAC file whose name is not plain ASCII (libFLAC opens it by
+// A FLAC file whose name is not plain ASCII (opened by
 // its UTF-8 name)
 procedure TTestPlaybackFlac.FlacWithNonAsciiNamePlays;
 const
@@ -1305,7 +1301,7 @@ begin
   AssertTrue('24 bit: bit-perfect', FThread.IsBitPerfect);
 end;
 
-{ ---> AulumicNS: a DFF file (MSB first, no blocks) gives the same DoP stream
+{ A DFF file (MSB first, no blocks) gives the same DoP stream
   as the DSF file with the same DSD }
 procedure TTestPlaybackDsd.DffDopIsBitPerfectWithTheMarkers;
 const
@@ -1534,7 +1530,7 @@ begin
   AssertTrue(Format('The second track fades out (%.3f)', [EndPeak / Mid]), EndPeak < 0.05 * Mid);
 end;
 
-// ---> ADDED: DoP on a DAC with 24 valid bits in a 32-bit container: the DSD
+// DoP on a DAC with 24 valid bits in a 32-bit container: the DSD
 // bytes and the markers are never rounded, also with the volume turned down
 procedure TTestPlaybackDsd.DopOn24In32IsUntouched;
 const
@@ -1556,7 +1552,7 @@ begin
   AssertTrue('Bit-perfect', FThread.IsBitPerfect);
 end;
 
-// ---> ADDED: DSD to PCM on a DAC with 24 valid bits in a 32-bit container:
+// DSD to PCM on a DAC with 24 valid bits in a 32-bit container:
 // the samples of a full 32-bit DAC, rounded to 24 bits with dither
 procedure TTestPlaybackDsd.DsdToPcmOn24In32IsDithered;
 const
@@ -1606,7 +1602,7 @@ begin
     [OffHalf, Samples]), OffHalf > Samples div 10);
 end;
 
-// ---> ADDED: A DSF file whose name is not plain ASCII: as DoP (exact) and as
+// A DSF file whose name is not plain ASCII: as DoP (exact) and as
 // PCM (it plays)
 procedure TTestPlaybackDsd.DsfWithNonAsciiNamePlays;
 const

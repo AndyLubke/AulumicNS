@@ -12,7 +12,7 @@ unit TestOutputRing;
   ring; an empty take is an underrun only when it counts (not while the ring
   plays empty on purpose, TAsioOutput.Drain); the least fill; Clear keeps
   the statistics; a full ring refuses a period. RingPeriodsFor sizes the ring
-  by time (the cause of the dropouts: three periods were 4 ms at 352.8 kHz).
+  by time (three periods would be only 4 ms at 352.8 kHz: dropouts).
   The log lines of the output diagnostics (AuLog: alOutputDropout,
   alOutputStats, packed as TPlayThread.CheckOutputHealth / LogStreamSummary
   pack them).
@@ -182,7 +182,7 @@ procedure TTestOutputRing.RingPeriodsFollowTheBufferTime;
 begin
   { 250 ms at 352.8 kHz: 88200 frames = 172.3 periods of 512 -> 173 + 1 }
   AssertEquals('512 at 352.8 kHz', 174, RingPeriodsFor(512, 352800, 250));
-  { the FiiO driver's 4096 at 352.8 kHz: 21.5 -> 22 + 1 }
+  { a driver's period of 4096 at 352.8 kHz: 21.5 -> 22 + 1 }
   AssertEquals('4096 at 352.8 kHz', 23, RingPeriodsFor(4096, 352800, 250));
   AssertEquals('44.1 kHz', 23, RingPeriodsFor(512, 44100, 250));
   AssertEquals('at least 3', 3, RingPeriodsFor(512, 44100, 1));

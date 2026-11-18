@@ -15,10 +15,9 @@ unit AuBooklet;
   turn the pages. Pages are rendered by the Windows PDF engine in the
   background at the size they are shown, neighbours in advance.
 
-  AulumicNS: copied from Aulos (replaces Aulumic's SumatraPDF); the bar and
-  the view are on Body (below the own title bar); FindBooklets moved to
-  uMetaUtils (the playback IO worker uses it for the banner's booklet button);
-  CloseBooklet frees the viewer at exit.
+  The bar and the view are on Body (below the own title bar); FindBooklets
+  is in uMetaUtils (the playback IO worker uses it for the banner's booklet
+  button); CloseBooklet frees the viewer at exit.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -44,7 +43,7 @@ type
     FForm: TAuBookletForm;
     FDragging: Boolean;
     FDragX, FDragY, FDragOX, FDragOY: Integer;
-    FSwipe: Integer;                // ---> AulumicNS: touch at fit: the way swiped so far
+    FSwipe: Integer;                // touch at fit: the way swiped so far
     FSwiped: Boolean;               // this swipe turned its page (one page per swipe)
   protected
     procedure DoPaint(G: TGfx); override;
@@ -106,7 +105,7 @@ type
     function BestBitmap(Page, PxWidth: Integer): TGfxBitmap;
     procedure RequestVisible;
     procedure ClampOffset;
-    // ---> AulumicNS: the render width for page P wanted at Px (128 px steps,
+    // the render width for page P wanted at Px (128 px steps,
     // at most MAX_PAGE_PIXELS); the width of the shown page at fit
     function RenderWidth(P, Px: Integer): Integer;
     function FitPageWidth: Integer;
@@ -258,10 +257,10 @@ begin
   else FForm.SetSlot(FForm.FSlot - 1);
 end;
 
-{ ---> AulumicNS: touch. Zoomed in, the page follows the finger both ways;
-  at fit, a swipe of S(120) (left / up = on) turns the page - one page per
-  swipe: the rest of the finger's way and the inertia after it are ignored
-  (the touch probe found two pages per swipe) }
+{ Touch. Zoomed in, the page follows the finger both ways; at fit, a swipe
+  of S(120) (left / up = on) turns the page - one page per swipe: the rest
+  of the finger's way and the inertia after it are ignored (they would turn
+  a second page) }
 function TAuPdfView.GesturePan: Integer;
 begin
   Result := GESTURE_PAN_VH;
@@ -545,14 +544,12 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: FIX the viewer became unresponsive or closed after zooming
-  in and "Fit to window": every zoom step rendered the shown pages AND their
-  neighbours at the zoomed width (up to 6000 px: ~200 MB a bitmap, ~600 MB
-  while it is rendered), two sizes kept of up to 25 pages - gigabytes. Now
-  a page is at most MAX_PAGE_PIXELS (drawn larger beyond that), the
-  neighbours are rendered at fit size, and the large bitmaps go again: of a
-  page that is not shown at once, of the shown ones at fit once their fit
-  size is there. }
+{ Memory: a page rendered at a zoomed width of 6000 px is ~200 MB as a
+  bitmap (~600 MB while it is rendered), and two sizes of up to 25 pages
+  would be gigabytes. So a page is at most MAX_PAGE_PIXELS (drawn larger
+  beyond that), the neighbours are rendered at fit size, and the large
+  bitmaps go again: of a page that is not shown at once, of the shown ones
+  at fit once their fit size is there. }
 const
   MAX_PAGE_PIXELS = 20000000;    // ~80 MB as a 32-bit bitmap
 

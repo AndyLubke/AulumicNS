@@ -5,8 +5,7 @@ unit AuHelp;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Help window of Aulos with a small native Markdown renderer (ported from the
-  help window of the Chess Contraption Workshop).
+  The help window, with a small native Markdown renderer.
 
   Supported Markdown:
     # / ## / ###           headings (# and ## appear in the topic list)
@@ -18,9 +17,9 @@ unit AuHelp;
     | a | b |              tables (first row = header when followed by |---|)
     **bold**  *italic*  `code`     inline styles;  \*  \`  \\  escapes
     <!-- ... -->           comments
-    ![caption](name)       a screenshot (AulumicNS)
+    ![caption](name)       a screenshot
 
-  AulumicNS: copied from Aulos. The help text is built into the exe
+  The help text is built into the exe
   (resource AULUMICNSHELP, from help\AulumicNS_help.md); a file
   AulumicNS_help.md next to the exe overrides it. The screenshots are built
   in as well (resources HELPIMG_<NAME>, from help\shots\<name>.png, made at
@@ -118,7 +117,7 @@ type
     procedure DoPaint(G: TGfx); override;
     procedure Resize; override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -1186,13 +1185,13 @@ var
 begin
   inherited CreateAu(AOwner, 'Aulumic - Help', 1180, 820);
   BorderStyle := bsSizeable;
-  { ---> AulumicNS (test list 2): no minimize button (the help is closed or
-    put behind; minimized it had no taskbar button to come back from) }
+  { no minimize button (the help is closed or put behind; minimized it
+    would have no taskbar button to come back from) }
   BorderIcons := [biSystemMenu, biMaximize];
   Position := poMainFormCenter;
   Constraints.MinWidth := S(760);
   Constraints.MinHeight := S(480);
-  FitToWorkArea;          // ---> AulumicNS: a small screen at a large scaling
+  FitToWorkArea;          // a small screen at a large scaling
   OnKeyDown := @HelpKey;
   OnClose := @HelpClose;
 
@@ -1394,7 +1393,7 @@ begin
   end;
 end;
 
-{ AulumicNS: the exact title first, then one that starts with Topic, then
+{ the exact title first, then one that starts with Topic, then
   one that contains it ("Artist Info" is not "Shortcuts in Artist Info") }
 procedure THelpWindow.GoTopic(const Topic: string);
 var

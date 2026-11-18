@@ -8,9 +8,9 @@ unit TestLongPaths;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Files whose path has 260 characters or more (Windows' MAX_PATH): the file
-  calls take the \\?\ form (AuAudioTypes.LongPath). Before, such a file was
-  listed by the scan but could not be opened: it was not in the library, and
-  every scan "had changes" (the library was replaced and saved at each start).
+  calls take the \\?\ form (AuAudioTypes.LongPath). Without it such a file is
+  listed by the scan but cannot be opened: it is not in the library, and
+  every scan "has changes" (the library is replaced and saved at each start).
 
   A FLAC file is written at a short path and moved into nested folders so its
   path has about 300 characters. Then: the tags are read, the scan finds it

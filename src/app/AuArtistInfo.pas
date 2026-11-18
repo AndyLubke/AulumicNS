@@ -5,8 +5,7 @@ unit AuArtistInfo;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Artist Info (Aulumic's uPanelArtistInfo in its popup; a click on an artist
-  in the banner): the biography and picture from Last.fm / Wikipedia /
+  Artist Info (a click on an artist in the banner): the biography and picture from Last.fm / Wikipedia /
   TheAudioDB (uLastFmScraper, one worker thread; the biography needs the
   user's own Last.fm API key from Preferences), saved in Data\MusicInfo,
   and how much of the artist the library holds. The biography can be edited
@@ -36,7 +35,7 @@ uses
   uLastFmScraper, uLibraryTypes, uAppConsts, uAppStrings, uOSUtils, AuLog, uSettingsManager;
 
 var
-  { the rejected Last.fm key is logged once per session (Aulumic) }
+  { the rejected Last.fm key is logged once per session }
   LastFmKeyRejectedLogged: Boolean = False;
 
 const
@@ -193,7 +192,7 @@ constructor TArtistInfoForm.CreateInfo(AOwner: TComponent; ALibrary: TLibraryMan
 var
   W, H: Integer;
 begin
-  { ---> AulumicNS: wider at first (was 600 x 780), then the size it had }
+  { 900 x 780 at first, then the size it had }
   ToolWindowSize(AppSettings.Data.ArtistWinW, AppSettings.Data.ArtistWinH, 900, 780, W, H);
   CreateAu(AOwner, 'Artist Info', W, H);
   DropIn := VIEWER_DROP_PX;                // comes down from above as it opens
@@ -292,7 +291,7 @@ begin
   FBtnWeb.SetBounds(X, S(12), S(BTN), S(BTN));
   FArtistLbl.SetBounds(S(20), S(12), Math.Max(S(40), X - S(28)), S(BTN));
   Y := S(64);
-  { Aulumic: without a biography the picture takes the whole window }
+  { without a biography the picture takes the whole window }
   BioVisible := FIsEditing or FFetching or (not HasPicture) or (Trim(FBioText) <> '');
   if FIsEditing then Bottom := S(44) else Bottom := S(16);
   if HasPicture or FIsEditing then
@@ -321,7 +320,7 @@ procedure TArtistInfoForm.Resize;
 begin
   inherited Resize;
   LayoutControls;
-  { ---> AulumicNS: the size for the next time (not a maximized one) }
+  { the size for the next time (not a maximized one) }
   if Showing and (WindowState = wsNormal) then
     SizeToRemember(AppSettings.Data.ArtistWinW, AppSettings.Data.ArtistWinH);
 end;
@@ -562,7 +561,7 @@ end;
 procedure TArtistInfoForm.WebClick(Sender: TObject);
 begin
   if Trim(FCurrentArtist) = '' then Exit;
-  { Aulumic: the search is for copying text in, so editing starts }
+  { the search is for copying text in, so editing starts }
   SetEditMode(True);
   OpenURL('https://www.google.com/search?q=' + SimpleURLEncode(ExtractFirstArtist(FCurrentArtist) + ' biography'));
 end;
@@ -734,7 +733,7 @@ begin
   FQueuedForce := ForceRefresh;
   LayoutControls;
   UpdateButtons;
-  { the window first, then the lookup (Aulumic's short delay) }
+  { the window first, then the lookup (a short delay) }
   FLoadTimer.Enabled := True;
 end;
 

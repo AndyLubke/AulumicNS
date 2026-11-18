@@ -5,7 +5,7 @@ unit AuVirtualFolderForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Virtual Folder editor (Aulumic's uFormAliasEditor; the library menu:
+  The Virtual Folder editor (the library menu:
   Create / Edit Virtual Folder...): a virtual folder is a .aullink file in a
   library folder that shows other folders inside it (e.g. all recordings of
   one composer from everywhere in the library).
@@ -16,7 +16,7 @@ unit AuVirtualFolderForm;
                   selected, to be checked)
     Folders       the folders inside it: Add Folder..., Remove (Del), folders
                   dropped from Explorer
-  The paths are kept relative to the folder of the link (as Aulumic). The
+  The paths are kept relative to the folder of the link. The
   search runs on a copy of the library (no disk access).
   =============================================================================}
 
@@ -28,7 +28,7 @@ uses
   Classes, SysUtils, StrUtils, Math, Controls, Forms, LCLType,
   AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, AuFolderPicker, uLibraryManager, uLibraryTypes;
 
-{ Aulumic's TfrmAliasEditor.ExecuteDialog: AName and APaths in and out }
+{ the dialog, shown modal: AName and APaths in and out }
 function EditVirtualFolder(AOwner: TComponent; const ABaseDir: string; var AName: string; APaths: TStringList;
   AIsEdit: Boolean; ALibrary: TLibraryManager): Boolean;
 { the dialog, not shown (screenshot mode) }
@@ -77,7 +77,7 @@ type
   end;
 
 var
-  { the search choices of the session (as Aulumic) }
+  { the search choices of the session }
   LastChecks: array[0..4] of Boolean = (True, True, True, False, True);
 
 const
@@ -88,7 +88,7 @@ const
   CHECK_HINTS: array[0..4] of string = (HINT_ALIAS_TAG_ARTIST, HINT_ALIAS_TAG_COMPOSER, HINT_ALIAS_TAG_ALBUM_TITLE,
     HINT_ALIAS_TAG_COMMENT_GENRE, HINT_ALIAS_TAG_FOLDER);
 
-{ Aulumic's ResolveAlbumFolder: the track's folder, or its parent when the
+{ the track's folder, or its parent when the
   parent is the album's folder (a disc folder inside an album folder) }
 function ResolveAlbumFolder(const ATrack: PTrackInfo; const ANormBase: string): string;
 var
@@ -158,7 +158,7 @@ begin
   BorderIcons := [biSystemMenu];
   Constraints.MinWidth := S(FORM_ALIAS_MINWIDTH);
   Constraints.MinHeight := S(FORM_ALIAS_MINHEIGHT);
-  FitToWorkArea;          // ---> AulumicNS: a small screen at a large scaling
+  FitToWorkArea;          // a small screen at a large scaling
   FOriginal := AName;
   FIsEdit := AIsEdit;
   FLibrary := ALibrary;
@@ -299,7 +299,7 @@ begin
   Layout;
 end;
 
-{ Enter in the Auto-Find box searches (Aulumic), elsewhere it saves }
+{ Enter in the Auto-Find box searches, elsewhere it saves }
 procedure TVirtualFolderForm.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   if (Key = VK_RETURN) and (Shift = []) and (ActiveControl = FSearch) then
@@ -406,7 +406,7 @@ begin
   UpdateButtons;
 end;
 
-{ Aulumic's Auto-Find: the album folders of the library tracks that contain
+{ Auto-Find: the album folders of the library tracks that contain
   every word of the term (whole words, accents ignored) in the chosen tags }
 procedure TVirtualFolderForm.FindClick(Sender: TObject);
 

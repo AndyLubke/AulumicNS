@@ -7,7 +7,7 @@ unit TestImageFormats;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The picture loader (AuGfx.ImageFromBytes, since 2026-11-13 on the Windows
+  The picture loader (AuGfx.ImageFromBytes, on the Windows
   Imaging Component) with the kinds of picture a cover or an artist picture
   can be, beyond the plain 24 bit JPEG: a greyscale JPEG, a CMYK JPEG (covers
   taken from print files), a PNG with 16 bits per channel, a PNG with
@@ -42,8 +42,8 @@ type
     procedure AScaledPhotoIsTurnedToo;
   end;
 
-  { the picture files the program writes (uMetaUtils, since 2026-11-13 with
-    WIC instead of FPImage): the album thumbnail and the downloaded artist
+  { the picture files the program writes (uMetaUtils, with
+    WIC): the album thumbnail and the downloaded artist
     picture }
   TTestPictureFiles = class(TTestCase)
   private

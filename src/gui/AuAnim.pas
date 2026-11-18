@@ -5,7 +5,7 @@ unit AuAnim;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: short animations of the GUI (hover fades, a sliding switch,
+  Short animations of the GUI (hover fades, a sliding switch,
   gliding scroll positions, windows that fade in). An animated number is a
   TAuAnim record that lives in the control (a field); AnimTo starts its way to
   a new value, one timer for the whole program moves all running ones about

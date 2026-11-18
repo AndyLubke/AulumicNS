@@ -11,9 +11,9 @@ unit uMetadataCustodian;
 // metadata and ReplayGain tags. Safely communicates with the audio engine to
 // temporarily release file locks without breaking playback.
 //
-// ---> AulumicNS: ported unchanged except for the log (AuLog) and the
-// message dialogs (AuDialogs). The library records it changes are journaled
-// by TLibraryManager (UpdateRecord, SetReplayGainFlag, ...).
+// It logs through AuLog and shows its messages with AuDialogs. The library
+// records it changes are journaled by TLibraryManager (UpdateRecord,
+// SetReplayGainFlag, ...).
 // =============================================================================
 
 interface
@@ -37,12 +37,12 @@ type
     FTotalBatchCount : Integer;
     FProcessedCount  : Integer;
     FUIStatusStr     : string;
-    // ---> AUDIT FIX: Files of the current batch that could not be updated
+    // Files of the current batch that could not be updated
     // (worker thread only) and the totals handed to SyncBatchCompleted
     FFailedCount       : Integer;
     FLastBatchFailed   : Integer;  // Guarded by FQueueLock
     FLastBatchTotal    : Integer;  // Guarded by FQueueLock
-    // ---> AUDIT FIX: Failed jobs are kept (full copies) so the user can retry
+    // Failed jobs are kept (full copies) so the user can retry
     // them. FFailed* = current batch (worker), FPending* = handed to
     // SyncBatchCompleted. All four guarded by FQueueLock.
     FJobFailed         : Boolean;  // Worker only: current job failed
@@ -59,9 +59,9 @@ type
     FLogMsg              : string;
     FLogIsError          : boolean;
 
-    // ---> AUDIT FIX: Library record update carriers. UpdateRecord replaces the
+    // Library record update carriers. UpdateRecord replaces the
     // strings of a library record, which the UI reads without the lock, so it
-    // runs on the main thread (SyncUpdateLibraryRecord) instead of this thread.
+    // runs on the main thread (SyncUpdateLibraryRecord), not on this thread.
     FSyncTrack           : TTrackInfo;
     FSyncEffAlbumArtist  : string;
     FSyncEffAlbum        : string;
@@ -102,19 +102,15 @@ implementation
 
 uses
   AuAudioTypes, Math, baseTag, AudioTag, tag_id3V2, tag_vorbis, uAppConsts, uEngineStateManager,
-  // ---> AulumicNS: the log is AuLog, the message dialogs are AuDialogs
   uMetaUtils, uOSUtils, AuLog, uAudioUtils, ALMetadata, uAppStrings,
   Forms, Controls, Dialogs, AuDialogs;
 
 const
   MAX_CUSTODIAN_COVER_BYTES = 15 * BYTES_PER_MB; // 15 MB safety ceiling
 
-// Inspects the actual magic bytes of the cover buffer so the MIME
-// string written into FLAC (METADATA_BLOCK_PICTURE) or ID3v2 (APIC/PIC) always
-// matches the binary image format on disk.
-// ---> AUDIT FIX: Date and size of a file exactly as the library scanner reads
+// Date and size of a file exactly as the library scanner reads
 // them (TSearchRec), so the library can store them after a save and the next
-// scan does not see Aulumic's own write as a change.
+// scan does not see the program's own write as a change.
 function GetScanStamp(const APath: string; out ATime, ASize: Int64): Boolean;
 var
   SR: TSearchRec;
@@ -134,6 +130,9 @@ begin
   end;
 end;
 
+// Inspects the actual magic bytes of the cover buffer so the MIME string
+// written into FLAC (METADATA_BLOCK_PICTURE) or ID3v2 (APIC/PIC) always matches
+// the binary image format on disk.
 function ResolveCoverMimeType(const ABytes: TBytes; const AFallbackMime: string): string;
 begin
   if (Length(ABytes) >= 4) and
@@ -151,7 +150,7 @@ begin
     Result := MIME_JPEG;
 end;
 
-// ---> AUDIT FIX: Frees the jobs in AList (and their cover buffers) and clears it
+// Frees the jobs in AList (and their cover buffers) and clears it
 procedure DisposeJobList(AList: TList);
 var
   I   : Integer;
@@ -373,7 +372,7 @@ begin
   RetryJobs := TList.Create;
   FailLines := TStringList.Create;
   try
-    // ---> AUDIT FIX: Take over the failed jobs of this batch (copies with all
+    // Take over the failed jobs of this batch (copies with all
     // tag / cover / ReplayGain values) and their display lines
     FQueueLock.Enter;
     try
@@ -398,7 +397,7 @@ begin
 
     if (Failed > 0) and (not Terminated) and (not Application.Terminated) then
     begin
-      // ---> AUDIT FIX: List the failed files (at most SAVE_FAILED_MAX_LINES,
+      // List the failed files (at most SAVE_FAILED_MAX_LINES,
       // the log keeps all of them) and offer Retry / Discard
       Msg := SafeFormat(FMT_MSG_SAVE_FAILED_HEAD, [Failed, Total]) + sLineBreak + sLineBreak;
       for I := 0 to Min(FailLines.Count, SAVE_FAILED_MAX_LINES) - 1 do
@@ -432,12 +431,12 @@ end;
 
 // =============================================================================
 // TRACK-LEVEL JIT BOUNCING DELEGATES
-// ---> AUDIT FIX N2: Compare FTargetFile against FPlaybackManager's exact
-// current track and queued gapless track paths instead of probing IsFileLocked!
+// FTargetFile is compared against FPlaybackManager's exact current track and
+// queued gapless track paths; IsFileLocked is never probed for this.
 // This guarantees an external lock (Explorer, antivirus, scanner) on another
 // file can never interrupt an unrelated playing track.
 // =============================================================================
-// ---> AUDIT FIX: Runs on the main thread (Synchronize from ProcessNextJob)
+// Runs on the main thread (Synchronize from ProcessNextJob)
 procedure TMetadataCustodian.SyncUpdateLibraryRecord;
 var
   LibTrack: TTrackInfo;
@@ -445,7 +444,7 @@ begin
   if not Assigned(FLibraryManager) then
     Exit;
 
-  // ---> CHANGED: Both calls lock the library themselves
+  // Both calls lock the library themselves
   FLibraryManager.UpdateRecord(FSyncTrack);
 
   if FLibraryManager.TryGetTrack(FSyncTrack.FilePath, LibTrack) then
@@ -466,8 +465,8 @@ begin
     Exit;
 
   // First process any track swap that already occurred on the audio thread.
-  // ---> AUDIT FIX R5: If we consumed it here, Update() will never see the swap
-  // and never call UpdateGapless, so make SyncResumeAudioIfNeeded re-arm it.
+  // Once it is consumed here, Update() never sees the swap
+  // and never calls UpdateGapless, so make SyncResumeAudioIfNeeded re-arm it.
   if FPlaybackManager.ConsumePendingTrackSwap then
     FNextWasEvicted := True;
 
@@ -505,7 +504,7 @@ end;
 // =============================================================================
 // TAG WRITING ENGINE
 // =============================================================================
-// ---> AulumicNS: ATrackOnly: the album gain and peak are not written (the
+// ATrackOnly: the album gain and peak are not written (the
 // old ones are removed like every ReplayGain field): a track without an album
 // tag has no album to take them from
 function TMetadataCustodian.WriteReplayGainTags(TagReader: TObject; TrkGain, AlbGain, TrkPeak, AlbPeak: Double;
@@ -566,9 +565,9 @@ begin
 
   if IsFLAC then
   begin
-    // ---> AUDIT FIX: Remove every existing ReplayGain field first (duplicates
-    // included), as the ID3 branch does; SetFrameValue below only updated the
-    // first field of each name and left duplicates with their old values.
+    // Remove every existing ReplayGain field first (duplicates
+    // included), as the ID3 branch does; SetFrameValue below only updates the
+    // first field of each name and would leave duplicates with their old values.
     for I := ReaderObj.Tags.Count - 1 downto 0 do
     begin
       El := ReaderObj.Tags.Frames[I];
@@ -623,7 +622,7 @@ begin
   end
   else if IsID3 then
   begin
-    // ---> AUDIT FIX N6: Normalize any corrupt ID3 version outside 2..4 to 3 (ID3v2.3)
+    // Normalize any corrupt ID3 version outside 2..4 to 3 (ID3v2.3)
     if ReaderObj.Tags is TID3Tags then
     begin
       if not (TID3Tags(ReaderObj.Tags).Version in [2..4]) then
@@ -697,7 +696,7 @@ var
   CommFrame      : TID3FrameComment;
   imgStream      : TMemoryStream;
 
-  // ---> AUDIT FIX: Writes one field. Frames with the alternative ID and any
+  // Writes one field. Frames with the alternative ID and any
   // duplicate frames are removed; the first frame with the primary ID is kept
   // and updated (or created). An empty value removes every matching frame.
   procedure WriteField(const APrimaryID, AAltID, AValue: string);
@@ -733,7 +732,7 @@ var
       ReaderObj.Tags.SetFrameValue(APrimaryID, AValue, TextFrameClass);
   end;
 
-  // ---> AUDIT FIX: FLAC multi-value fields (Artist, Album Artist, Genre,
+  // FLAC multi-value fields (Artist, Album Artist, Genre,
   // Composer, Performer): every '; '-separated part becomes its own field
   // (ARTIST=A, ARTIST=B), the standard Vorbis comment form. All existing
   // fields with this ID are replaced; an empty value removes them all.
@@ -779,7 +778,7 @@ var
       WriteField(APrimaryID, AAltID, AValue);
   end;
 
-  // ---> AUDIT FIX: A changed track or disc number keeps the total that was
+  // A changed track or disc number keeps the total that was
   // already in the file ('5/12' edited to 6 becomes '6/12').
   function NumberWithTotal(const APrimaryID, AAltID: string; ANumber: Integer): string;
   var
@@ -824,7 +823,7 @@ begin
 
   IsFLAC := IsFlacFile(ReaderObj.FileName);
 
-  // ---> AUDIT FIX N6: Normalize any corrupt ID3 version outside 2..4 to 3 (ID3v2.3)
+  // Normalize any corrupt ID3 version outside 2..4 to 3 (ID3v2.3)
   if (not IsFLAC) and (ReaderObj.Tags is TID3Tags) then
   begin
     if not (TID3Tags(ReaderObj.Tags).Version in [2..4]) then
@@ -837,11 +836,11 @@ begin
   if P.IsModified then
   begin
     // =========================================================================
-    // ---> AUDIT FIX: Only the fields the user actually changed are written.
+    // Only the fields the user actually changed are written.
     // Every other frame in the file stays exactly as it was. (Writing all
-    // fields rewrote values the editor only shows in simplified form:
-    // comments lost their line breaks, '5/12' became '5', untitled files got
-    // their file name as title, ID3v2.4 years moved to TYER.)
+    // fields would rewrite values the editor only shows in simplified form:
+    // comments would lose their line breaks, '5/12' would become '5', untitled
+    // files would get their file name as title, ID3v2.4 years would move to TYER.)
     // =========================================================================
     IsVorbis := ReaderObj.Tags is TVorbisTags;
     IsV24    := (ReaderObj.Tags is TID3Tags) and
@@ -988,8 +987,8 @@ begin
     end;
   end;
   // 4. IMAGE LOGIC
-  // ---> AUDIT FIX R6: If the replacement cover exceeds the size limit, keep the
-  // existing cover untouched instead of deleting it and writing nothing.
+  // If the replacement cover exceeds the size limit, keep the
+  // existing cover untouched (never delete it and write nothing).
   if P.CoverModified and P.HasCover and
      (Length(P.CoverData) > MAX_CUSTODIAN_COVER_BYTES) then
   begin
@@ -1014,7 +1013,7 @@ begin
       end;
     end;
 
-    // ---> AUDIT FIX C6: Enforce 15 MB cover size limit in the custodian
+    // Enforce 15 MB cover size limit in the custodian
     if P.HasCover and (Length(P.CoverData) > 0) and
        (Length(P.CoverData) <= MAX_CUSTODIAN_COVER_BYTES) then
     begin
@@ -1084,7 +1083,7 @@ begin
   if not Assigned(FLibraryManager) then
     Exit;
 
-  // ---> CHANGED: The library clears the flags under its own lock and now
+  // The library clears the flags under its own lock and
   // also marks itself changed, so the cleared flags are saved
   FLibraryManager.ClearReplayGainForAlbums(FTaintedAlbums);
 
@@ -1109,7 +1108,7 @@ begin
   Synchronize(@SyncAddLog);
 end;
 
-// ---> AUDIT FIX: Keeps a full copy of a failed job (worker thread) so it can be
+// Keeps a full copy of a failed job (worker thread) so it can be
 // retried, plus its line for the "Tags Not Saved" dialog. Must be called
 // BEFORE the job's cover buffer is released.
 procedure TMetadataCustodian.RecordFailedJob(Job: PMetadataJob);
@@ -1164,7 +1163,7 @@ var
       Exit;
 
     TargetAlb := Job^.AlbumName;
-    LiveTrack := Default(TTrackInfo);  // ---> AulumicNS: no warning in the release build
+    LiveTrack := Default(TTrackInfo);  // no warning in the release build
 
     if Assigned(FLibraryManager) and
        FLibraryManager.TryGetTrack(Job^.FilePath, LiveTrack) and
@@ -1175,8 +1174,8 @@ var
       FTaintedAlbums.Add(TargetAlb);
   end;
 
-  // ---> AUDIT FIX: Every skipped file is now logged with its reason and
-  // counted (previously most of these exits were completely silent)
+  // Every skipped file is logged with its reason and
+  // counted
   procedure ReportSkip(const AReason: string);
   begin
     Inc(FFailedCount);
@@ -1212,10 +1211,10 @@ begin
         Exit;
       end;
 
-      // ---> AUDIT FIX: Only wait for handles that really prevent replacing the
+      // Only wait for handles that really prevent replacing the
       // file (IsFileReplaceBlocked). Virus scanners and the search indexer read
-      // files with delete sharing and no longer block a save; the old exclusive
-      // check (IsFileLocked) treated any open handle as a lock. Wait up to 5 s.
+      // files with delete sharing and do not block a save; an exclusive
+      // check (IsFileLocked) would treat any open handle as a lock. Wait up to 5 s.
       RetryCount := 0;
       while (not Terminated) and IsFileReplaceBlocked(Job^.FilePath) and (RetryCount < FILE_REPLACE_WAIT_STEPS) do
       begin
@@ -1275,7 +1274,7 @@ begin
             end;
         end;
 
-        // ---> AUDIT FIX: Remember whether the tag was only partly readable, so the
+        // Remember whether the tag was only partly readable, so the
         // discarded part can be reported after a successful save
         if TagObj.Tags is TID3Tags then
           PartialTag := TID3Tags(TagObj.Tags).HasUnreadableData;
@@ -1329,7 +1328,7 @@ begin
       if PartialTag then
         LogSafe(SafeFormat(FMT_LOG_META_PARTIAL_TAG, [ExtractFileName(Job^.FilePath)]));
 
-      // ---> AUDIT FIX: New date and size of the saved file for the library record
+      // New date and size of the saved file for the library record
       if not GetScanStamp(Job^.FilePath, StampTime, StampSize) then
       begin
         StampTime := 0;
@@ -1340,9 +1339,8 @@ begin
       begin
         if Job^.ActionType = matReplayGain then
         begin
-          // ---> CHANGED: Under the library's own lock; it now also marks the
+          // Under the library's own lock; it also marks the
           // library changed, so the flag and the new date / size are saved
-          // (before, they were lost unless something else changed too)
           FLibraryManager.SetReplayGainFlag(Job^.FilePath, True, StampTime, StampSize);
         end
         else if Job^.ActionType = matTagEditor then
@@ -1362,7 +1360,7 @@ begin
           UpdatedTrk.DateStr     := Job^.TagEditor.Current.DateStr;
           UpdatedTrk.TrackNumber := Job^.TagEditor.Current.Track;
           UpdatedTrk.DiscNumber  := Job^.TagEditor.Current.Disc;
-          // ---> AUDIT FIX: The editor comment may have line breaks now; the
+          // The editor comment may have line breaks; the
           // library keeps the one-line form, the same as after a scan
           UpdatedTrk.Comment     := CompactCommentText(Job^.TagEditor.Current.Comment);
 
@@ -1380,7 +1378,7 @@ begin
 
           EffFolder := ExcludeTrailingPathDelimiter(ExtractFileDir(Job^.FilePath));
 
-          // ---> AUDIT FIX: Update the library record on the main thread (the UI
+          // Update the library record on the main thread (the UI
           // reads its strings without the lock). The effective album values for
           // the thumbnail come back through the carrier fields.
           if not Terminated then
@@ -1434,7 +1432,7 @@ begin
     end;
 
   finally
-    // ---> AUDIT FIX: Keep a copy for Retry before the cover buffer is released
+    // Keep a copy for Retry before the cover buffer is released
     if FJobFailed and (not Terminated) then
     begin
       try
@@ -1447,7 +1445,7 @@ begin
     if Job^.ActionType = matTagEditor then
       SetLength(Job^.TagEditor.CoverData, 0);
 
-    // ---> AUDIT FIX N1: Release FileLockRegistry BEFORE calling
+    // Release FileLockRegistry BEFORE calling
     // SyncResumeAudioIfNeeded so UpdateGapless sees the file is no longer busy
     // and immediately re-arms gapless playback!
     if Assigned(FileLockRegistry) then
@@ -1583,7 +1581,7 @@ begin
         try
           FLastBatchFailed := FFailedCount;
           FLastBatchTotal  := LocalProcessed;
-          // ---> AUDIT FIX: Hand the failed jobs of this batch to SyncBatchCompleted
+          // Hand the failed jobs of this batch to SyncBatchCompleted
           for I := 0 to FFailedJobs.Count - 1 do
             FPendingRetryJobs.Add(FFailedJobs[I]);
           FFailedJobs.Clear;

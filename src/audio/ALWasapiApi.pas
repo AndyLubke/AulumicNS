@@ -9,12 +9,11 @@ unit ALWasapiApi;
 
   The Windows Core Audio (WASAPI / MMDevice) declarations AulumicNS uses: COM
   interfaces with their GUIDs, error codes, the wave format records and the
-  device property key. Moved unchanged from ALAudioThread (phase 7a): the
-  method order of each COM interface must match Windows exactly.
+  device property key. The method order of each COM interface must match
+  Windows exactly.
   Used by ALOutputWasapi and ALAudioThread (playback) and ALAudioEngine (the
   device list).
-  ---> CHANGED (ObjFPC switch, step 1): ObjFPC like the rest of Aulumic; the
-  declarations hold no strings (PWideChar stays PWideChar), and the record
+  The declarations hold no strings (PWideChar stays PWideChar), and the record
   layouts are checked by Tests\TestPlayback (TTestNativeLayouts).
   ============================================================================}
 

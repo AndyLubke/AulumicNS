@@ -27,7 +27,7 @@ function IsDrivePresent(const APath: String): boolean;
 
 function InvalidFileNameChar(aFileNameChar: Char): boolean;
 function SanitizeAndValidateFileName(var aFileName: string): TFileNameError;
-// ---> AUDIT FIX: True for Windows reserved device names (CON, PRN, AUX, NUL,
+// True for Windows reserved device names (CON, PRN, AUX, NUL,
 // COM1..COM9, LPT1..LPT9), also with an extension ("nul.txt") or trailing spaces.
 function IsReservedDeviceName(const AName: string): boolean;
 
@@ -37,20 +37,20 @@ procedure RevealFileInExplorer(const FilePath: string);
 // CPU Monitor
 function GetAppCPUUsage: double;
 
-// Explicit destructor to be called from FormDestroy
+// Explicit destructor, called from FreeAppSingletons (uAppLifetime)
 procedure FreeOSUtilsSingletons;
 
 // Check if a file is locked
 function IsFileLocked(const AFileName: string): boolean;
 
-// ---> AUDIT FIX: True when the file cannot be replaced (renamed / deleted) right
+// True when the file cannot be replaced (renamed / deleted) right
 // now, i.e. some process holds it open WITHOUT delete sharing (for example
-// Aulumic's own audio reader). Readers that allow replacement, such as virus
+// the program's own audio reader). Readers that allow replacement, such as virus
 // scanners or the search indexer, do not block. This is exactly the condition
 // a tag save (temp file + MoveFileEx) needs.
 function IsFileReplaceBlocked(const AFileName: string): boolean;
 
-// ---> AUDIT FIX: Names the processes that currently have AFileName open (via the
+// Names the processes that currently have AFileName open (via the
 // Windows Restart Manager), e.g. 'MsMpEng.exe (PID 4120)' or 'Aulumic itself'.
 // Returns '' when nothing is found or the information is unavailable.
 function DescribeFileUsers(const AFileName: string): string;
@@ -70,7 +70,7 @@ function SafeFormat(const Fmt: string; const Args: array of const; const Default
 
 procedure RateLimitThreadUI(AThread: TThread; var ALastTick: QWord; AMethod: TThreadMethod);
 
-// ---> ADDED: Opts the process out of Windows power throttling (EcoQoS): the
+// Opts the process out of Windows power throttling (EcoQoS): the
 // CPU speed is not lowered and the 1 ms timer request is honoured also when
 // the window is minimized or hidden (Windows 11). False = back to the Windows
 // default. Returns False when not supported (before Windows 10 1709).
@@ -80,7 +80,7 @@ implementation
 
 uses
   LCLIntf, SyncObjs, uCrashTracer, uAppStrings,
-  AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 const
   // Win32 MoveFileExW flags for atomic NTFS file replacement
@@ -118,7 +118,7 @@ begin
   FLastCheckTick := 0;
   FLock          := TCriticalSection.Create;
 
-  // ---> AUDIT FIX: Zero-initialize SysInfo via Default() to silence compiler hint
+  // Zero-initialize SysInfo via Default() to silence compiler hint
   SysInfo := Default(TSystemInfo);
   GetSystemInfo(SysInfo);
   if SysInfo.dwNumberOfProcessors > 0 then
@@ -141,7 +141,7 @@ var
   SysTime64, ProcTime64, SysDiff, ProcDiff: int64;
   CurrentTick: QWord;
 begin
-  // ---> AUDIT FIX: Initialize Win32 out structs to silence Hint 5057
+  // Initialize Win32 out structs to silence Hint 5057
   CreationTime      := Default(TFileTime);
   ExitTime          := Default(TFileTime);
   KernelTime        := Default(TFileTime);
@@ -248,7 +248,7 @@ begin
       Result := False
     else if Err = ERROR_ACCESS_DENIED then
     begin
-      // ---> AUDIT FIX O2: A read-only file (or read-only media) refuses
+      // A read-only file (or read-only media) refuses
       // GENERIC_WRITE even when nobody has it open. Re-test with read access only,
       // still exclusive, so it is not misreported as "locked by another process".
       HFile := Windows.CreateFileW(PWideChar(WidePath), GENERIC_READ, 0, nil,
@@ -282,7 +282,7 @@ end;
 {$ENDIF}
 
 // =============================================================================
-// ---> AUDIT FIX: Replace-ability check and lock diagnostics
+// Replace-ability check and lock diagnostics
 // =============================================================================
 function IsFileReplaceBlocked(const AFileName: string): boolean;
 {$IFDEF WINDOWS}
@@ -345,7 +345,7 @@ type
     TSSessionId         : DWORD;
     bRestartable        : BOOL;
   end;
-  // ---> ADDED: Named, so Default() can zero them (no "not initialized" hint)
+  // Named, so Default() can zero them (no "not initialized" hint)
   TRmSessionKey         = array[0..CCH_RM_SESSION_KEY] of WideChar;
   TRmProcessInfos       = array[0..MAX_PROCS - 1] of TRmProcessInfo;
   TRmStartSession       = function(out pSessionHandle: DWORD; dwSessionFlags: DWORD;
@@ -514,8 +514,8 @@ begin
   Result := CommitAtomicFile(ATempFile, ATargetFile, DummyErr, AWriteThrough);
 end;
 
-// ---> AUDIT FIX O1: Flush temp file contents via FlushFileBuffers before
-// atomic rename when AWriteThrough is True!
+// Flushes the temp file contents via FlushFileBuffers before the
+// atomic rename when AWriteThrough is True
 function SaveStreamAtomic(AStream: TStream; const ATargetFile: string; AWriteThrough: Boolean = True): boolean;
 var
   TempFile, TargetDir: string;
@@ -564,8 +564,8 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX O1: Write via TFileStream and call FlushFileBuffers(FS.Handle)
-// before CommitAtomicFile so file data is durable on disk prior to rename!
+// Writes via TFileStream and calls FlushFileBuffers(FS.Handle) before
+// CommitAtomicFile, so the file data is durable on disk prior to the rename
 function SaveStringsAtomic(ALines: TStrings; const ATargetFile: string; out AErrorMsg: string; AEncoding: TEncoding = nil): boolean;
 var
   TempFile: string;
@@ -636,9 +636,6 @@ begin
   Result := SaveStringsAtomic(ALines, ATargetFile, DummyErr, AEncoding);
 end;
 
-// ---> AulumicNS: ForceSumatraTabsEnabled / OpenPDFBooklet removed (the booklet
-// viewer is built in: AuBooklet)
-
 function IsDriveRootMissing(const APath: String): boolean;
 var
   DriveRoot: String;
@@ -704,7 +701,7 @@ begin
     end;
   end;
 
-  // ---> AUDIT FIX: Windows cannot create files named after a device
+  // Windows cannot create files named after a device
   // (CON, NUL, AUX, ...), so treat them like an illegal name.
   if IsReservedDeviceName(aFileName) then
     Result := feIllegalChar;

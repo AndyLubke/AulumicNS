@@ -34,7 +34,7 @@ type
     Year        : integer;
     DateStr     : string;
     IsValid     : boolean;
-    // ---> AUDIT FIX: True only when the file and its tag were read without
+    // True only when the file and its tag were read without
     // error. The tag editor never saves a file whose read failed, because its
     // fields would be empty and saving would clear the real tags.
     ReadOk      : boolean;
@@ -45,7 +45,7 @@ type
     AllTagsDisplay : string;
     HasCover    : boolean;
     CoverData   : TBytes;
-    // ---> ADDED: Filled only by the playback I/O worker at a track change, so
+    // Filled only by the playback I/O worker at a track change, so
     // the UI thread needs no disk access for the banner: the folder cover
     // image (only when there is no embedded cover) and whether the folder has
     // a PDF booklet. FolderInfoValid = False means: not looked up.
@@ -63,13 +63,13 @@ function ReadTrackMetadata(const FileName: string;
   ExtractPicture: boolean = True; IncludeAllTags: boolean = False;
   KeepCommentLineBreaks: boolean = False): TAudioMetadata;
 
-// ---> ADDED: For playlist imports of tracks that are not in the library: the
-// file is checked only once (by the tag reader itself) instead of twice, which
+// For playlist imports of tracks that are not in the library: the
+// file is checked only once (by the tag reader itself), not twice, which
 // matters for thousands of tracks on a network drive. False (AMeta not usable)
 // when the file does not exist or its tags could not be read. No picture.
 function TryReadTrackMetadata(const FileName: string; out AMeta: TAudioMetadata): boolean;
 
-// ---> AulumicNS: the text fields only (title, album, ReplayGain values ...):
+// The text fields only (title, album, ReplayGain values ...):
 // embedded pictures are not even loaded (basetag.TagReadTextOnly), so
 // HasCover is always False here. For the play thread, which reads the
 // ReplayGain values and the album of a track before it plays.
@@ -84,11 +84,11 @@ implementation
 
 uses
   uAppConsts, uAppStrings, tag_id3v2,
-  AuAudioTypes,   // ---> AulumicNS: LongPath (paths of 260 characters and more)
-  // ---> MOVED (from uFormTagEditor): links the AulumicTag file readers (FLAC,
+  AuAudioTypes,   // LongPath (paths of 260 characters and more)
+  // Links the AulumicTag file readers (FLAC,
   // WAV, DSF, ...). Each registers itself with AudioTag in its initialization;
   // without them GetFileTagsObject silently returns TDummyReader and every
-  // file reads as untagged (no title, sample rate 0) - in Aulumic, in the test
+  // file reads as untagged (no title, sample rate 0) - in AulumicNS, in the test
   // program and in any other program that reads metadata through this unit.
   // The compiler reports it as "not used" because no identifier from it is
   // referenced; the hint is hidden ({%H-}). Do NOT remove.
@@ -107,7 +107,7 @@ begin
 end;
 
 // =============================================================================
-// ---> AUDIT FIX 2.2: Helper to step back over any incomplete trailing UTF-8
+// Helper to step back over any incomplete trailing UTF-8
 // multi-byte sequence when a string is truncated at a fixed byte limit.
 // =============================================================================
 procedure TrimIncompleteTrailingUTF8(const S: string; var Len: Integer);
@@ -148,7 +148,7 @@ end;
 
 // =============================================================================
 // Single-pass in-place string sanitizer & semicolon compactor.
-// Replaces the multi-pass "while Pos(';;') > 0 do StringReplace" loop, strips
+// Collapses repeated semicolons in the same pass, strips
 // embedded binary/control characters (#0..#31), and enforces a safe length cap!
 // =============================================================================
 function SanitizeAndCompactTag(const RawStr: string; MaxLen: Integer = MAX_STANDARD_TAG_LEN): string;
@@ -217,7 +217,7 @@ begin
     // All other control/binary bytes (#1..#8, #11..#12, #14..#31) are skipped
   end;
 
-  // ---> AUDIT FIX 2.2: Ensure truncation at Limit never leaves half a UTF-8 char
+  // Ensure truncation at Limit never leaves half a UTF-8 char
   if Length(RawStr) > MaxLen then
     TrimIncompleteTrailingUTF8(Result, WriteIdx);
 
@@ -246,13 +246,13 @@ begin
   if Length(Target) > MaxTotalLen then
   begin
     NewLen := MaxTotalLen;
-    // ---> AUDIT FIX 2.2: Keep UTF-8 boundary intact when capping combined length
+    // Keep UTF-8 boundary intact when capping combined length
     TrimIncompleteTrailingUTF8(Target, NewLen);
     SetLength(Target, NewLen);
   end;
 end;
 
-// ---> AUDIT FIX: Comment cleanup for the tag editor. Like
+// Comment cleanup for the tag editor. Like
 // SanitizeAndCompactTag (control bytes removed, #0 separators become '; ',
 // capped at MaxLen without splitting a UTF-8 character), but line breaks are
 // kept and normalized to CR LF, and spacing inside the text is not changed.
@@ -408,7 +408,7 @@ begin
   try
     TagReader := nil;
     try
-      // ---> AulumicNS: ATextOnly: the pictures are not loaded at all
+      // ATextOnly: the pictures are not loaded at all
       TagReader := GetFileTagsObject(FileName, ATextOnly);
       if not Assigned(TagReader) then
         Exit;
@@ -420,7 +420,7 @@ begin
       begin
         if Assigned(TagReader.Tags.Images[0]) and Assigned(TagReader.Tags.Images[0].Image) then
         begin
-          // ---> AUDIT FIX 3.3: Use base TStream rather than unchecked TMemoryStream cast
+          // Use base TStream rather than unchecked TMemoryStream cast
           ImgStream := TagReader.Tags.Images[0].Image;
           if (ImgStream.Size > 0) and (ImgStream.Size <= 15728640) then
           begin
@@ -440,7 +440,7 @@ begin
         begin
           if Assigned(TagReader.Tags.Images[I]) and Assigned(TagReader.Tags.Images[I].Image) then
           begin
-            // ---> AUDIT FIX 3.3: Safe class check before calling TMemoryStream.Clear
+            // Safe class check before calling TMemoryStream.Clear
             if TagReader.Tags.Images[I].Image is TMemoryStream then
               TMemoryStream(TagReader.Tags.Images[I].Image).Clear
             else
@@ -467,7 +467,7 @@ begin
       else
         Result.Year := StrToIntDef(Result.DateStr, 0);
 
-      // ---> AUDIT FIX 1.1: Compute duration in 64-bit Int64 and clamp to a
+      // Compute duration in 64-bit Int64 and clamp to a
       // sane ceiling (99 hours = 359,999 seconds) to prevent 32-bit wrap-around!
       if CommonTags.Duration > 0 then
       begin
@@ -495,7 +495,7 @@ begin
           if (not Assigned(Frame)) or (Frame is TImageElement) then
             Continue;
 
-          // ---> AUDIT FIX 3.1: Skip oversized text frames BEFORE calling
+          // Skip oversized text frames BEFORE calling
           // Frame.AsString so multi-megabyte corrupt frames are never decoded!
           if Frame.Size > MAX_FRAME_RAW_LEN then
             Continue;
@@ -509,7 +509,7 @@ begin
           if CleanStr = '' then
             Continue;
 
-          // ---> Tag editor Inspector only: every text frame, with custom
+          // Tag editor Inspector only: every text frame, with custom
           // TXXX / TXX frames shown as 'description = value'
           if IncludeAllTags then
           begin
@@ -535,7 +535,7 @@ begin
           end;
 
           case UpperID of
-            // ---> AUDIT FIX: ID3v2.2 frame IDs (TCO, TP1, TP2, TCM, TP3, COM, TPA,
+            // ID3v2.2 frame IDs (TCO, TP1, TP2, TCM, TP3, COM, TPA,
             // TRK) are read as well; the tag editor writes them for v2.2 tags.
             'GENRE', 'TCON', 'TCO':
               AppendTag(Result.Genre, SanitizeAndCompactTag(CleanStr, 512), 1024);
@@ -577,7 +577,7 @@ begin
         begin
           if not KeepCommentLineBreaks then
             Result.Comment := SanitizeAndCompactTag(CommonTags.Comment, MAX_COMMENT_TAG_LEN)
-          // ---> AUDIT FIX: Tag editor: for ID3 the loop above already read every
+          // Tag editor: for ID3 the loop above already read every
           // comment it shows; the common-tags comment would only add the iTunNORM
           // frames that the editor never writes or removes. For FLAC this is the
           // DESCRIPTION field (shown when there is no COMMENT).

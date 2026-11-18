@@ -5,9 +5,8 @@ unit AuMainForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The main window of AulumicNS - the layout of Aulumic, built with the
-  AulumicNS GUI library (no .lfm, no VirtualTreeView, vector icons, own
-  title bar):
+  The main window of AulumicNS, built with the AulumicNS GUI library
+  (no .lfm, vector icons, own title bar):
 
     +------------------------------------------------------------------+
     | title bar (main menu, caption, Preferences)                       |
@@ -20,7 +19,7 @@ unit AuMainForm;
     | status line                                                       |
     +------------------------------------------------------------------+
 
-  Split like Aulumic's main window: this unit builds the window, the menus,
+  Split into include files: this unit builds the window, the menus,
   the theme and the keys; AuMainForm_playback.inc drives the engine (the UI
   timer, the banner, the transport, device / rate / volume / tone);
   AuMainForm_files.inc adds files and keeps the play list in sync with the
@@ -29,9 +28,9 @@ unit AuMainForm;
   the playlists (the selector, the View menu, drag and drop, M3U);
   AuMainForm_dialogs.inc Properties, the tag writer and the ReplayGain scan.
 
-  The engine is Aulumic's with the built-in decoders and resampler, over
-  WASAPI and ASIO; the library is Aulumic's library manager, stored in the
-  Aulos format; the playlists are in uPlaylistStore.
+  The engine has built-in decoders and a built-in resampler and plays over
+  WASAPI and ASIO; the library is the library manager, stored by uDbStore;
+  the playlists are in uPlaylistStore.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -90,45 +89,44 @@ type
     FLastPlaySec: Integer;
     FLastBitPerfect: Boolean;
     FRateShown: Boolean;
-    FRateKey: string;             // ---> AulumicNS: what the rate line shows (SignalKey)
+    FRateKey: string;             // what the rate line shows (SignalKey)
     FMeterSlices: array[0..METER_RING_SIZE - 1] of TMeterSlice;
     FMeterFifo: array of TMeterSlice;
     FMeterFifoLen: Integer;
     FMeterEpochSeen: Integer;
-    { ---> AulumicNS: the slices shown at the pace of real time (Aulumic's
-      TPeakMeterState.ProcessMeterSlices) }
+    { the slices shown at the pace of real time }
     FMeterLastTick: QWord;
     FMeterAccMs: Double;
     FMeterNoDataMs: Integer;
     FMeterLastL, FMeterLastR: Single;
     FCpuText: string;
     FCpuTick: QWord;
-    { library (milestone 3) }
+    { library }
     FLibrary: TLibraryManager;
     FWatcher: TLibraryWatcher;
     FWatchMuteUntil: QWord;      // the watcher's changes are the program's own writes until then
     FCtxNode: TAuTreeNode;       // the node of the library context menu
     FStartupScanDone: Boolean;
-    FActivePlaySeconds: Double;  // play counting (Aulumic's scrobble)
+    FActivePlaySeconds: Double;  // play counting
     FIsScrobbled: Boolean;
     FScrobblePath: string;
     FScrobbleMeta: TAudioMetadata;
     FPlayCountTick: QWord;
-    { playlists (milestone 4) }
+    { playlists }
     FPlaylists: TPlaylistStore;
     FShownPl: string;            // the playlist on screen
     FPlayingPl: string;          // the playlist the play queue was made from
     FBusyDepth: Integer;         // BeginBusy / EndBusy
-    // ---> AulumicNS: ShowPlaylist is filling the pane (PlChanged leaves the
-    // queue alone: an auto-playlist is cleared first, and syncing the queue of
-    // the playing playlist with that empty list stopped the playback)
+    // ShowPlaylist is filling the pane (PlChanged leaves the queue alone:
+    // an auto-playlist is cleared first, and syncing the queue of the
+    // playing playlist with that empty list would stop the playback)
     FLoadingPl: Boolean;
     FInExceptionDialog: Boolean; // AppException shows one dialog at a time
     FPlSaveDue: QWord;           // when the shown playlist's changes are stored
     FDropAt: Integer;            // an Explorer drop over the playlist: insert here (-1 none)
     FMenuPlNames, FAddToNames: TStringList;   // the playlists of the open menus (Tag = index)
     FDeviceIds: TStringList;     // "api|id" of the device menu items (Tag = index)
-    { tools (milestone 5) }
+    { tools }
     FCustodian: TMetadataCustodian;   // writes tags and ReplayGain in the background
     {$IF DEFINED(DEBUG) or DEFINED(MEMTEST)}
     FMemTest: string;            // --test-repair=<report>: memory around a repair
@@ -173,18 +171,16 @@ type
     procedure SaveWindowSettings;
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     function ConfirmCloseWhileBusy: Boolean;
-    // ---> AulumicNS: Windows is shutting down, restarting or logging off
-    // (Aulumic's AppQueryEndSession / AppEndSession): everything is saved
-    // when Windows asks; when the session really ends, the close runs
+    // Windows is shutting down, restarting or logging off: everything is
+    // saved when Windows asks; when the session really ends, the close runs
     procedure AppQueryEndSession(var Cancel: Boolean);
     procedure AppEndSession(Sender: TObject);
     procedure TerminateAfterEndSession(Data: PtrInt);
     procedure SaveForSessionEnd;
-    // ---> AulumicNS: the hang watchdog (uHangWatch), once the message loop runs
+    // the hang watchdog (uHangWatch), once the message loop runs
     procedure StartWatchAsync(Data: PtrInt);
-    // ---> AulumicNS: Aulumic's handler for exceptions that escape an event
-    // handler (was not wired up: an access violation showed the plain LCL
-    // message and left no trace)
+    // the handler for exceptions that escape an event handler (without it
+    // an access violation shows the plain LCL message and leaves no trace)
     procedure AppException(Sender: TObject; E: Exception);
     procedure ShowPrefsPage(APage: Integer);
     { theme }
@@ -416,13 +412,13 @@ uses
   AuCoverViewer, AuArtistInfo, AuBooklet, AuHelp, uHangWatch, uDriveKeepAlive, ALHeadroom,
   AuAbout, uVersionHelper, uInputBlock;
 
-{ Aulumic's list font sizes are 6 .. 20; the panes use pixels }
+{ the list font sizes of the settings are 6 .. 20; the panes use pixels }
 function PaneTextPx(FontSize: Integer): Single;
 begin
   Result := FontSize + 2;
 end;
 
-{ ---> AulumicNS: the hang report's last log lines. Runs on the watchdog
+{ the hang report's last log lines. Runs on the watchdog
   thread while the UI thread hangs (the log is only changed by the UI thread,
   which is stuck then); no lock that the UI thread might hold. }
 function HangLogTail: string;
@@ -438,7 +434,7 @@ begin
     Result := Result + '  ' + L[I] + LineEnding;
 end;
 
-{ ---> AulumicNS: Aulumic's AppException. Every exception that escapes an
+{ Every exception that escapes an
   event handler goes to the log with its place and callers (module+$offset:
   look them up in the .dbg of the same build), the log is saved at once (the
   program may not get to close normally), and a themed message is shown -
@@ -532,7 +528,7 @@ begin
   begin
     EnableCustomFrame;
     TitleBar.OnPaintBack := @TitleBack;
-    { ---> AulumicNS: the main menu at the left, next to the icon (where a
+    { the main menu at the left, next to the icon (where a
       program's menu is looked for; the icon itself opens Windows' window menu) }
     TitleBar.AddButton(icMenu, 'Main menu', @TitleMenuClick, True);
     TitleBar.AddButton(icSettings, 'Preferences (Ctrl+P)', @TitlePrefsClick);
@@ -842,7 +838,7 @@ var
   P: TPlaybackManager;
 begin
   FShuttingDown := True;
-  { ---> AulumicNS: traced step by step; a failing step is written to
+  { traced step by step; a failing step is written to
     ShutdownTraceLog.txt and the next ones still run (see FormCloseQuery) }
   WriteShutDownTrace('Destroy: closing the tool windows');
   try
@@ -909,7 +905,7 @@ begin
     {$ENDIF}
     FreeAndNil(FLibrary);
     FreeAndNil(UserStatsManager);
-    { ---> AulumicNS: saved in FreeLibrary. The play threads are gone (the
+    { saved in FreeLibrary. The play threads are gone (the
       playback was freed above) - unless one did not stop in time and was
       set aside (stuck in a driver or a file read): it may still wake up and
       meet a new peak, so the book is left to it and to the end of the
@@ -1164,11 +1160,11 @@ begin
   AppSettings.Save(Self);
 end;
 
-{ ---> AulumicNS: the close as Aulumic's teardown: traced step by step
-  (uCrashTracer: written to ShutdownTraceLog.txt only when a step fails), and
-  a failing step no longer stops the ones after it }
-{ ---> AulumicNS: closing while tags are written, ReplayGain is calculated or
-  the library is scanned asks first (it closed at once) }
+{ the close is traced step by step (uCrashTracer: written to
+  ShutdownTraceLog.txt only when a step fails), and a failing step does not
+  stop the ones after it }
+{ closing while tags are written, ReplayGain is calculated or the library is
+  scanned asks first }
 function TMainForm.ConfirmCloseWhileBusy: Boolean;
 var
   Lines: string;
@@ -1228,7 +1224,7 @@ begin
   end;
   WriteShutDownTrace('Close: saving the log');
   try
-    { ---> AulumicNS: always when Preferences > Advanced says so, else only
+    { always when Preferences > System says so, else only
       when an error was logged }
     SaveLog(True, not AppSettings.Data.AlwaysSaveLog);
   except
@@ -1276,7 +1272,7 @@ begin
     LogShutdownStepError('Session end: save the library and the statistics');
   end;
   try
-    { ---> AulumicNS: always when Preferences > Advanced says so, else only
+    { always when Preferences > System says so, else only
       when an error was logged }
     SaveLog(True, not AppSettings.Data.AlwaysSaveLog);
   except
@@ -1296,7 +1292,7 @@ end;
 { the session ends now: the close without its question (the playback stops,
   everything is saved), then the program leaves its message loop. Queued:
   Application.Terminate inside the WM_ENDSESSION that Windows waits for could
-  block (Aulumic: about 1 shutdown in 5 never ended). Windows usually ends
+  block (about 1 shutdown in 5 would never end). Windows usually ends
   the process as soon as this returns. }
 procedure TMainForm.AppEndSession(Sender: TObject);
 var
@@ -1396,8 +1392,7 @@ begin
   else G.FillRect(0, 0, TitleBar.Width, TitleBar.Height, clPanel);
 end;
 
-{ ---> AulumicNS: the main menu and Preferences buttons are in the title bar
-  (were in the banner, with a sun / moon theme button that was removed) }
+{ the main menu and Preferences buttons are in the title bar }
 procedure TMainForm.TitleMenuClick(Sender: TObject);
 var
   R: TRect;
@@ -1438,7 +1433,7 @@ begin
   FArtistMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 
-{ the signal path (Aulos) as a popup under the badge; a second click closes
+{ the signal path as a popup under the badge; a second click closes
   it. The device name is looked up once (it enumerates the devices). }
 procedure TMainForm.BannerBadge(Sender: TObject; ScreenPt: TPoint);
 begin
@@ -1453,7 +1448,7 @@ begin
     FPlayback.State = psPaused);
 end;
 
-{ the built-in booklet viewer (Aulos; Aulumic opened SumatraPDF): the PDFs
+{ the built-in booklet viewer: the PDFs
   of the playing album's folder, its sub folders and a disc folder's parent }
 procedure TMainForm.BannerBooklet(Sender: TObject);
 var
@@ -1483,14 +1478,14 @@ begin
   AppSettings.Data.LeftPanelWidth := FLibWanted;
 end;
 
-{ ---> AulumicNS: as Aulumic's FormResize, the playlist keeps at least
+{ the playlist keeps at least
   MIN_RPANEL_WIDTH (a narrower window narrows the library pane, down to
   MIN_LPANEL_WIDTH); the splitter cannot go past that either.
-  2026-11-13: when the window gets wider again the pane goes back to the
-  width the user chose (FLibWanted, set by the splitter). Before, it stayed
-  narrow: with the TV at the NUC switched off Windows gives the desktop a
+  When the window gets wider again the pane goes back to the
+  width the user chose (FLibWanted, set by the splitter). Otherwise it would
+  stay narrow: with the display switched off Windows may give the desktop a
   small size for a moment, the window shrinks with it - and the library pane
-  was narrow for good when the TV came back. }
+  would be narrow for good when the display comes back. }
 procedure TMainForm.MidResize(Sender: TObject);
 var
   MaxW, W: Integer;
@@ -1615,8 +1610,8 @@ begin
   ShowPrefsPage(-1);
 end;
 
-{ the Preferences dialog; after OK the new settings are applied as in
-  Aulumic's TfrmMain.ShowPrefsDialog: the engine gets its config (the
+{ the Preferences dialog; after OK the new settings are applied:
+  the engine gets its config (the
   playing track restarts when an audio setting or the device changed), the
   playlist is shown again when its default formats changed, the library
   tree is filled again for other groups, new folders are scanned }
@@ -1697,7 +1692,7 @@ begin
   end;
 end;
 
-{ the help (Aulos' Markdown window with the screenshots built in) }
+{ the help (the Markdown window with the screenshots built in) }
 procedure TMainForm.MnHelp(Sender: TObject);
 begin
   ShowHelpWindow('');
@@ -1705,8 +1700,7 @@ end;
 
 procedure TMainForm.MnAbout(Sender: TObject);
 begin
-  { ---> AulumicNS: a window of its own with the version of this program
-    file (it showed a version written into the source) }
+  { a window of its own with the version of this program file }
   ShowAbout(Self);
 end;
 
@@ -2302,7 +2296,7 @@ begin
       VK_TAB:
         if FLib.Tree.Focused then FPl.List.SetFocus
         else FLib.Tree.SetFocus;
-      { ---> AulumicNS: the rating of the selected playlist rows (a header:
+      { the rating of the selected playlist rows (a header:
         its whole group), 0 = no rating }
       Ord('0')..Ord('5'), VK_NUMPAD0..VK_NUMPAD5:
         if InEdit or FLib.Tree.Focused then Exit

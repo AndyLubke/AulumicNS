@@ -5,8 +5,8 @@ unit AuTree;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  TAuTreeView - owner-drawn tree for the library pane (replaces the
-  VirtualTreeView of Aulumic). Nodes are small objects owned by the tree;
+  TAuTreeView - owner-drawn tree for the library pane.
+  Nodes are small objects owned by the tree;
   their children can be loaded lazily (OnExpanding) so that a library with
   tens of thousands of folders opens instantly. Features: multi-selection,
   accordion mode, dimmed (unavailable) and accent (category) nodes, a three
@@ -131,7 +131,7 @@ type
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure UTF8KeyPress(var UTF8Key: TUTF8Char); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected

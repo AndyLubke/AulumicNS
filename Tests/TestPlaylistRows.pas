@@ -12,8 +12,6 @@ unit TestPlaylistRows;
     TTestRowCopies  : track <-> stored playlist entry
     TTestRowRules   : CleanTag, TimeStrToSecs, FormatGroupDuration,
                       PlaylistGroupKey
-    (The tests of the row copies of Aulumic's playlist tree and of its rule
-    for Remove dead items went with that code on 2026-11-12.)
     TTestRatings    : the rating key (album artist / album fallbacks),
                       average, star under a click, same star clears
     TTestHeaderText : a group header in one or two lines (FitTextWithEllipsis,

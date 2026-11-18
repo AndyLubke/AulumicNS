@@ -76,15 +76,14 @@ const
   FILE_ARTIST_BIO_USER        = 'artist_bio.user';
   FILE_ARTIST_IMAGE_USER      = 'artist_image.user';
 
-  // ---> AulumicNS: Aulumic's font glyph icons (TAppIcon, ICONS_OUTLINE) are
-  // replaced by the vector icons of AuIcons
+  // The icons are the vector icons of AuIcons
 
   //Thread delay in ms
   THREAD_DELAY_MS             = 150;
 
   // Timer intervals, waits and retries (ms unless stated otherwise)
-  UI_TIMER_INTERVAL_MS        = 50;   // main UI timer (tmrUI), 20 times per second
-  UI_TIMER_IDLE_INTERVAL_MS   = 250;  // tmrUI when nothing is playing or changing (4 times per second)
+  UI_TIMER_INTERVAL_MS        = 50;   // main UI timer (TMainForm.FUiTimer), 20 times per second
+  UI_TIMER_IDLE_INTERVAL_MS   = 250;  // FUiTimer when nothing is playing or changing (4 times per second)
   LIB_SEARCH_DELAY_MS         = 300;  // typing pause before the library search runs
   PANEL_LOAD_DELAY_MS         = 250;  // artist info / cover art popup deferred load
   TAGLOADER_TIMER_MS          = 50;
@@ -92,28 +91,26 @@ const
   FILE_REPLACE_WAIT_STEP_MS   = 100;  // custodian: wait for a file that cannot be replaced yet
   FILE_REPLACE_WAIT_STEPS     = 50;   // 50 x 100 ms = 5 s
   CUSTODIAN_JOB_YIELD_MS      = 5;
-  // ---> ADDED: Longest wait for the play thread to end after Stop; a thread
+  // Longest wait for the play thread to end after Stop; a thread
   // that is still running then is set aside (see TAudioEngine.Stop)
   PLAY_THREAD_STOP_TIMEOUT_MS = 5000;
-  // ---> ADDED: Longest wait at exit for a drive-wake worker that still runs
+  // Longest wait at exit for a drive-wake worker that still runs
   // after a Cancel (uDriveKeepAlive.FinishSetAsideThreads)
   DRIVE_WAKE_EXIT_WAIT_MS     = 2000;
-  // ---> ADDED: "Waiting for drive..." appears only when waking the drives
-  // takes longer than this (an awake drive answers within milliseconds)
-  // ---> AulumicNS: 1.2 s (was 0.3 s): a drive that needs a second showed the
-  // window for a moment at every click on the cover; the busy cursor is there
-  // from the start
-  // ---> AulumicNS 2026-11-14: 5 s. Until then the wait looks like a busy
+  // "Waiting for drive..." appears only when waking the drives takes longer
+  // than this (an awake drive answers within milliseconds; with a shorter
+  // delay a drive that needs a second would show the window for a moment at
+  // every click on the cover). Until then the wait looks like a busy
   // window - the busy cursor, no input (uInputBlock), everything still
   // painting; the window with its Cancel button is for a disk that really
   // has to spin up. Escape stops the wait before and after.
   DRIVE_WAIT_SHOW_DELAY_MS    = 5000;
-  // ---> AulumicNS: a drive that answered within this time (a wake, the track
+  // A drive that answered within this time (a wake, the track
   // that plays, the keep-alive read) is awake: WakeDrives does not check it
   // again. Far below any sleep timer (minutes); short, so a NAS that was
   // switched off is asked again soon.
   DRIVE_ANSWER_MEMORY_MS      = 20000;
-  // ---> ADDED: A NAS / network share whose server does not answer within
+  // A NAS / network share whose server does not answer within
   // this time counts as not connected (uDriveKeepAlive.ServerAnswers; a
   // server on the network answers within milliseconds, even with its disks
   // asleep). Windows itself waits 20-60 s for it.
@@ -139,14 +136,14 @@ const
   FORM_DEBUG_WIDTH            = 400;
   FORM_DEBUG_HEIGHT           = 600;
 
-  // ---> MODIFIED: Default & minimum dimensions for Virtual Folder (Alias) Editor
+  // Minimum dimensions for the Virtual Folder (Alias) Editor
   FORM_ALIAS_MINWIDTH         = 680;
   FORM_ALIAS_MINHEIGHT        = 480;
 
   FORM_TONE_POPUP_WIDTH       = 260;
   FORM_TONE_POPUP_HEIGHT      = 280;
 
-  // ---> ADDED: Log window (at 96 dpi). The minimum width keeps the three
+  // Log window (at 96 dpi). The minimum width keeps the three
   // buttons (Save to File... / Clear / Close) in view
   FORM_APPLOG_WIDTH           = 900;
   FORM_APPLOG_HEIGHT          = 600;
@@ -165,21 +162,10 @@ const
   // UI Panels
   UI_TOP_PANEL_DEFAULTHEIGHT  = 200;
 
-  { === Alternative virtual links ===
-    - Current:	              PREFIX_VIRTUAL_LINK = #$F0#$9F#$94#$97 + ' ';
-    - Redirect Hook Arrow:	  PREFIX_VIRTUAL_LINK = #$E2#$86#$AA + ' ';
-    - Shortcut Arrow:         PREFIX_VIRTUAL_LINK = #$E2#$86#$97 + ' ';
-    - Monochrome Chain:       PREFIX_VIRTUAL_LINK = #$E2#$9B#$93 + ' ';
-    - Virtual Collection:     PREFIX_VIRTUAL_LINK = #$E2#$97#$88 + ' ';
-    - Merged / Linked Folder: PREFIX_VIRTUAL_LINK = #$E2#$8A#$95 + ' ';
-    - »	Double Chevron:     	PREFIX_VIRTUAL_LINK = #$C2#$BB + ' ';	the `»` link prefix
-  }
-
   // File Paths and Masks
   FILE_VALID_EXTS             = '.flac,.wav,.dsf,.dff';
-  // ---> AulumicNS: the library and the user stats in the Aulos format
-  // (uDbStore: snapshot .adb + journal .jnl); Aulumic's files are only read
-  // by the tests (AulumicNS has no import from Aulumic)
+  // The library and the user stats are stored by uDbStore (snapshot .adb +
+  // journal .jnl)
   FILE_DB                     = 'library.adb';
   FILE_USER_STATS             = 'stats.adb';
   FILE_PLAYLISTS              = 'playlists.adb';   // all playlists (uPlaylistStore)
@@ -210,7 +196,7 @@ var
   AppPluginsDir     : string;
   AppCacheThumbsDir : string;
   AppMusicInfoDir   : string;
-  AppLogDir         : string;   // ---> AulumicNS: the log file (the data folder)
+  AppLogDir         : string;   // the log file (the data folder)
 
 implementation
 
@@ -218,7 +204,7 @@ uses
   AuSettings;
 
 initialization
-  // ---> AulumicNS: portable - everything in Data\ and Cache\ next to the exe
+  // Portable - everything in Data\ and Cache\ next to the exe
   // (or %APPDATA%\AulumicNS when that folder cannot be written, see AuSettings)
   AppExePath        := ParamStr(0);
   AppBaseDir        := IncludeTrailingPathDelimiter(ExtractFilePath(AppExePath));

@@ -12,12 +12,8 @@ unit uAutoPlaylist;
                              auto-playlist (newest first, grouped like the view)
   Which tracks belong to an auto-playlist is decided by the library
   (TLibraryManager.GetTracksByQuery with uLibraryQuery.EvaluateTrack).
+  The auto-playlists themselves are stored in uPlaylistStore.
   Covered by Tests\TestAutoPlaylist.pas.
-
-  ---> AulumicNS: the auto-playlists are stored in uPlaylistStore. Aulumic's
-  .apq files (TAutoPlaylistDef, ParseAutoPlaylist, LoadAutoPlaylist,
-  SaveAutoPlaylist) and their tests were removed on 2026-11-12: nothing in
-  AulumicNS read or wrote them (they are in the backups).
   =============================================================================}
 
 interface
@@ -29,7 +25,7 @@ uses
 // orders ATracks (PTrackInfo) newest first and returns True. Grouped by
 // album or folder, the groups are ordered by their newest track and keep
 // their tracks together (in track order when the dates are equal).
-// ---> CHANGED: Groups with the same date in the library order
+// Groups with the same date are in the library order
 // (uLibraryTypes.CompareLibraryNamesNatural).
 // ADateSuffix is the header / track format suffix that shows the date
 // ('' when the query uses neither). False (ATracks unchanged) when the query
@@ -42,9 +38,6 @@ implementation
 
 uses
   uOSUtils, uTagParser, uUserStatsManager, uLibraryTypes, uPlaylistRows;
-
-// ---> MOVED from TFramePlaylist (PrepareAutoPlaylistView and its sort
-// functions), unchanged except that the grouping comes in as a parameter
 
 type
   PAutoSortItem = ^TAutoSortItem;
@@ -82,8 +75,8 @@ begin
   else if B^.GroupStamp < A^.GroupStamp then
     Exit(-1);
 
-  // ---> CHANGED: Groups with the same date in the library order (accents
-  // with their letter, numbers by value; was CompareText: 'Ánimals' after Z)
+  // Groups with the same date in the library order (accents with their
+  // letter, numbers by value; CompareText would put 'Ánimals' after Z)
   Result := CompareLibraryNamesNatural(A^.GroupKey, B^.GroupKey);
   if Result <> 0 then
     Exit;
@@ -136,8 +129,8 @@ begin
   GroupMaxMap               := TStringList.Create;
   GroupMaxMap.Sorted        := True;
   GroupMaxMap.CaseSensitive := False;
-  // ---> AUDIT FIX: Internal lookup only: plain (non-locale) comparison. With the
-  // locale comparison this took ~2 s for 46,000 tracks on the NUC.
+  // Internal lookup only: plain (non-locale) comparison. The locale
+  // comparison would take seconds for a large library.
   GroupMaxMap.UseLocale     := False;
   SortItems                 := TList.Create;
   try
@@ -161,7 +154,7 @@ begin
         Stamp := TInfo^.DateAdded;
       end;
 
-      // ---> CHANGED (phase 5c-1): The playlist's own group key (uPlaylistRows),
+      // The playlist's own group key (uPlaylistRows),
       // so the date order keeps exactly the groups the view shows
       GKey := PlaylistGroupKey(TInfo^, AGrouping);
 

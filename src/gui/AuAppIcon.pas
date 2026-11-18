@@ -5,7 +5,7 @@ unit AuAppIcon;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The application icon: the Aulumic logo (a golden "A" whose crossbar
+  The application icon: the AulumicNS logo (a golden "A" whose crossbar
   flows out as sound waves, on a dark tile), drawn as vector graphics so it
   is sharp at every size. Used for the window (HICON at the system sizes)
   and written as an .ico file for the executable (AulumicNS.ico, made with
@@ -39,7 +39,7 @@ const
   TileLo = $FF121214;
 
 const
-  { ---> AulumicNS: the letter is drawn wider than designed (it looked
+  { the letter is drawn wider than designed (it would look
     squeezed): its x coordinates are stretched by LOGO_KX (small: by
     LOGO_KX_SMALL) around LOGO_CX and the drawing moves LOGO_SHIFT to the
     left. The waves follow the letter up to WAVE_RIGHT (past the right leg);

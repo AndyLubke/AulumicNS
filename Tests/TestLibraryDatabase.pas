@@ -8,13 +8,13 @@ unit TestLibraryDatabase;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Tests for the library database file (Library.db) of TLibraryManager:
+  Tests for the library database file of TLibraryManager:
   loading a hand-written file (all 21 track fields, library folders, virtual
   folders, escaped characters), save + reload keeps everything, escaping of
   tabs / line breaks / a literal '<br>' in tags, and that nothing is written
   when nothing changed. Only files in a temporary folder are used.
-  ---> AulumicNS: the hand-written file is Aulumic's text, imported with
-  ImportAulumicDatabase and saved as AulumicNS' snapshot (library.adb) before
+  The hand-written file is the tests' text format (uLibraryDatabase), loaded
+  with ImportAulumicDatabase and saved as the library's snapshot before
   each test loads it. TTestLibraryStore: the journal (an edit survives
   without a save, a journal of an older snapshot and a torn record are
   ignored), a damaged snapshot is kept as a backup, the user stats journal,
@@ -70,13 +70,13 @@ type
     procedure SetReplayGainFlagsCountsTheChanges;
     procedure ClearReplayGainForAlbumsOnlyTouchesThoseAlbums;
     procedure ReadsFromAThreadWhileTheMainThreadEdits;
-    // ---> ADDED (phase 4): the track lists are copies (TTrackList)
+    // The track lists are copies (TTrackList)
     procedure TrackListsHoldCopies;
     procedure TrackListsStayValidWhenTheLibraryIsReplaced;
     procedure TrackListGettersFindTheRightTracks;
   end;
 
-  { ---> AulumicNS: snapshot + journal (uDbStore) }
+  { Snapshot + journal (uDbStore) }
   TTestLibraryStore = class(TTestCase)
   private
     FDir    : string;
@@ -108,7 +108,7 @@ const
   LINK_PATH   = 'D:\Music\Favourites.aullink';
   EMPTY_LINK  = 'D:\Music\Empty.aullink';
 
-// One Library.db track line: the 21 fields in file order, tab-separated
+// One track line of the text format: the 21 fields in order, tab-separated
 function TrackLine(const AFields: array of string): string;
 var
   I: Integer;
@@ -142,7 +142,7 @@ begin
   WriteSampleLibrary(FDbFile);
 end;
 
-// The sample Library.db: two library folders, two virtual folders, two tracks
+// The sample library: two library folders, two virtual folders, two tracks
 // (track 1 with ReplayGain, album 'Kind of Blue'; track 2 without)
 procedure SampleLines(SL: TStrings);
 begin
@@ -166,7 +166,7 @@ begin
       '1700000100', 'False', '123456789', 'Live<tab>1985', 'Antonín Dvořák', '']));
 end;
 
-// ---> AulumicNS: the sample as Aulumic's text file (for the import)
+// The sample as a text file (for ImportAulumicDatabase)
 procedure WriteSampleText(const AFile: string);
 var
   SL: TStringList;
@@ -180,8 +180,8 @@ begin
   end;
 end;
 
-// ---> AulumicNS: the sample library in AulumicNS' own format at AFile:
-// Aulumic's text imported (ImportAulumicDatabase) and saved as a snapshot, so
+// The sample library in AulumicNS' own format at AFile:
+// the text imported (ImportAulumicDatabase) and saved as a snapshot, so
 // every test that loads AFile reads the snapshot written by SaveDatabase
 procedure WriteSampleLibrary(const AFile: string);
 var
@@ -371,7 +371,7 @@ begin
   First := TLibraryManager.Create(FDbFile);
   try
     First.LoadDatabase;
-    // Save with Aulumic's own writer, then read it again
+    // Save with the library's own writer, then read it again
     First.IsDirty := True;
     First.SaveDatabase;
     AssertFalse('Clean after the save', First.IsDirty);
@@ -731,10 +731,10 @@ begin
   end;
 end;
 
-// The case phase 4 is about: a list fetched before the library replaces all
-// its records (here by loading Library.db again; a finished scan does the
-// same) keeps complete, unchanged tracks. Before, the list held pointers to
-// the library's records, which were disposed by then.
+// A list fetched before the library replaces all its records (here by an
+// import; a finished scan does the same) keeps complete, unchanged tracks:
+// it holds copies, not pointers to the library's records, which are
+// disposed by then.
 procedure TTestLibraryAccess.TrackListsStayValidWhenTheLibraryIsReplaced;
 var
   InMusic, All: TTrackList;
@@ -752,8 +752,8 @@ begin
     AssertEquals('One track below D:\Music', 1, InMusic.Count);
     AssertEquals('All tracks', 2, All.Count);
 
-    // A new library: track 1 with another title, track 2 gone (---> AulumicNS:
-    // imported from an edited text; the import replaces all records as a
+    // A new library: track 1 with another title, track 2 gone (imported
+    // from an edited text; the import replaces all records as a
     // load or a finished scan does)
     SampleLines(SL);
     for I := SL.Count - 1 downto 0 do

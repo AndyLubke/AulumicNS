@@ -103,7 +103,7 @@ type
     procedure DblClick; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
   protected
@@ -191,7 +191,7 @@ type
     procedure DblClick; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    function PanBy(DX, DY: Integer): Boolean; override;   // ---> AulumicNS: touch
+    function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
     function ScrollOffset: Integer; override;
     constructor Create(AOwner: TComponent); override;

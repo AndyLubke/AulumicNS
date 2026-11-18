@@ -18,9 +18,8 @@ unit uAppLifetime;
     GlobalCPUMonitor (uOSUtils)
     the log          (AuLog)
   and the threads set aside because they did not end in time (uDriveKeepAlive).
-  ---> AulumicNS: no audio DLLs to unload (FLAC, resampler and ReplayGain are
-  built in); no theme / modern-control singletons (the GUI library keeps no
-  global objects that need freeing).
+  There are no audio DLLs to unload (FLAC, resampler and ReplayGain are built
+  in), and the GUI library keeps no global objects that need freeing.
   EndProcessIfThreadsLeft is the last call of AulumicNS.lpr: when such a
   thread (or a play thread) is still running, the process ends there, without
   the runtime's own final cleanup (a thread that ends during it can deadlock).
@@ -69,8 +68,7 @@ procedure EndProcessIfThreadsLeft;
 begin
   if not (SetAsideThreadsRunning or PlayThreadsStillRunning) then
     Exit;
-  { ---> a note (as Aulumic): the trace is written, so a stuck thread at exit
-    is on record }
+  { a note: the trace is written, so a stuck thread at exit is on record }
   WriteShutDownNote('A thread is still running: the process ends now, ' +
                     'without the final runtime cleanup (no memory report).');
   TerminateProcess(GetCurrentProcess, ExitCode);

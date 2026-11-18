@@ -8,16 +8,15 @@ unit ALReaderDSF;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read DSF files.
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic; the
-  file name is UTF-8 (opened as it is, no conversion).
+  The file name is UTF-8 (opened as it is, no conversion).
 ==============================================================================}
 
 interface
 
 uses
   SysUtils, Classes, Math,
-  AuAudioTypes,  // ---> AulumicNS: LongPath (paths of 260 characters and more)
-  ALReaderDFF;   // ---> AulumicNS: DFF files are read by TDffReader
+  AuAudioTypes,  // LongPath (paths of 260 characters and more)
+  ALReaderDFF;   // DFF files are read by TDffReader
 
 type
 
@@ -44,7 +43,7 @@ type
     // from output DoP stream channels (2 for Mono/Stereo, >2 for Multi-Channel)
     FFileChannels: word;
     FChannelCount: word;
-    // ---> AulumicNS: a DSDIFF file is read by this reader (same output)
+    // A DSDIFF file is read by this reader (same output)
     FDff: TDffReader;
 
     procedure ReadNextBlocks;
@@ -121,14 +120,14 @@ var
 begin
   inherited Create;
 
-  // ---> AUDIT FIX: Initialize local records
+  // Initialize local records
   Header := Default(TDsfChunkHeader);
   Fmt    := Default(TDsfFmtChunk);
 
   if not FileExists(LongPath(FileName)) then
     raise Exception.Create(ERR_FILE_NOT_FOUND + ' ' + FileName);
 
-  // ---> AulumicNS: DSDIFF (.dff): the same DoP output from TDffReader
+  // DSDIFF (.dff): the same DoP output from TDffReader
   if IsDffFile(FileName) then
   begin
     FDff            := TDffReader.Create(FileName);
@@ -156,7 +155,7 @@ begin
   FFile.Position := Header.Size;
   FFile.ReadBuffer(Fmt, SizeOf(Fmt));
 
-  // ---> AUDIT FIX 2.4: Validate DSF format chunk fields before allocating memory
+  // Validate DSF format chunk fields before allocating memory
   // - FormatID must be 0 (DSD raw)
   // - BitsPerSample must be 1 (LSB-first DSF; 8 = MSB-first)
   // - BlockSizePerChannel must be within 1..65536 (spec standard is 4096)
@@ -301,7 +300,7 @@ var
   POut, PL, PR: pbyte;
   BytesProduced: integer;
   FramesNeeded, FramesInBlock, FramesToCopy, I: integer;
-  // ---> AUDIT FIX 2.2: Keep FramesValidLeft as Int64 so DSF files larger than
+  // Keep FramesValidLeft as Int64 so DSF files larger than
   // 8.58 GB never overflow 32-bit signed Integer and terminate early!
   ValidRemainingBytes, FramesValidLeft: int64;
   MarkerLocal: byte;

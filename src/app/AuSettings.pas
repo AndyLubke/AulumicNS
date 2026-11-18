@@ -10,8 +10,8 @@ unit AuSettings;
     <exe>\Cache\   thumbnails, cover cache
   When the folder of the exe cannot be written (e.g. under Program Files):
     %APPDATA%\AulumicNS\ (and its Cache sub folder).
-  The settings themselves are Aulumic's TAppSettings (uSettingsManager),
-  extended with the AulumicNS fields; uAppConsts builds its paths from here.
+  The settings themselves are TAppSettings (uSettingsManager);
+  uAppConsts builds its paths from here.
   =============================================================================}
 
 {$mode objfpc}{$H+}

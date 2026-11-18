@@ -103,7 +103,7 @@ begin
   else Result := FormatFloat('0.###', Rate / 1000, DefaultFormatSettings);
 end;
 
-{ ---> AulumicNS: used at every file call that takes the path of a music file
+{ Used at every file call that takes the path of a music file
   or of a file next to it (the tag readers and writers, the readers, the
   scanner, the helpers of uOSUtils / uMetaUtils). Only full paths get the
   prefix (X:\... or \\server\share\...): Windows takes a \\?\ path as it is,

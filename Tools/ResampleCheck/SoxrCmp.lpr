@@ -5,8 +5,8 @@ program SoxrCmp;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  AulumicNS' AuResample against libsoxr (Aulumic's DLL, Aulumic's settings).
-  A check tool (2026-11-11/12), not part of the program.
+  AulumicNS' AuResample against libsoxr (the libsoxr DLL, the same settings).
+  A check tool, not part of the program.
 
   Build (from the project folder; nothing is written into src):
     C:\Lazarus\fpc\3.2.2\bin\x86_64-win64\fpc.exe -MObjFPC -O3 -dRELEASE
@@ -133,7 +133,7 @@ begin
   end
   else
   begin
-    { exactly as Aulumic's TResamplerSource.CreateSoxrState }
+    { libsoxr with the same settings as ours }
     FillChar(Io, SizeOf(Io), 0);
     Io.itype := 1;      // SOXR_FLOAT64_I
     Io.otype := 1;

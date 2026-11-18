@@ -107,7 +107,7 @@ begin
   BorderIcons := [biSystemMenu];      // the LCL gives a sizeable window all buttons
   Constraints.MinWidth := S(420);
   Constraints.MinHeight := S(320);
-  FitToWorkArea;          // ---> AulumicNS: a small screen at a large scaling
+  FitToWorkArea;          // a small screen at a large scaling
 
   FUp := TAuIconButton.Create(Self);
   FUp.Parent := Body;

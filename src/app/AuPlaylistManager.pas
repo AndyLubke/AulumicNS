@@ -5,15 +5,15 @@ unit AuPlaylistManager;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Playlist Manager (Aulumic's uFormPlaylistManager, Main menu >
+  The Playlist Manager (Main menu >
   Playlist > Playlist Manager..., Alt+P, the Edit button above the
   playlist): all playlists - the Default playlist, your playlists, the
   auto-playlists (funnel) - with
     New... (Ctrl+N), New Auto-playlist..., Edit... (F2, the Playlist Editor),
     Remove (Del), Import... (M3U / M3U8), Export... (M3U8), Close.
   Double click or Enter shows the playlist and closes the manager.
-  AulumicNS: the changes go straight into the playlist store (Aulumic wrote
-  the files); the main window learns about renames, the playlists whose
+  The changes go straight into the playlist store (uPlaylistStore);
+  the main window learns about renames, the playlists whose
   view or rules changed and the one to show (TPlaylistManagerResult).
   =============================================================================}
 
@@ -225,7 +225,7 @@ begin
   FBtnNewAuto.Enabled := FStore <> nil;
 end;
 
-{ X -> Y followed by Y -> Z is recorded as X -> Z (Aulumic) }
+{ X -> Y followed by Y -> Z is recorded as X -> Z }
 procedure TPlaylistManagerForm.RecordRename(const AOld, ANew: string);
 var
   I: Integer;

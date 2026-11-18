@@ -9,16 +9,15 @@ unit uCrashTracer;
 
   Helper unit for tracing crashes at closing down.
 
-  ---> AUDIT FIX: Always active, writes only when something went wrong.
+  Always active, writes only when something went wrong.
   Every trace step is kept in memory (a few dozen short lines). Nothing is
   written after a clean shutdown. At the first error the steps so far are
   written to ShutdownTraceLog.txt together with the error, and every later
   step is written directly, so the log shows where it happened.
   Unhandled exceptions that reach the RTL (for example during the final
   cleanup after the main form is gone) are written the same way.
-  (Replaces the former ENABLE_SHUTDOWN_TRACE constant.)
 
-  ---> ADDED: DescribeCodeAddress / DescribeExceptionPlace give the place of
+  DescribeCodeAddress / DescribeExceptionPlace give the place of
   an exception as 'AulumicNS.exe+$offset' (with the calls that led there), for
   the log; Tools\FindCodeAddress.ps1 turns it into routine, file and line.
   =============================================================================}
@@ -30,19 +29,19 @@ uses
 
 procedure BeginShutdownTrace;
 procedure WriteShutDownTrace(const StepName: string; IsError: Boolean = False);
-// ---> ADDED: Something unusual that is no error (e.g. a thread still running
-// at exit): written like an error (the trace so far goes to the file), but
-// labelled 'NOTE:' instead of '!!! EXCEPTION !!!'
+// Something unusual that is no error (e.g. a thread still running at exit):
+// written like an error (the trace so far goes to the file), but labelled
+// 'NOTE:' instead of '!!! EXCEPTION !!!'
 procedure WriteShutDownNote(const ANote: string);
 function  LogShutdownException(const AContext: string; E: Exception = nil): string;
-// ---> AulumicNS: for an except block of a shutdown step: the exception being
+// For an except block of a shutdown step: the exception being
 // handled (a Pascal one or an OS-level one) via LogShutdownException
 procedure LogShutdownStepError(const AStep: string);
 
-// ---> ADDED: A code address as module + offset, e.g. 'AulumicNS.exe+$1A2B3C'
+// A code address as module + offset, e.g. 'AulumicNS.exe+$1A2B3C'
 // (look it up with Tools\FindCodeAddress.ps1); '$...' when it lies in no module
 function  DescribeCodeAddress(AAddr: CodePointer): string;
-// ---> ADDED: Where the exception being handled happened, then the calls that
+// Where the exception being handled happened, then the calls that
 // led there (at most AMaxCallers): 'AulumicNS.exe+$1A2B <- AulumicNS.exe+$3C4D
 // <- ...'. Only meaningful inside an except block or Application.OnException.
 function  DescribeExceptionPlace(AMaxCallers: Integer = 8): string;
@@ -148,7 +147,7 @@ procedure BeginShutdownTrace;
 begin
   GTraceStep    := 0;
   GTraceSubStep := 0;
-  { ---> AulumicNS: a new trace (TMainForm.FormCloseQuery calls it once): an
+  { A new trace (TMainForm.FormCloseQuery calls it once): an
     error traced before is in the file already; the steps of the close are
     written only when one of them fails (and the tests can start clean) }
   GHadError := False;
@@ -266,8 +265,8 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Unhandled exceptions that reach the RTL (outside the LCL's own
-// handler, e.g. in the final cleanup) are traced, then handled as before.
+// Unhandled exceptions that reach the RTL (outside the LCL's own handler, e.g.
+// in the final cleanup) are traced, then passed on to the previous handler.
 procedure TracerExceptProc(Obj: TObject; Addr: CodePointer; FrameCount: Longint;
   Frame: PCodePointer);
 begin

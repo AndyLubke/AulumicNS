@@ -7,10 +7,10 @@ unit TestMetadataCustodian;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The metadata custodian writes the tags of the Properties dialog (the ported
-  uMetadataCustodian on its own thread): WAV (ID3 in an 'id3 ' chunk), FLAC
+  The metadata custodian writes the tags of the Properties dialog
+  (uMetadataCustodian, on its own thread): WAV (ID3 in an 'id3 ' chunk), FLAC
   (Vorbis comments, several values as separate fields), DSF (ID3 at the end)
-  and DFF (an 'ID3 ' chunk, new in AulumicNS). Each test checks that the
+  and DFF (an 'ID3 ' chunk). Each test checks that the
   changed fields are in the file afterwards, that the unchanged ones stay as
   they were and that the audio data is byte for byte the same.
   The custodian shows a dialog when a file could not be written; a console
@@ -443,7 +443,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: a track without an album tag: the track gain and peak are
+// A track without an album tag: the track gain and peak are
 // written, the album gain and peak a former scan left are taken out
 procedure TTestMetadataCustodian.TrackOnlyReplayGainRemovesTheAlbumValues;
 var

@@ -7,7 +7,7 @@ unit TestHangWatch;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> AulumicNS: uHangWatch, the watchdog for a frozen main window. A thread
+  Tests for uHangWatch, the watchdog for a frozen main window. A thread
   plays the UI thread: it owns a window and stops taking messages for a while
   (Sleep). A second thread makes a window owned by that window (as an ASIO
   driver may do with the window it gets: their input is tied together). The

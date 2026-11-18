@@ -5,10 +5,10 @@ unit AuResample;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Sample rate conversion of AulumicNS - replaces libsoxr, in Pascal, all in
-  double precision. Built on the polyphase converter of Aulos (rational
-  L / M, Kaiser windowed sinc, two stages for ratios of 3 and more) and
-  extended with Aulumic's resampler settings:
+  Sample rate conversion of AulumicNS, in Pascal, all in
+  double precision. A polyphase converter (rational
+  L / M, Kaiser windowed sinc, two stages for ratios of 3 and more)
+  with these resampler settings:
 
   - Quality: the precision in bits like soxr (0 = 32, 1 = 28, 2 = 24,
     3 = 20, 4 = 16 bits); the stop band attenuation is 6.02 dB per bit.
@@ -35,8 +35,8 @@ unit AuResample;
   loops are also written in SSE2 and AVX assembler with the same result bit
   for bit (SetResampleSimd).
 
-  TAuStreamResampler has the streaming interface the engine used with
-  libsoxr: Process takes input frames, returns how many it used and how many
+  TAuStreamResampler has a streaming interface like
+  libsoxr's: Process takes input frames, returns how many it used and how many
   output frames it wrote (interleaved doubles). Call Flush once at the end
   of the input, or the last block of an FFT stage never comes out.
   =============================================================================}
@@ -53,7 +53,7 @@ type
   TDoubleArray = array of Double;
   TAuPhase = (rpLinear, rpIntermediate, rpMinimum);
 
-  { ---> AulumicNS: the filter's inner loop (the dot product of the taps):
+  { The filter's inner loop (the dot product of the taps):
     rsAuto takes AVX when the CPU and Windows support it, else SSE2 (every
     x64 CPU); rsPascal / rsSSE2 / rsAVX force one (Tools\AudioSim --simd=,
     to compare). All give the same output bit for bit. }
@@ -63,8 +63,8 @@ type
 procedure SetResampleSimd(AMode: TResampleSimd);
 { the inner loop in use: 'AVX', 'SSE2' or 'Pascal' }
 function ResampleSimdName: string;
-{ ---> AulumicNS: long filters of 2x up / 2:1 down stages by FFT (default on);
-  off = every stage in direct form, as before (to compare: AudioSim --fft=0).
+{ Long filters of 2x up / 2:1 down stages by FFT (default on);
+  off = every stage in direct form (to compare: AudioSim --fft=0).
   Applies to converters created afterwards. }
 procedure SetResampleFft(AOn: Boolean);
 function ResampleFftOn: Boolean;
@@ -102,7 +102,7 @@ type
     FBase: Int64;
     FOutCount: Int64;
     FStepQ, FStepR: Integer;      // FM div FL, FM mod FL (Produce steps with them)
-    { ---> AulumicNS: the FFT form (overlap-save). Each phase P is a
+    { The FFT form (overlap-save). Each phase P is a
       convolution of the input with its FT taps; the stage computes it for
       blocks of up to FBlk input frames at once: one FFT of the block (two
       channels at a time, as real and imaginary part), per phase a product
@@ -191,7 +191,7 @@ type
       frames to OutBuf (OutDone); the unused input stays with the caller }
     procedure Process(InBuf: PDouble; InFrames: Integer; out InDone: Integer;
       OutBuf: PDouble; OutFrames: Integer; out OutDone: Integer);
-    { ---> AulumicNS: the input has ended (for now): what it still gives
+    { The input has ended (for now): what it still gives
       comes with the next Process calls (InFrames 0 is fine). Needed by the
       FFT stages, harmless for the direct ones. }
     procedure Flush;
@@ -219,10 +219,10 @@ uses
   cpu;
 
 const
-  { ---> AulumicNS: the largest FFT of an FFT stage }
+  { The largest FFT of an FFT stage }
   FFT_MAX_SIZE = 1 shl 16;
 
-{ ---- the inner loop (---> AulumicNS, 2026-11-11) ----
+{ ---- the inner loop ----
 
   An output sample is the dot product of FT coefficients with FT input
   samples per channel. The Pascal loop keeps four running sums per channel:
@@ -380,7 +380,7 @@ asm
   vzeroupper
 end;
 
-{ ---> AulumicNS: the FFT butterflies of one group (TAuFftPlan.Forward, the
+{ The FFT butterflies of one group (TAuFftPlan.Forward, the
   stages of half size H >= 4): Count butterflies, pairs H apart. Each lane
   does what the Pascal loop does for its K, in the same order and without
   fused multiply-add, so all three give the same bits. The pointers are
@@ -613,7 +613,7 @@ begin
   end;
 end;
 
-{ the Pascal loop (as before; for comparisons) }
+{ the Pascal loop (for comparisons) }
 procedure DotStereoPas(A: PDotArgs);
 var
   J: PtrInt;
@@ -722,7 +722,7 @@ begin
   Result := GFftOn;
 end;
 
-{ ---- TAuFftPlan (---> AulumicNS, 2026-11-11) ----
+{ ---- TAuFftPlan ----
 
   Radix-2, decimation in time: the input in bit reversed order, then log2 N
   stages of butterflies. The stage of half size H combines pairs H apart
@@ -1275,10 +1275,10 @@ begin
   end;
 end;
 
-{ ---- the cost of the two forms (---> AulumicNS) ----
+{ ---- the cost of the two forms ----
 
   In nanoseconds per output frame (stereo) on one E-core of the development
-  PC, measured 2026-11-11 (AVX). Only the ratio decides, and with fixed
+  PC, measured with AVX. Only the ratio decides, and with fixed
   numbers, so that a stage takes the same form (and gives the same output)
   on every PC. }
 
@@ -1352,7 +1352,7 @@ begin
   FStepQ := FM div FL;
   FStepR := FM mod FL;
   SetLength(FHist, FCh);
-  { ---> AulumicNS: the FFT form for upsampling by an integer (FM = 1, up to
+  { The FFT form for upsampling by an integer (FM = 1, up to
     8) and 2:1 downsampling, when it costs less than the direct form
     (FftCost: the steep stages at every quality, most short ones too) }
   FFft := GFftOn and (((FM = 1) and (FL >= 2) and (FL <= 8)) or ((FL = 1) and (FM = 2))) and
@@ -1583,8 +1583,8 @@ var
 begin
   Result := 0;
   FT4 := FT and not 3;
-  { ---> AulumicNS: the position of the first output; then it steps on by
-    FM / FL with additions (was a 64-bit div and mod per output sample) }
+  { The position of the first output; then it steps on by
+    FM / FL with additions (no 64-bit div and mod per output sample) }
   T := FOutCount * FM + FD;
   M0 := T div FL;                         // newest input sample used
   P := Integer(T mod FL);                 // the phase
@@ -1597,8 +1597,8 @@ begin
     Off := Integer(First - FBase);
     Cf := @FCoef[P * FT];
     Args.Cf := Cf;
-    { ---> AulumicNS: the taps in groups of 4 by the SIMD loop (see
-      TDotArgs), the last 0 .. 3 and the sums as before: bit-identical.
+    { The taps in groups of 4 by the SIMD loop (see
+      TDotArgs), the last 0 .. 3 and the sums in Pascal: bit-identical.
       Stereo in one pass: each coefficient is loaded once for both. }
     if FCh = 2 then
     begin
@@ -1663,7 +1663,7 @@ var
   Drop, C: Integer;
 begin
   if SrcFrames > 0 then Append(Src, SrcFrames);
-  { ---> AulumicNS: room for every output the input so far allows (output N
+  { Room for every output the input so far allows (output N
     needs input frame (N * FM + FD) div FL); the FFT form gives a whole
     block at once }
   Cap := (Int64(FBase + FHistLen) * FL - FD) div FM - FOutCount + 2;

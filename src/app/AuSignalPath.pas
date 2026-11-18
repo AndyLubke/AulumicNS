@@ -5,12 +5,12 @@ unit AuSignalPath;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The signal path (Aulos' TAuSignalPath of its Now Playing page): every stage
+  The signal path (TAuSignalPath): every stage
   between the file and the DAC - source, decoder or DSD transport,
   ReplayGain, tone control, resampler, volume, dither, output - green when it
   passes the signal on unchanged, amber when it changes it, with a summary
   line (bit-perfect or processed).
-  AulumicNS: a popup under the badge of the banner (a click on it) that
+  It is a popup under the badge of the banner (a click on it) that
   follows the playback while it is open (refreshed twice a second). The
   stages come from the play thread's snapshot (TPlaybackManager.
   GetSignalInfo), the playing file and the settings (BuildSignalPath).
@@ -54,7 +54,7 @@ type
     function Stage(I: Integer): TAuStage;
     property Summary: string read FSummary;
     property SummaryState: TAuStageState read FSummaryState;
-    { ---> AulumicNS: the most it may take (px; 0 = no limit): the stages close up }
+    { the most it may take (px; 0 = no limit): the stages close up }
     property MaxHeight: Integer read FMaxHeight write FMaxHeight;
   end;
 
@@ -138,7 +138,7 @@ begin
   Invalidate;
 end;
 
-{ ---> AulumicNS: the distance of the stages: 52, closer (down to 40) when
+{ the distance of the stages: 52, closer (down to 40) when
   all of them would not fit into MaxHeight (a small screen at a large scaling) }
 function TAuSignalPath.Pitch: Integer;
 var
@@ -304,7 +304,7 @@ end;
 
 function DsdName(ARate: Integer): string;
 begin
-  Result := DsdRateName(ARate);   // ---> both DSD families (uAudioUtils)
+  Result := DsdRateName(ARate);   // both DSD families (uAudioUtils)
 end;
 
 function CodecOf(const APath: string): string;
@@ -334,8 +334,8 @@ begin
   else Result := Result + IntToStr(AHz) + ' Hz';
 end;
 
-{ ---> AulumicNS: the bands of the tone control that are set (five bands since
-  2026-11-14: all of them would not fit a line) }
+{ the bands of the tone control that are set (all five would not fit a
+  line) }
 function ToneBandsText: string;
 const
   NAMES: array[0..4] of string = ('Bass', 'Low mid', 'Mid', 'High mid', 'Treble');
@@ -398,7 +398,7 @@ begin
   begin
     S2 := Format('Decimation to %s kHz  ·  %s', [RateText(AInfo.InRate),
       GainText(AppSettings.Data.Audio.DsdToPcmGain)]);
-    { ---> AulumicNS: the gain is applied with the volume (after the
+    { the gain is applied with the volume (after the
       resampler), so it clips only at the end, where the preamp helps }
     if AppSettings.Data.Audio.DsdToPcmGain = 6 then S2 := S2 + ' (SACD reference, with the volume)'
     else if AppSettings.Data.Audio.DsdToPcmGain <> 0 then S2 := S2 + ' (with the volume)';
@@ -409,7 +409,7 @@ begin
     P.AddStage(icBolt, 'Decoder', 'Built-in FLAC decoder  ·  lossless', stTransparent)
   else
     P.AddStage(icBolt, 'Decoder', 'PCM, read as stored', stTransparent);
-  { ReplayGain (---> AulumicNS: RGFactor also holds the preamp: shown as a
+  { ReplayGain (RGFactor also holds the preamp: shown as a
     stage of its own, the ReplayGain stage shows the rest) }
   RgDb := 0;
   if AInfo.RGFactor > 0 then RgDb := 20 * Log10(AInfo.RGFactor);
@@ -427,7 +427,7 @@ begin
     P.AddStage(icSliders, 'ReplayGain', 'No gain to apply (no ReplayGain tags, or 0 dB)', stTransparent)
   else
     P.AddStage(icSliders, 'ReplayGain', 'Off', stTransparent);
-  { ---> AulumicNS: the preamp (Preferences > Volume), when one is set }
+  { the preamp (Preferences > Volume), when one is set }
   if Abs(AInfo.PreampDB) >= 0.005 then
   begin
     if DsdOut then
@@ -471,7 +471,7 @@ begin
   end
   else
     P.AddStage(icVolume2, 'Volume', 'Bypassed (100 %)', stTransparent);
-  { ---> AulumicNS: automatic headroom (it is part of the gain: shown where
+  { automatic headroom (it is part of the gain: shown where
     it lowers something, or could) }
   if AInfo.HeadroomOn and not DsdOut then
   begin

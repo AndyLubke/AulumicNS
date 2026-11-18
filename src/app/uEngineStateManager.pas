@@ -29,8 +29,8 @@ type
 
   TEngineStateChangeEvent = procedure(Sender: TObject; ActiveStates: TAppEngineStates) of object;
 
-  // ---> MODIFIED: Added parameterless TAppSimpleEvent to match UpdateInfoBars,
-  // JumpToNowPlaying, ClearThumbCache, and BackgroundIOBatchFinished!
+  // Parameterless TAppSimpleEvent: UpdateInfoBars, JumpToNowPlaying,
+  // ClearThumbCache and BackgroundIOBatchFinished
   TAppSimpleEvent         = procedure of object;
   TAppStatusEvent         = procedure(const AMsg: string; ProgressPct: Double) of object;
   TAppBoolEvent           = procedure(AValue: Boolean) of object;
@@ -47,14 +47,13 @@ type
     FBroadcastPending            : Boolean;
     FOnStateChanged              : TEngineStateChangeEvent;
 
-    // Decoupled UI & App hooks bound by TfrmMain
+    // Decoupled UI & App hooks bound by TMainForm
     FDefaultCoverObject          : TObject;
     FIsAutoPlaylistActive        : Boolean;
     FOnStatusUpdate              : TAppStatusEvent;
     FOnReplayGainLabel           : TAppBoolEvent;
     FOnReplayGainProgress        : TAppCountEvent;
     FOnRequestLibraryScan        : TAppScanRequestEvent;
-    // ---> MODIFIED: Changed from TNotifyEvent to TAppSimpleEvent
     FOnUpdateInfoBars            : TAppSimpleEvent;
     FOnJumpToNowPlaying          : TAppSimpleEvent;
     FOnClearThumbCache           : TAppSimpleEvent;
@@ -81,7 +80,7 @@ type
     procedure UpdateStatusUI(const AMsg: string; ProgressPct: Double = -1);
     procedure ShowBackgroundIOStatus(const AMsg: string; ProgressPct: Double = -1);
     procedure ShowReplayGainLabel(AShow: Boolean);
-    // ---> ADDED: Live 'album x of y' in the ReplayGain status label
+    // Live 'album x of y' in the ReplayGain status label
     procedure ShowReplayGainProgress(ACurrent, ATotal: Integer);
     procedure RequestLibraryScan(FullRebuild: Boolean = False; SilentQueue: Boolean = False);
     procedure UpdateInfoBars;
@@ -107,7 +106,6 @@ type
                                                   write FOnReplayGainProgress;
     property OnRequestLibraryScan: TAppScanRequestEvent read FOnRequestLibraryScan
                                                        write FOnRequestLibraryScan;
-    // ---> MODIFIED: Changed from TNotifyEvent to TAppSimpleEvent
     property OnUpdateInfoBars: TAppSimpleEvent read FOnUpdateInfoBars
                                               write FOnUpdateInfoBars;
     property OnJumpToNowPlaying: TAppSimpleEvent read FOnJumpToNowPlaying
@@ -130,9 +128,9 @@ uses
   uAppStrings;
 
 const
-  // ---> AUDIT FIX: Moved here from uAppStrings (texts stay in uAppStrings), so
-  // uAppStrings no longer uses uEngineStateManager. The circular reference
-  // between the two units made FPC 3.2.2 crash internally while compiling.
+  // Here and not in uAppStrings (the texts are there), so that uAppStrings
+  // does not use uEngineStateManager: a circular reference between the two
+  // units makes FPC 3.2.2 crash internally while compiling.
   BUSY_STATE_MESSAGE: array[TAppEngineState] of string = (
     BUSY_MSG_LIBRARY,       // esLibraryBusy
     BUSY_MSG_REPLAYGAIN,    // esReplayGainBusy
@@ -209,28 +207,24 @@ begin
     FOnRequestLibraryScan(FullRebuild, SilentQueue);
 end;
 
-// ---> MODIFIED: Parameterless invocation
 procedure TEngineStateManager.UpdateInfoBars;
 begin
   if (Self <> nil) and Assigned(FOnUpdateInfoBars) then
     FOnUpdateInfoBars();
 end;
 
-// ---> MODIFIED: Parameterless invocation
 procedure TEngineStateManager.JumpToNowPlaying;
 begin
   if (Self <> nil) and Assigned(FOnJumpToNowPlaying) then
     FOnJumpToNowPlaying();
 end;
 
-// ---> MODIFIED: Parameterless invocation
 procedure TEngineStateManager.ClearThumbCache;
 begin
   if (Self <> nil) and Assigned(FOnClearThumbCache) then
     FOnClearThumbCache();
 end;
 
-// ---> MODIFIED: Parameterless invocation
 procedure TEngineStateManager.BackgroundIOBatchFinished;
 begin
   if (Self <> nil) and Assigned(FOnBackgroundIOBatchFinished) then

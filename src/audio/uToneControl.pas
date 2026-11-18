@@ -10,23 +10,22 @@ unit uToneControl;
 // The tone control: a hybrid 'Baxandall / semi parametric EQ' of five bands,
 // each with an adjustable frequency - bass (low shelf), low mid, mid, high mid
 // (peaking), treble (high shelf), in series in this order, all with
-// Q = 1 / sqrt 2. (Three bands - bass, mid, treble - until 2026-11-14.) A band
-// at 0 dB is skipped, so the three bands of before (bass, one of the mids,
-// treble) give the samples they always gave. ToneResponseDB gives the curve
+// Q = 1 / sqrt 2. A band at 0 dB is skipped: it is not in the chain.
+// ToneResponseDB gives the curve
 // the Tone Control window draws, from the same coefficients.
 // Strictly accepts Integers for thread-safe UI transport, converting to
 // 64-bit Doubles internally for DSP math.
 //
-// ---> AulumicNS: the glide. A setting changed while music plays does not
+// The glide. A setting changed while music plays does not
 // replace the coefficients in one step (a faint tick on loud music): every
 // band moves from where it is to the new setting in TONE_GLIDE_MS, its gain
 // in dB and its frequency in octaves along an eased line (a half cosine), and
 // the coefficients are set again TONE_GLIDE_STEPS_PER_S times a second on the
 // way. "Off" (direct mode) and 0 dB are a glide to 0 dB, after which the band
-// is bypassed as before; "on" is a glide from 0 dB. A change made before any
+// is bypassed; "on" is a glide from 0 dB. A change made before any
 // sample went through, or after a reset (seek, another sample rate), arrives
-// at once, as it always did. With unchanged settings nothing here runs: the
-// samples are what they were, bit for bit (TTestToneControl).
+// at once. With unchanged settings nothing of the glide runs: the
+// samples are the same bit for bit (TTestToneControl).
 // The caller counts the frames: see Gliding / GlideChunk / Advance.
 // =============================================================================
 
@@ -37,13 +36,13 @@ uses
 
 const
   // Microscopic anti-denormal offset prevents CPU subnormal stalls during silence
-  // ---> AulumicNS: in the interface (was in the implementation). The play
+  // In the interface because the play
   // thread inlines ProcessSampleL / R, and the compiler can only inline
   // ProcessBiquad into another unit when everything it uses is visible
-  // there: with the constant hidden, every filter of every sample was a call.
+  // there: with the constant hidden, every filter of every sample is a call.
   ANTI_DENORMAL_OFFSET = 1.0e-20;
 
-  // ---> AulumicNS: a new setting arrives in this time, the coefficients are
+  // A new setting arrives in this time, the coefficients are
   // set again this often on the way
   TONE_GLIDE_MS          = 40;
   TONE_GLIDE_STEPS_PER_S = 4000;
@@ -59,7 +58,7 @@ type
 
   TToneBandValues = array[0..TONE_BANDS - 1] of Double;
 
-  // ---> AulumicNS: everything that changes while samples run through the
+  // Everything that changes while samples run through the
   // tone control - the filters with their memory and a glide in work
   // (SaveState / RestoreState)
   TToneSnapshot = record
@@ -69,7 +68,7 @@ type
     GlideLen, GlidePos, StepLen, StepLeft: Integer;
   end;
 
-  // ---> AulumicNS: settings as the curve in the Tone Control window needs
+  // Settings as the curve in the Tone Control window needs
   // them (the bands in their order; gains in tenths of a dB, as everywhere)
   TToneCurve = record
     Rate: Integer;
@@ -91,7 +90,7 @@ type
     // Independent stereo filters for series processing (the bands in order)
     FL, FR: array[0..TONE_BANDS - 1] of TBiquad;
 
-    // ---> AulumicNS: the glide. FCur* is what the filters are set to now
+    // The glide. FCur* is what the filters are set to now
     // (0 dB = the band is off), on its way from FFrom* to the settings;
     // FGlidePos of FGlideLen frames are done, the coefficients are set again
     // every FStepLen frames (FStepLeft until the next time). FHot: samples
@@ -120,17 +119,17 @@ type
     // (bass, mid and treble alone: the two other bands keep what they have)
     procedure SetFrequencies(ABassHz, AMidHz, ATrebleHz: Integer);
     procedure SetGains(ABassDB, AMidDB, ATrebleDB: Integer);
-    // ---> AulumicNS: all five bands
+    // All five bands
     procedure SetBandFrequencies(const AHz: TToneInts);
     procedure SetBandGains(const ATenths: TToneInts);
 
     procedure SetDirectMode(AEnabled: Boolean);
 
     // Returns True only when not in DirectMode AND at least one band is non-zero
-    // ---> AulumicNS: and while a glide to "off" or to 0 dB is still running
+    // and while a glide to "off" or to 0 dB is still running
     function IsActive: Boolean; inline;
 
-    // ---> AulumicNS: the glide. While Gliding, hand over at most GlideChunk
+    // The glide. While Gliding, hand over at most GlideChunk
     // frames at a time and call Advance with their number afterwards (the
     // coefficients change there; IsActive may change too). MarkPlayed after
     // a block of samples: from then on a new setting glides. FinishGlide
@@ -147,7 +146,7 @@ type
     function ProcessSampleL(Input: Double): Double; inline;
     function ProcessSampleR(Input: Double): Double; inline;
 
-    // ---> AulumicNS: the filters' memory and the glide, to run samples
+    // The filters' memory and the glide, to run samples
     // through them and then put everything back as if nothing had been
     // processed (the automatic headroom looks at a block behind the tone
     // control before it is played: TPlayThread.RunGain). The settings are
@@ -156,7 +155,7 @@ type
     procedure RestoreState(const AState: TToneSnapshot);
   end;
 
-// ---> AulumicNS: what the three filters do to a tone of AFreq Hz, in dB, with
+// What the filters do to a tone of AFreq Hz, in dB, with
 // the coefficients the tone control itself uses at that sample rate
 function ToneResponseDB(const ACurve: TToneCurve; AFreq: Double): Double;
 
@@ -167,7 +166,7 @@ uses uAppConsts;
 const
   DEFAULT_FILTER_Q     = 0.7071067811865475; // 1 / Sqrt(2) Butterworth Q
 
-  // ---> AUDIT FIX T1: Safe bounds for tone control frequencies (Hz) and gains (0.1 dB units)
+  // Safe bounds for tone control frequencies (Hz) and gains (0.1 dB units)
   TONE_MIN_FREQ_HZ     = 10;
   TONE_MAX_FREQ_HZ     = 40000;
   TONE_MIN_GAIN_TENTHS = -200; // -20.0 dB
@@ -206,7 +205,7 @@ begin
   F.s2 := 0.0;
 end;
 
-// ---> AulumicNS: the filters start anew (seek, a new stream): nothing to
+// The filters start anew (seek, a new stream): nothing to
 // glide from, so a glide in work ends where it was going
 procedure TToneControl.ResetAllStates;
 var
@@ -261,7 +260,7 @@ begin
   Changed := False;
   for B := 0 to TONE_BANDS - 1 do
   begin
-    // ---> AUDIT FIX T1: Clamp frequencies to sane bounds before updating coefficients
+    // Clamp frequencies to sane bounds before updating coefficients
     V := EnsureRange(AHz[B], TONE_MIN_FREQ_HZ, TONE_MAX_FREQ_HZ);
     if FHzInt[B] <> V then
     begin
@@ -281,7 +280,7 @@ begin
   Changed := False;
   for B := 0 to TONE_BANDS - 1 do
   begin
-    // ---> AUDIT FIX T1: Clamp gains to [-20.0 .. +20.0 dB] so Power(10, GainDB / 40)
+    // Clamp gains to [-20.0 .. +20.0 dB] so Power(10, GainDB / 40)
     // can never overflow on a corrupted configuration value!
     V := EnsureRange(ATenths[B], TONE_MIN_GAIN_TENTHS, TONE_MAX_GAIN_TENTHS);
     if FDBInt[B] <> V then
@@ -304,7 +303,7 @@ begin
 end;
 
 // True bit-perfect bypass check when EQ is enabled but all bands are 0.0 dB
-// ---> AulumicNS: the band flags alone - in direct mode every band is off
+// The band flags alone - in direct mode every band is off
 // (after its glide to 0 dB)
 function TToneControl.IsActive: Boolean; inline;
 begin
@@ -313,8 +312,8 @@ end;
 
 { ---- the glide ---- }
 
-// Where band ABand is going: its setting, or 0 dB in direct mode. The same
-// expression as ever (tenths x 0.1), so the coefficients at the end of a
+// Where band ABand is going: its setting, or 0 dB in direct mode. Always the
+// same expression (tenths x 0.1), so the coefficients at the end of a
 // glide are those of a tone control that was set this way from the start.
 function TToneControl.TargetDB(ABand: Integer): Double;
 begin
@@ -471,7 +470,7 @@ begin
 end;
 
 // Pre-calculates Cos(w0), Sin(w0), Sqrt(A), InvA0, and clamps Nyquist
-// ---> AulumicNS: AUnityAtZero off for a band that is working (a glide through
+// AUnityAtZero off for a band that is working (a glide through
 // or from 0 dB): the plain formulas, which give b = a there. The unity set
 // below ignores the filter's memory - with samples in it, that is a step.
 procedure TToneControl.CalcCoeffs(var ALeft, ARight: TBiquad; AFilterType: TFilterType; Freq, GainDB, Q: Double;
@@ -485,7 +484,7 @@ begin
   if FSampleRate <= 0 then
     Exit;
 
-  // ---> AUDIT FIX T1: Secondary defence-in-depth clamp inside CalcCoeffs
+  // Secondary defence-in-depth clamp inside CalcCoeffs
   if IsNan(GainDB) or IsInfinite(GainDB) then
     ClampedGainDB := 0.0
   else
@@ -520,7 +519,7 @@ begin
   SinCos(w0, sinW0, cosW0);
   alpha := sinW0 / (2.0 * Q);
 
-  // ---> AulumicNS: unity until the case sets them (the -O3 data flow
+  // Unity until the case sets them (the -O3 data flow
   // analysis cannot see that the case covers every filter type)
   b0 := 1.0; b1 := 0.0; b2 := 0.0;
   a0 := 1.0; a1 := 0.0; a2 := 0.0;

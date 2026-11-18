@@ -68,7 +68,7 @@ var
   DriveMapCache : array['A'..'Z'] of TDriveMapEntry;
   DriveMapLock  : TCriticalSection = nil;
 
-// ---> AUDIT FIX: Returns the UNC root ('\\server\share') a mapped network
+// Returns the UNC root ('\\server\share') a mapped network
 // drive letter points to, or '' for local drives. Cached per drive letter for
 // 10 s so frequent IsFileBusy calls (scanner, playback) stay cheap.
 function GetMappedDriveUNCRoot(ADrive: Char): string;
@@ -127,10 +127,10 @@ begin
 end;
 {$ENDIF}
 
-// ---> AUDIT FIX F1: Normalizes separators, resolves '.'/'..' and relative
+// Normalizes separators, resolves '.'/'..' and relative
 // segments (ExpandFileName), and expands 8.3 short names to long names so the
 // same file always maps to the same registry key.
-// ---> AUDIT FIX: A path on a mapped network drive ('Z:\Music\x.flac') is
+// A path on a mapped network drive ('Z:\Music\x.flac') is
 // rewritten to its UNC spelling ('\\nas\share\Music\x.flac'), so both
 // spellings of the same file share one registry key.
 function NormalizeLockPath(const AFilePath: string): string;

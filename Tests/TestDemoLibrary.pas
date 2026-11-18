@@ -367,7 +367,7 @@ begin
   end;
 end;
 
-{ ---> AulumicNS: the preamp has a stage of its own (RGFactor holds it, also
+{ The preamp has a stage of its own (RGFactor holds it, also
   with ReplayGain off); the ReplayGain stage shows only its own gain }
 procedure TTestDemoLibrary.SignalPathShowsThePreamp;
 var
@@ -403,7 +403,7 @@ begin
     Inf.RGFactor := 1;
     BuildSignalPath(P, Inf, M, 'C:\Music\a.flac', '', False);
     AssertFalse('no preamp stage', FindStage(P, 'Headroom', St));
-    { ---> AulumicNS: automatic headroom shows what it takes off; with
+    { automatic headroom shows what it takes off; with
       nothing to lower it is there only where it could act (resampled) }
     Inf.HeadroomOn := True;
     Inf.HeadroomDB := -0.8;

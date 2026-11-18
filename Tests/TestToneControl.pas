@@ -13,8 +13,8 @@ unit TestToneControl;
   The play thread inlines ProcessSampleL / R; these tests hold the output,
   bit for bit, against the same filters written out here, so a change of how
   the code is compiled or arranged (inlining, block processing) cannot change
-  the sound unnoticed. The three bands of before come out as they always
-  did; settings with three bands move their mid to the right new band.
+  the sound unnoticed. Bass, mid and treble alone give the samples of a
+  three-band chain; settings with three bands move their mid to its band.
   TTestToneGlide: a setting changed while music plays glides in without a
   jump, also through 0 dB and into "off"; the curve (ToneResponseDB) is the
   level a sine really gets.
@@ -247,8 +247,9 @@ begin
   end;
 end;
 
-{ a setting of the three bands of before, with its mid in any of the three
-  middle bands, gives the samples it gave: a band at 0 dB is not in the chain }
+{ a setting of bass, mid and treble only, with its mid in any of the three
+  middle bands, gives the samples of three bands: a band at 0 dB is not in
+  the chain }
 procedure TTestToneControl.ThreeBandsOfFiveAreTheOldThree;
 var
   Old, New: TToneControl;
@@ -291,7 +292,7 @@ begin
   end;
 end;
 
-{ the settings of a build with three bands: the Mid band was at 220 Hz .. 3 kHz }
+{ stored settings with three bands: their Mid band is at 220 Hz .. 3 kHz }
 procedure TTestToneControl.SettingsWithThreeBandsMoveTheirMid;
 
   procedure Check(AMidHz, AMidDB, WantMidHz, WantMidDB, WantLowHz, WantLowDB, WantHighHz, WantHighDB: Integer);
@@ -519,7 +520,7 @@ begin
   try
     Before := Feed(Tone, 60, 0, 4600, 4600);
     Tone.SetGains(0, 0, 0);
-    Tone.FinishGlide;                 // the builds before the glide: at once
+    Tone.FinishGlide;                 // without the glide: at once
     Stepped := Joined(Before, Feed(Tone, 60, 4600, 4800, 100000));
   finally
     Tone.Free;

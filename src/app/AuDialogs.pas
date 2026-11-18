@@ -5,9 +5,9 @@ unit AuDialogs;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Aulumic's message dialogs (ALMessageDlg of uFormCustomMsg) in the style of
-  AulumicNS: the same calls (buttons as TMsgDlgButtons, a default button, the
-  kind of message, or two own captions), shown with the themed TAuForm.
+  The message dialogs (ALMessageDlg) in the style of AulumicNS: buttons as
+  TMsgDlgButtons, a default button, the kind of message, or two own
+  captions, shown with the themed TAuForm.
   =============================================================================}
 
 {$mode ObjFPC}{$H+}

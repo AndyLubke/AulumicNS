@@ -22,7 +22,7 @@ uses
   Classes, SysUtils, SyncObjs, ALMetadata, uLibraryTypes, uDbStore;
 
 type
-  // ---> ADDED: Progress of a scan, called on the main thread (TThread.Queue).
+  // Progress of a scan, called on the main thread (TThread.Queue).
   // TLibraryManager passes a method that looks up its OnScanProgress at the
   // moment of the call, so clearing that event also stops the reports.
   TScanProgressProc = procedure(const ScanMsg, CurrentFolder: string;
@@ -32,8 +32,7 @@ type
 
   TLibraryScannerThread = class(TThread)
   private
-    // ---> CHANGED: The manager's lock and progress method (was the manager
-    // itself, whose private fields this class used)
+    // The manager's lock and progress method
     FLock             : TCriticalSection;
     FOnProgress       : TScanProgressProc;
     FFoldersToScan    : TStringList;
@@ -44,7 +43,7 @@ type
     FProgressCounter  : integer;
     FExistingDict     : TStringList;
     FCheckedThumbs    : TStringList;
-    // ---> AulumicNS: the texts that repeat from track to track (folder,
+    // The texts that repeat from track to track (folder,
     // artist, album ...) once, and their search forms per pool id: the
     // records of a scan take half the memory, and the search form of an
     // artist is made once, not for every track
@@ -55,13 +54,13 @@ type
     FHasChanges       : boolean;
     FTracksAdded      : integer;
     FTracksModified   : integer;
-    // ---> AUDIT FIX: Set when Execute aborted on an unexpected exception, so the
-    // (partial) results are discarded instead of replacing the library.
+    // Set when Execute aborted on an unexpected exception, so the
+    // (partial) results are discarded and never replace the library.
     FScanFailed       : boolean;
     FTotalFilesToScan : integer;
     FIsCounting       : boolean;
     FLastUITick       : QWord;
-    // ---> AUDIT FIX: One flag per FExistingDict entry: True once that record is
+    // One flag per FExistingDict entry: True once that record is
     // represented in FScannedTracks (re-read, cloned or carried over), so a
     // carry-over never duplicates a track and works across subfolders.
     FExistingTaken    : array of Boolean;
@@ -104,9 +103,9 @@ type
       Folders: TStringList; ExistingDB: TList; IsRefresh: boolean);
     destructor Destroy; override;
 
-    // ---> CHANGED: Public (TLibraryManager.MergeScannedLinks uses it)
+    // Public: TLibraryManager.MergeScannedLinks uses it
     function  KeepsExistingLink(const ALinkPath: string): Boolean;
-    // ---> ADDED: Hands over the virtual folders found by the scan (the list
+    // Hands over the virtual folders found by the scan (the list
     // ScannedLinks returns) and keeps AReplacement instead, which is freed
     // with this thread. Used by TLibraryManager.MergeScannedLinks.
     function  SwapScannedLinks(AReplacement: TStringList): TStringList;
@@ -114,8 +113,7 @@ type
     property ScannedTracks: TList read FScannedTracks;
     property RootsLostDuringScan: TStringList read FRootsLost;
     property RootsOfflineAtStart: TStringList read FRootsOffline;
-    // ---> ADDED: Results read by TLibraryManager.HandleScannerFinished (it
-    // used the private fields before)
+    // Results read by TLibraryManager.HandleScannerFinished
     property TracksAdded: integer read FTracksAdded;
     property TracksModified: integer read FTracksModified;
     property ScanFailed: boolean read FScanFailed;
@@ -149,9 +147,9 @@ begin
   FExistingDict               := TStringList.Create;
   FExistingDict.CaseSensitive := False;
   FExistingDict.Duplicates    := dupIgnore;
-  // ---> AUDIT FIX: Plain (non-locale) comparison for this internal path list.
+  // Plain (non-locale) comparison for this internal path list.
   // The locale comparison converts both strings to UTF-16 and calls Windows on
-  // every comparison, which made sorting/lookups of ~50,000 paths slow.
+  // every comparison, which makes sorting/lookups of ~50,000 paths slow.
   FExistingDict.UseLocale     := False;
 
   FTextPool                    := TDbStrPool.Create;
@@ -301,9 +299,9 @@ begin
   else
     UpperAllTags := UpperCase(Copy(AMeta.AllTags, 1, 65536));
 
-  // ---> AUDIT FIX: Both a track gain and an album gain are required, so a
-  // file with only a track gain is offered by a normal ReplayGain scan
-  // ---> AulumicNS: a track without an album tag has no album gain to get
+  // Both a track gain and an album gain are required, so a
+  // file with only a track gain is offered by a normal ReplayGain scan.
+  // A track without an album tag has no album gain to get
   // (the ReplayGain scan gives it its track gain only): the track gain is
   // all it needs
   HasRG := (Pos(TAG_RG_TRACK_GAIN, UpperAllTags) > 0) and
@@ -342,7 +340,7 @@ begin
 
   AMeta := Default(TAudioMetadata);
 
-  // ---> AUDIT FIX D3: Always normalize FolderDir without trailing backslash
+  // FolderDir is always stored without a trailing backslash
   CleanFolderDir := ExcludeTrailingPathDelimiter(AFolderDir);
 
   // 3. Allocate permanent PTrackInfo in clean low heap memory
@@ -386,7 +384,7 @@ begin
   if Idx >= 0 then
     ExistingTrack := PTrackInfo(FExistingDict.Objects[Idx]);
 
-  // ---> AUDIT FIX S3: Read ExistingTrack under FCriticalSection
+  // ExistingTrack is read under the manager's lock
   if Assigned(ExistingTrack) then
   begin
     FLock.Enter;
@@ -453,7 +451,7 @@ begin
     SafeDir      := FCurrentDir;
     SafeProgress := FProgressCounter;
     SafeTotal    := FTotalFilesToScan;
-    // ---> AulumicNS: the total of a refresh is the number of tracks the
+    // The total of a refresh is the number of tracks the
     // library had: more files than that = the total grows with them
     if (SafeTotal > 0) and (SafeProgress > SafeTotal) then
       SafeTotal := SafeProgress;
@@ -482,7 +480,7 @@ begin
             Break;
           if (SR.Name = '.') or (SR.Name = '..') then
             Continue;
-          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is Aulumic)
+          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is AulumicNS)
           if (SR.Attr and faHidden) = faHidden then
             Continue;
           if (SR.Attr and faSysFile) = faSysFile then
@@ -516,8 +514,8 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Root-folder rule. True when the scan folder (library root
-// from Preferences) that APath belongs to is no longer reachable: the drive was
+// Root-folder rule. True when the scan folder (library root
+// from Preferences) that APath belongs to cannot be reached: the drive was
 // unplugged / the share went away. Everything under such a root is SKIPPED and
 // its records are KEPT. When the root is still there, a missing subfolder or
 // file really was deleted/renamed and its record may be dropped.
@@ -540,7 +538,7 @@ begin
   Result := IsDriveRootMissing(P);
 end;
 
-// ---> AUDIT FIX: Moves every scan folder that is no longer reachable from
+// Moves every scan folder that cannot be reached any more from
 // FFoldersToScan to FRootsLost and keeps all of its records that were not
 // re-read yet. Called after the pre-count and again after the actual scan.
 procedure TLibraryScannerThread.HandleLostRoots;
@@ -562,7 +560,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Marks the existing library record for APath as represented
+// Marks the existing library record for APath as represented
 // in FScannedTracks (FExistingDict is sorted, so IndexOf is a binary search)
 procedure TLibraryScannerThread.MarkExistingTaken(const APath: string);
 var
@@ -575,9 +573,9 @@ begin
     FExistingTaken[Idx] := True;
 end;
 
-// ---> AUDIT FIX D2: Keeps the existing library records of a folder that cannot
-// be scanned (access denied, network hiccup, drive unplugged during the scan)
-// instead of deleting them. IncludeSubDirs = also everything below ADir.
+// Keeps the existing library records of a folder that cannot be scanned
+// (access denied, network hiccup, drive unplugged during the scan);
+// they are never deleted. IncludeSubDirs = also everything below ADir.
 // Records that are already in FScannedTracks are skipped (FExistingTaken).
 procedure TLibraryScannerThread.CarryOverExistingUnder(const ADir: string; IncludeSubDirs: Boolean);
 var
@@ -627,7 +625,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Keeps the existing record of one file that vanished or could
+// Keeps the existing record of one file that vanished or could
 // not be read during the scan
 procedure TLibraryScannerThread.CarryOverSingle(const APath: string);
 var
@@ -677,9 +675,6 @@ var
   DirFailed        : Boolean;
   CountedAsAdded   : Boolean;
 
-  // ---> AUDIT FIX: Carry-over moved to CarryOverExistingUnder / CarryOverSingle
-  // (scanner methods), using FExistingTaken instead of a per-folder list.
-
   // Records the FindNext result so a listing that stops on an I/O error
   // (rather than ERROR_NO_MORE_FILES) can be detected after the loop
   function NextEntry: integer;
@@ -693,7 +688,7 @@ var
   var
     CoverBytes: TBytes;
   begin
-    // ---> AUDIT FIX: Initialize managed array to nil to silence compiler hint
+    // The managed array starts as nil (silences a compiler hint)
     CoverBytes := nil;
     try
       FTempMeta := Default(TAudioMetadata);
@@ -742,10 +737,10 @@ begin
   try
   try
     FindRes := FindFirst(LongPath(IncludeTrailingPathDelimiter(CleanDir) + '*.*'), faAnyFile, SR);
-    // ---> AUDIT FIX: Keep the records when the folder exists but cannot be
+    // Keep the records when the folder exists but cannot be
     // listed, OR when its library root has disappeared (drive unplugged during
     // the scan). Only a folder that is really gone while its root is still
-    // there is dropped (deleted / renamed by the user).
+    // there is dropped (it was deleted or renamed).
     if (FindRes <> 0) and (DirectoryExists(LongPath(CleanDir)) or ScanRootGone(CleanDir)) then
     begin
       if not Terminated then
@@ -759,7 +754,7 @@ begin
             Break;
           if (SR.Name = '.') or (SR.Name = '..') then
             Continue;
-          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is Aulumic)
+          {$PUSH}{$WARN 5044 OFF} // faHidden / faSysFile / faSymLink: Windows-only (so is AulumicNS)
           if (SR.Attr and faHidden) = faHidden then
             Continue;
           if Pos('.~.', SR.Name) > 0 then
@@ -779,8 +774,8 @@ begin
           end
           else
           begin
-            // ---> AUDIT FIX D2: Isolate each file inside its own try..except
-            // so a single malformed file never aborts scanning the rest of the directory!
+            // Each file has its own try..except, so a single malformed
+            // file never aborts scanning the rest of the directory
             ClonedTrack := nil;
             CountedAsAdded := False;
             try
@@ -801,8 +796,8 @@ begin
                     CanCloneExisting := False;
                     ClonedTrack      := nil;
 
-                    // ---> AUDIT FIX S3: Copy ExistingTrack^ under FCriticalSection
-                    // so concurrent UpdateRecord calls on the custodian thread cannot race!
+                    // ExistingTrack^ is copied under the manager's lock, so
+                    // UpdateRecord calls on the custodian thread cannot race
                     FLock.Enter;
                     try
                       if FileTime <= ExistingTrack^.LastModified then
@@ -865,7 +860,7 @@ begin
                 FTempMeta     := ReadTrackMetadata(FullPath, False);
                 TrackHasCover := FTempMeta.HasCover;
 
-                // ---> AUDIT FIX: The file vanished while it was being read.
+                // The file vanished while it was being read.
                 // Root gone (drive unplugged): keep its existing record.
                 // Root still there: the file was deleted, so drop it.
                 // Either way it is neither added nor modified.
@@ -881,11 +876,10 @@ begin
                   Continue;
                 end;
 
-                // ---> AulumicNS: FIX a change only now that the file is there
-                // and gets its record (was set before the file was read: a
-                // file that could not be opened - its path had 260 characters
-                // or more - was neither added nor modified, but every scan
-                // "had changes": the library was replaced and saved each time)
+                // A change only now that the file is there and gets its
+                // record. Set before the file is read, a file that cannot be
+                // opened (neither added nor modified) would make every scan
+                // "have changes": the library replaced and saved each time.
                 FHasChanges := True;
                 AddTrackLocal(FullPath, CleanDir, FTempMeta, FileTime, FileSize);
 
@@ -899,9 +893,9 @@ begin
                     if (ThumbHash <> '') and (not FCheckedThumbs.Find(ThumbHash, ThumbIdx)) then
                     begin
                       FCheckedThumbs.Add(ThumbHash);
-                      // ---> AUDIT FIX: A file changed outside Aulumic may have a new
+                      // A file changed outside AulumicNS may have a new
                       // cover: its album thumbnail is made again (once per album per
-                      // scan). Aulumic's own writes store the new file date, so they
+                      // scan). AulumicNS's own writes store the new file date, so they
                       // do not count as changed.
                       if not CountedAsAdded then
                         GenerateThumbIsolated(FullPath, ThumbHash, TrackHasCover, True)
@@ -922,7 +916,7 @@ begin
                 ClonedTrack := nil;
               end;
               FTempMeta := Default(TAudioMetadata);
-              // ---> AUDIT FIX: Keep the existing record of a file that could
+              // Keep the existing record of a file that could
               // not be read this time
               try
                 CarryOverSingle(FullPath);
@@ -946,7 +940,7 @@ begin
     DirFailed := True;
   end;
 
-  // ---> AUDIT FIX: The listing broke off: keep everything not seen yet in this
+  // The listing broke off: keep everything not seen yet in this
   // folder AND below it (subfolders that were never reached)
   if DirFailed and (not Terminated) then
   begin
@@ -1121,7 +1115,7 @@ begin
         end;
       end;
 
-      // ---> AUDIT FIX: One "taken" flag per existing record (sorted indices are final now)
+      // One "taken" flag per existing record (the sorted indices are final now)
       SetLength(FExistingTaken, FExistingDict.Count);
       for I := 0 to High(FExistingTaken) do
         FExistingTaken[I] := False;
@@ -1138,9 +1132,9 @@ begin
 
       FIsCounting       := True;
       FTotalFilesToScan := 0;
-      // ---> AulumicNS: a refresh of a library that has tracks takes their
+      // A refresh of a library that has tracks takes their
       // number as the total for the progress bar (SyncProgress raises it
-      // when more files turn up). Counting the files first walked every
+      // when more files turn up). Counting the files first would walk every
       // folder a second time: half of the time of a scan without changes,
       // more on a network drive or one that has to wake up.
       if FIsRefresh and (FExistingDict.Count > 0) then
@@ -1154,7 +1148,7 @@ begin
         end;
       FIsCounting := False;
 
-      // ---> AUDIT FIX: Phase boundary pre-count -> actual scan. PreScanCount
+      // Boundary between the pre-count and the actual scan. PreScanCount
       // swallows every error, so a drive unplugged while counting only shows
       // up as a low file count. Check the roots again here: a root that has
       // gone is skipped completely and keeps all of its records.
@@ -1183,15 +1177,15 @@ begin
         ScanDirectory(FFoldersToScan[I]);
       end;
 
-      // ---> AUDIT FIX: A scan folder whose drive disappeared during the actual
+      // A scan folder whose drive disappeared during the actual
       // scan keeps all of its existing records that were not re-read
       if not Terminated then
         HandleLostRoots;
 
     except
-      // ---> AUDIT FIX: Still swallowed (never kill the thread), but the scan is
-      // now flagged as failed so HandleScannerFinished keeps the current library
-      // instead of committing an incomplete track list.
+      // Swallowed (never kill the thread), but the scan is flagged as
+      // failed, so HandleScannerFinished keeps the current library and
+      // never commits an incomplete track list.
       FScanFailed := True;
     end;
 

@@ -16,11 +16,11 @@ uses
   Classes, SysUtils, IniFiles, Forms, uPlaybackManager;
 
 function SettingsAdjust(aNum, aMin, aMax : integer) : integer;
-{ ---> AulumicNS: the size (96-DPI units) a tool window opens with: the
+{ The size (96-DPI units) a tool window opens with: the
   remembered one (0 = ADefW / ADefH), at most 92 % of the work area at the
   current scaling }
 procedure ToolWindowSize(ARememberedW, ARememberedH, ADefW, ADefH: Integer; out W, H: Integer);
-// ---> AulumicNS: tone settings of the builds with three bands - the Mid
+// Tone settings written with three bands - the Mid
 // setting goes to the band that has its frequency among the five (below
 // 800 Hz: low mid, from 3 kHz: high mid), and the Mid band is flat at 1 kHz
 procedure MoveThreeBandMid(var AMidHz, AMidDB, ALowMidHz, ALowMidDB, AHighMidHz, AHighMidDB: Integer);
@@ -40,11 +40,11 @@ type
     LeftPanelWidth      : integer;
     ToneWinLeft         : integer;
     ToneWinTop          : integer;
-    // ---> AulumicNS: the sizes of the cover viewer and Artist Info, in 96-DPI
+    // The sizes of the cover viewer and Artist Info, in 96-DPI
     // units (their client area below the title bar; 0 = the default)
     CoverWinW, CoverWinH   : integer;
     ArtistWinW, ArtistWinH : integer;
-    PropsWinW, PropsWinH   : integer;   // Properties (sizable since 2026-11-11)
+    PropsWinW, PropsWinH   : integer;   // Properties
 
     LibrarySelection    : string;
     PlaylistSelection   : string;
@@ -69,18 +69,17 @@ type
     DefaultGroupingMode : integer;
     DefaultHeaderFormat : string;
     DefaultTrackFormat  : string;
-    // ---> AulumicNS: the selection moves to the track that starts playing
-    // (as in Aulumic, where it always did; an option here, the user 2026-11-17)
+    // The selection moves to the track that starts playing
     CursorFollowsPlayback: Boolean;
     ShowPeakmeter       : boolean;
     LastFMApiKey        : string;
 
-    // --- AulumicNS ---
+    // --- APPEARANCE, OUTPUT & OTHER STATE ---
     ThemeMode           : integer;   // 0 dark, 1 light, 2 follow Windows (DarkMode follows it)
     Accent              : integer;   // 0 .. AccentCount - 1
     UIFontSize          : integer;   // the whole UI text, percent (90 .. 130)
-    Animations          : boolean;   // ---> AulumicNS: short fades and gliding movements (AuAnim)
-    GpuPaint            : boolean;   // ---> AulumicNS: large controls drawn by the graphics card (AuControls.GpuPaintAllowed)
+    Animations          : boolean;   // short fades and gliding movements (AuAnim)
+    GpuPaint            : boolean;   // large controls drawn by the graphics card (AuControls.GpuPaintAllowed)
     Muted               : boolean;
     ShuffleMode         : integer;   // 0 off, 1 tracks, 2 albums (TShuffleMode)
     RepeatMode          : integer;   // 0 off, 1 all, 2 one
@@ -89,7 +88,7 @@ type
     AsioDriverID        : string;    // is the one of the chosen interface
     WatchFolders        : boolean;
     PrefsPage           : integer;
-    PrefsCards          : string;    // ---> AulumicNS: the cards of Preferences that are open (ids, comma separated)
+    PrefsCards          : string;    // the cards of Preferences that are open (ids, comma separated)
     LastAddDir          : string;    // the folder of the last "Add Files / Folder"
     RGScanThreads       : integer;   // ReplayGain scan: tracks measured at once (1 .. RG_MAX_THREADS)
     AlwaysSaveLog       : boolean;   // AulumicNSLog.txt at every exit (else only after errors)
@@ -115,7 +114,7 @@ type
     destructor  Destroy; override;
     procedure   Load;
     procedure   Save(AForm: TForm);
-    // ---> AulumicNS: Audio.OutputApi / DeviceID from OutputApi and the device
+    // Audio.OutputApi / DeviceID from OutputApi and the device
     // of that interface (WasapiDeviceID / AsioDriverID)
     procedure   SyncOutputDevice;
   end;
@@ -170,8 +169,8 @@ const
   KEY_VOLUME_LOCKED     = 'VolumeLocked';
   KEY_PREAMP_DB         = 'PreampDB';
   KEY_ENABLE_SOFTCLIP   = 'EnableSoftClipping';
-  KEY_AUTO_HEADROOM     = 'AutoHeadroom';   // ---> AulumicNS
-  KEY_HEADROOM_MERGED   = 'HeadroomMerged'; // ---> AulumicNS: see LoadSettings
+  KEY_AUTO_HEADROOM     = 'AutoHeadroom';   // automatic headroom (ALHeadroom)
+  KEY_HEADROOM_MERGED   = 'HeadroomMerged'; // see TAppSettings.Load
 
   KEY_RESAMPLE_QUAL       = 'ResampleQuality';
   KEY_UPSAMPLE_PHASE      = 'UpsamplePhase';
@@ -212,8 +211,8 @@ const
   KEY_TONE_BASSHZ         = 'ToneBassHz';
   KEY_TONE_MIDHZ          = 'ToneMidHz';
   KEY_TONE_TREBLEHZ       = 'ToneTrebleHz';
-  // ---> AulumicNS: five bands (2026-11-14)
-  KEY_TONE_LOWMID         = 'ToneLowMid';
+  // The low mid and high mid bands
+  KEY_TONE_LOWMID        = 'ToneLowMid';
   KEY_TONE_HIGHMID        = 'ToneHighMid';
   KEY_TONE_LOWMIDHZ       = 'ToneLowMidHz';
   KEY_TONE_HIGHMIDHZ      = 'ToneHighMidHz';
@@ -226,8 +225,7 @@ const
   KEY_PROPS_WIN_W         = 'PropertiesWinWidth';
   KEY_PROPS_WIN_H         = 'PropertiesWinHeight';
 
-  // ---> AulumicNS
-  KEY_THEME_MODE          = 'ThemeMode';
+  KEY_THEME_MODE         = 'ThemeMode';
   KEY_ACCENT              = 'Accent';
   KEY_UI_FONT_SIZE        = 'UIFontSize';
   KEY_ANIMATIONS          = 'Animations';
@@ -257,9 +255,6 @@ begin
     Result := aMax;
 end;
 
-// ---> AUDIT FIX: True when the file exists, is not empty and contains at least
-// one [Section] header. A file truncated or zero-filled by a crash / power loss
-// fails this check, so it is never loaded and never copied over the backup.
 procedure MoveThreeBandMid(var AMidHz, AMidDB, ALowMidHz, ALowMidDB, AHighMidHz, AHighMidDB: Integer);
 begin
   if AMidHz < 800 then
@@ -299,6 +294,9 @@ begin
   H := Min(H, Round(Screen.WorkAreaHeight * 0.92 / K) - 40);
 end;
 
+// True when the file exists, is not empty and contains at least one [Section]
+// header. A file truncated or zero-filled by a crash / power loss fails this
+// check, so it is never loaded and never copied over the backup.
 function IniFileLooksValid(const APath: string): Boolean;
 var
   SL : TStringList;
@@ -327,7 +325,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Copies ASource to ATarget through a flushed temp file plus an
+// Copies ASource to ATarget through a flushed temp file plus an
 // atomic rename, so ATarget is always either the old or the complete new copy.
 function CopyFileAtomic(const ASource, ATarget: string): Boolean;
 var
@@ -347,7 +345,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX: Durable write-through flush of an already written file
+// Durable write-through flush of an already written file
 function FlushFileToDisk(const APath: string): Boolean;
 var
   FS: TFileStream;
@@ -367,8 +365,8 @@ end;
 
 { TAppSettings }
 
-// ---> AUDIT FIX: Crash-safe settings save.
-//  1. TMemIniFile writes to <ini>.tmp (same encoding as before; clears Dirty).
+// Crash-safe settings save.
+//  1. TMemIniFile writes to <ini>.tmp (same encoding; clears Dirty).
 //  2. The temp file is flushed to disk; on failure nothing is replaced.
 //  3. The current ini is COPIED (not moved) to <ini>.bak, and only when it is
 //     valid, so a damaged ini can never overwrite a good backup.
@@ -421,7 +419,7 @@ begin
   FIniPath   := AppIniPath;
   BackupPath := FIniPath + '.bak';
 
-  // ---> AUDIT FIX: Restore the backup when the ini is missing OR damaged
+  // Restore the backup when the ini is missing OR damaged
   // (empty / truncated by a crash). The backup itself is kept (copied, not moved).
   if (not IniFileLooksValid(FIniPath)) and IniFileLooksValid(BackupPath) then
   try
@@ -441,7 +439,7 @@ begin
   inherited Destroy;
 end;
 
-{ ---> AulumicNS: the system DPI from Windows itself; Screen.PixelsPerInch
+{ The system DPI from Windows itself; Screen.PixelsPerInch
   is still 96 when Load runs (before Application.Initialize) }
 function SystemDpi: Integer;
 var
@@ -462,9 +460,9 @@ var
   LPanelW : integer;
   WorkW   : integer;
 begin
-  { ---> AulumicNS: the panel widths are logical pixels (S() scales them),
-    the work area is physical: at 225 % a quarter of it was 960 "logical"
-    pixels (the library pane then took a narrow window's whole width) }
+  { The panel widths are logical pixels (S() scales them),
+    the work area is physical: at 225 % a quarter of it would be 960 "logical"
+    pixels (the library pane would take a narrow window's whole width) }
   WorkW := Round(Screen.WorkAreaWidth * 96 / SystemDpi);
   Data.WinState := TWindowState(FIniFile.ReadInteger(SEC_WINDOW, KEY_WIN_STATE, VAL_DEF_WIN_STATE));
 
@@ -510,7 +508,7 @@ begin
   Data.PlayListFontSize  := SettingsAdjust(Data.PlayListFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
 
   Data.Audio.DeviceID    := FIniFile.ReadString(SEC_AUDIO, KEY_DEVICE_ID, '');
-  // ---> AulumicNS: DoP on by default (as the help describes the first start)
+  // DoP on by default (as the help describes the first start)
   Data.Audio.UseDoP      := FIniFile.ReadBool(SEC_AUDIO, KEY_DOP, True);
   Data.Audio.ResamplePCM := FIniFile.ReadBool(SEC_AUDIO, KEY_RESAMPLE, False);
   Data.Volume            := FIniFile.ReadInteger(SEC_AUDIO, KEY_VOLUME, VAL_DEF_VOLUME);
@@ -528,11 +526,11 @@ begin
   Data.Audio.VolumeLocked       := FIniFile.ReadBool(SEC_AUDIO, KEY_VOLUME_LOCKED, False);
   Data.Audio.PreampDB           := FIniFile.ReadInteger(SEC_AUDIO, KEY_PREAMP_DB, VAL_DEF_PREAMP_DB);
   Data.Audio.EnableSoftClipping := FIniFile.ReadBool(SEC_AUDIO, KEY_ENABLE_SOFTCLIP, False);
-  // ---> AulumicNS: on unless switched off (the user's choice, 2026-11-12)
+  // On unless switched off
   Data.Audio.AutoHeadroom       := FIniFile.ReadBool(SEC_AUDIO, KEY_AUTO_HEADROOM, True);
-  // ---> AulumicNS (2026-11-12): the automatic headroom and the preamp are
-  // one setting now (Automatic, or a fixed value). A settings file from
-  // before that goes to Automatic once (agreed with the user).
+  // The automatic headroom and the preamp are one setting (Automatic, or a
+  // fixed value). A settings file without the HeadroomMerged key goes to
+  // Automatic once.
   if not FIniFile.ReadBool(SEC_AUDIO, KEY_HEADROOM_MERGED, False) then
   begin
     Data.Audio.AutoHeadroom := True;
@@ -570,8 +568,8 @@ begin
   Data.Audio.ToneMidHz    := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_MIDHZ,    VAL_DEF_MIDHZ);
   Data.Audio.ToneTrebleHz := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_TREBLEHZ, VAL_DEF_TREBLEHZ);
 
-  // ---> AulumicNS: five bands (2026-11-14)
-  Data.Audio.ToneLowMidDB  := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_LOWMID,    0);
+  // The low mid and high mid bands
+  Data.Audio.ToneLowMidDB := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_LOWMID,    0);
   Data.Audio.ToneHighMidDB := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_HIGHMID,   0);
   Data.Audio.ToneLowMidHz  := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_LOWMIDHZ,  VAL_DEF_LOWMIDHZ);
   Data.Audio.ToneHighMidHz := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_HIGHMIDHZ, VAL_DEF_HIGHMIDHZ);
@@ -598,7 +596,7 @@ begin
   Data.CursorFollowsPlayback := FIniFile.ReadBool(SEC_UI, KEY_CURSOR_FOLLOWS, True);
 
   Data.ShowPeakMeter := FIniFile.ReadBool(SEC_UI, KEY_SHOWPEAKMETER, True);
-  // ---> AulumicNS: no key is built in (the source is public): the user's own
+  // No key is built in (the source is public): the user's own
   // key, entered in Preferences > System > Artist information.
   Data.LastFmApiKey  := Trim(FIniFile.ReadString(SEC_ADVANCED, KEY_LASTFM_API_KEY, ''));
 
@@ -607,8 +605,7 @@ begin
   Data.Audio.EnableMMCSS      := FIniFile.ReadBool(SEC_AUDIO, KEY_ENABLE_MMCSS, True);
   Data.Audio.KeepDrivesAwake  := FIniFile.ReadBool(SEC_AUDIO, KEY_KEEP_DRIVES_AWAKE, False);
 
-  // ---> AulumicNS
-  Data.ThemeMode    := SettingsAdjust(FIniFile.ReadInteger(SEC_UI, KEY_THEME_MODE, 0), 0, 2);
+  Data.ThemeMode   := SettingsAdjust(FIniFile.ReadInteger(SEC_UI, KEY_THEME_MODE, 0), 0, 2);
   Data.DarkMode     := Data.ThemeMode <> 1;
   Data.Accent       := SettingsAdjust(FIniFile.ReadInteger(SEC_UI, KEY_ACCENT, 0), 0, 5);
   Data.UIFontSize   := SettingsAdjust(FIniFile.ReadInteger(SEC_UI, KEY_UI_FONT_SIZE, 100), 80, 130);
@@ -620,7 +617,7 @@ begin
   Data.OutputApi    := SettingsAdjust(FIniFile.ReadInteger(SEC_AUDIO, KEY_OUTPUT_API, 0), 0, 1);
   Data.WasapiDeviceID := Data.Audio.DeviceID;
   Data.AsioDriverID := FIniFile.ReadString(SEC_AUDIO, KEY_ASIO_DRIVER, '');
-  // on by default (milestone 3; network folders are never watched)
+  // on by default (network folders are never watched)
   Data.WatchFolders := FIniFile.ReadBool(SEC_LIBRARY, KEY_WATCH_FOLDERS, True);
   Data.RGScanThreads := FIniFile.ReadInteger(SEC_ADVANCED, KEY_RG_SCAN_THREADS, 1);
   Data.AlwaysSaveLog := FIniFile.ReadBool(SEC_ADVANCED, KEY_ALWAYS_SAVE_LOG, False);
@@ -686,7 +683,7 @@ begin
   if Data.WinHeight > Screen.DesktopHeight then
     Data.WinHeight := Screen.DesktopHeight;
 
-  // ---> AUDIT FIX: Support multi-monitor negative DesktopLeft / DesktopTop coordinates
+  // Support multi-monitor negative DesktopLeft / DesktopTop coordinates
   if Data.WinLeft <> VAL_UNINITIALIZED_POS then
   begin
     Data.WinLeft := SettingsAdjust(Data.WinLeft, Screen.DesktopLeft,
@@ -745,7 +742,7 @@ begin
   if not IsValidIntOption(Data.Audio.ToneHighMidHz, TONE_HIGHMID_HZ_OPTIONS) then
     Data.Audio.ToneHighMidHz := VAL_DEF_HIGHMIDHZ;
 
-  // ---> AulumicNS: the only two bands whose choices meet are bass (up to
+  // The only two bands whose choices meet are bass (up to
   // 250 Hz) and low mid (from 220 Hz): the low mid stays above the bass
   if Data.Audio.ToneLowMidHz <= Data.Audio.ToneBassHz then
     Data.Audio.ToneLowMidHz := 300;
@@ -782,7 +779,7 @@ begin
   FIniFile.WriteInteger(SEC_MAIN, KEY_MOD_VERSION, Data.ModificationVersion);
   FIniFile.WriteInteger(SEC_WINDOW, KEY_WIN_STATE, Ord(AForm.WindowState));
 
-  // ---> AUDIT FIX: Always persist normal/restored window bounds even when closing Maximized!
+  // Always persist normal/restored window bounds even when closing Maximized!
   if AForm.WindowState = wsNormal then
   begin
     Data.WinLeft   := AForm.Left;
@@ -825,7 +822,7 @@ begin
   FIniFile.WriteInteger(SEC_UI, KEY_LIBRARYFONTSIZE,  Data.LibraryFontSize);
   FIniFile.WriteInteger(SEC_UI, KEY_PLAYLISTFONTSIZE, Data.PlayListFontSize);
 
-  // ---> AulumicNS: the WASAPI device (the ASIO driver has its own key)
+  // The WASAPI device (the ASIO driver has its own key)
   FIniFile.WriteString(SEC_AUDIO, KEY_DEVICE_ID,     Data.WasapiDeviceID);
   FIniFile.WriteBool(SEC_AUDIO, KEY_DOP,             Data.Audio.UseDoP);
   FIniFile.WriteBool(SEC_AUDIO, KEY_RESAMPLE,        Data.Audio.ResamplePCM);
@@ -882,7 +879,7 @@ begin
   FIniFile.WriteBool(SEC_UI, KEY_CURSOR_FOLLOWS,       Data.CursorFollowsPlayback);
 
   FIniFile.WriteBool(SEC_UI, KEY_SHOWPEAKMETER,        Data.ShowPeakMeter);
-  // ---> MODIFIED: The built-in key is not stored (empty value, see Load)
+  // The key the user entered (empty = none, see Load)
   FIniFile.WriteString(SEC_ADVANCED, KEY_LASTFM_API_KEY, Data.LastFmApiKey);
 
   FIniFile.WriteBool(SEC_AUDIO, KEY_USE_HIGHRES_TIMER, Data.Audio.UseHighResTimer);
@@ -890,8 +887,7 @@ begin
   FIniFile.WriteBool(SEC_AUDIO, KEY_ENABLE_MMCSS,      Data.Audio.EnableMMCSS);
   FIniFile.WriteBool(SEC_AUDIO, KEY_KEEP_DRIVES_AWAKE, Data.Audio.KeepDrivesAwake);
 
-  // ---> AulumicNS
-  FIniFile.WriteInteger(SEC_UI, KEY_THEME_MODE,     Data.ThemeMode);
+  FIniFile.WriteInteger(SEC_UI, KEY_THEME_MODE,    Data.ThemeMode);
   FIniFile.WriteInteger(SEC_UI, KEY_ACCENT,         Data.Accent);
   FIniFile.WriteInteger(SEC_UI, KEY_UI_FONT_SIZE,   Data.UIFontSize);
   FIniFile.WriteBool(SEC_UI, KEY_ANIMATIONS,        Data.Animations);

@@ -16,9 +16,8 @@ uses
   SysUtils, uAppConsts;
 
 function GetWasapiErrorString(hr: HRESULT): string;
-// Fills ACombo with the DisplayName of each option of AArray, leaving out the
-// '-' separators (DataStr = '')
-// ---> ADDED: FillCombo leaves out the separators, so row N of the combo box is
+// A combo box shows the DisplayName of each option of AArray and leaves out
+// the '-' separators (DataStr = ''), so row N of the combo box is
 // not AArray[N] when AArray has them. These convert between the two by
 // position (never by the row's text). -1 = no such option / row.
 //   OptionOfComboRow: the AArray index of combo row ARow
@@ -73,7 +72,7 @@ const
   LBL_MULTIPLE_VALUES         = '<< Multiple Values >>';
   LBL_NOT_AVAILABLE           = ' (not available)';  // Suffix for an unreachable library folder
 
-  // Standard Button Labels (uFormProgress)
+  // Standard Button Labels (uMetadataCustodian)
   LBL_BTN_RETRY               = 'Retry';
   LBL_BTN_DISCARD             = 'Discard';
   LBL_META_KIND_TAGS          = 'tags';        // kind of a failed save in the "Tags Not Saved" dialog
@@ -157,7 +156,7 @@ const
   FMT_ERR_NAME_DUPLICATE      = 'The name "%s" already exists.' + sLineBreak + 'Please choose a different name.';
   FMT_ERR_PLAYEDIT_RESERVED   = '"%s" is a reserved system playlist name.' + sLineBreak + 'Please choose a different name.';
 
-  // ---> AulumicNS: back from Aulumic for TMainForm.AppException
+  // For TMainForm.AppException
   FMT_ERR_UNEXPECTED          = 'An unexpected error occurred:' + sLineBreak + sLineBreak +
                                 '%s' + sLineBreak + sLineBreak +
                                 'The details have been written to the log.';
@@ -193,7 +192,7 @@ const
   // 6. ENGINE TAG TEMPLATES (Prefix: TAGFMT_ requires custom text replacement)
   // =========================================================================
   LBL_BIT_PERFECT             = 'Bit-Perfect';
-  // ---> ADDED: Top banner while a track is being opened
+  // Top banner while a track is being opened
   LBL_WAITING_FOR_DRIVE       = 'Waiting for drive...';
   FMT_LOG_PLAYBACK_STALLED    = '[Playback] Playback of "%s" waited %d.%d s for the drive (slow or sleeping drive?).';
   FMT_LOG_SLOW_OPEN           = '[Playback] Opening "%s" took %d.%d s (slow or sleeping drive?).';
@@ -241,7 +240,7 @@ const
   FMT_LOG_TAGEDIT_SKIPPED     = 'Tag editor: %d file(s) could not be read and were not changed.';
   ERR_DECODE_DSF_RATE         = 'Invalid or corrupted DSF sample rate.';
   ERR_DECODE_DSF_STEREO       = 'DSD-to-PCM requires a 2-channel stereo DSF file.';
-  ERR_SOXR_INIT               = 'Failed to initialize the resampler.';   // ---> AulumicNS: no libsoxr
+  ERR_SOXR_INIT               = 'Failed to initialize the resampler.';   // the built-in resampler (AuResample)
   ERR_INVALID_FILE_PATH       = 'Invalid file path.';
   FMT_ERR_OS_ERROR            = 'OS Error %d: %s';
   ERR_RENAME_FAILED           = 'RenameFile failed.';
@@ -257,7 +256,7 @@ const
   ERR_LASTFM_NETWORK_PREFIX  = 'Last.fm network error: ';
   ERR_LASTFM_API_PREFIX      = 'Last.fm: ';
   ERR_LASTFM_GENERIC         = 'Last.fm returned an error.';
-  // ---> ADDED: Last.fm error 10 (invalid key) / 26 (suspended key)
+  // Last.fm error 10 (invalid key) / 26 (suspended key)
   ERR_LASTFM_KEY_REJECTED    = 'Artist information is not available: Last.fm did not accept the API key. Check it in Preferences > System > Artist information. Saved biographies and pictures still work.';
   LOG_LASTFM_KEY_REJECTED    = '[Artist Info] Last.fm did not accept the API key (invalid or blocked). Biographies of new artists cannot be fetched until the key is replaced.';
   ERR_LASTFM_PARSE_PREFIX    = 'Error parsing biography data: ';
@@ -270,7 +269,7 @@ const
   DIALOG_FILTER_AUDIO_FILES   = 'Audio Files (*.flac;*.wav;*.dsf;*.dff)|*.flac;*.wav;*.dsf;*.dff';
 
   // ===========================================================================
-  // ARTIST INFO & COVER ART POPUP HINTS (uPanelArtistInfo / uPanelCoverArt)
+  // ARTIST INFO & COVER ART POPUP HINTS (AuArtistInfo / AuCoverViewer)
   // ===========================================================================
 
   // Artist Info Popup Hints
@@ -286,7 +285,7 @@ const
   // Cover Art Popup Hints
   HINT_COVER_PREV               = 'Previous image (Left arrow, right-click or scroll up)';
   HINT_COVER_NEXT               = 'Next image (Right arrow, click or scroll down)';
-  // Playlist Manager Hints (uFormPlaylistManager)
+  // Playlist Manager Hints (AuPlaylistManager)
   HINT_PLM_LIST                 = 'Your playlists. Auto-playlists (funnel icon) are listed below the divider; their tracks are chosen by rules.';
   HINT_PLM_NEW                  = 'Create a new standard playlist (Ctrl+N).';
   HINT_PLM_NEW_AUTO             = 'Create a new auto-playlist. Its tracks are chosen automatically by rules you set.';
@@ -296,7 +295,7 @@ const
   HINT_PLM_EXPORT               = 'Export the selected playlist as an M3U8 file. An auto-playlist is exported with its current tracks, without its rules.';
 
   // ===========================================================================
-  // ARTIST INFO POPUP DIALOGS & STATUS (uPanelArtistInfo)
+  // ARTIST INFO POPUP DIALOGS & STATUS (AuArtistInfo)
   // ===========================================================================
   LBL_FETCHING_INFO             = 'Fetching information...';
   LBL_BIO_UNAVAILABLE           = 'Biography not available.';
@@ -312,14 +311,14 @@ const
   MSG_REFRESH_ARTIST_CONFIRM    = 'Refreshing from online sources will overwrite the existing biography and picture for %s.' + LineEnding + LineEnding + 'Do you want to continue?';
 
   // ===========================================================================
-  // TAG EDITOR & INSPECTOR STRINGS (uFormTagEditor)
+  // TAG EDITOR & INSPECTOR STRINGS (AuPropertiesForm)
   // ===========================================================================
   CAP_TAG_EDITOR_PROPERTIES     = 'Properties';
   HINT_BTN_WEB_COVER            = 'Search the web for the album cover. Copy an image and press Ctrl+V here, or drop an image file.';
   DLG_SELECT_COVER_ART_TITLE    = 'Select new cover art';
   DLG_FILTER_COVER_ART          = 'All Supported Images|*.jpg;*.jpeg;*.png;*.bmp|JPEG Images (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG Images (*.png)|*.png|Bitmap Images (*.bmp)|*.bmp';
 
-  // ---> ADDED: Cover Art Size Validation Strings
+  // Cover Art Size Validation Strings
   TITLE_COVER_TOO_LARGE         = 'Cover art too large';
   ERR_COVER_TOO_LARGE           = 'The selected cover image exceeds the 15 MB maximum limit for embedded artwork.';
   FMT_ERR_COVER_FILE_TOO_LARGE  = '"%s" (%.1f MB) exceeds the 15 MB maximum size limit for embedded cover art.';
@@ -351,7 +350,7 @@ const
   INS_LBL_TOTAL_FILE_SIZE       = 'Total File Size: ';
 
   // ===========================================================================
-  // VIRTUAL FOLDER / ALIAS EDITOR STRINGS (uFormAliasEditor / uFrameLibrary)
+  // VIRTUAL FOLDER / ALIAS EDITOR STRINGS (AuVirtualFolderForm)
   // ===========================================================================
   FMT_TITLE_CREATE_VIRTUAL_FOLDER    = 'Create Virtual Folder - %s';
   FMT_TITLE_EDIT_VIRTUAL_FOLDER      = 'Edit Virtual Folder - %s';
@@ -389,7 +388,7 @@ const
   HINT_ALIAS_SAVE                    = 'Save the virtual folder and update the library.';
 
   // ===========================================================================
-  // REPLAYGAIN SCANNER STRINGS (uFormReplayGain)
+  // REPLAYGAIN SCANNER STRINGS (AuReplayGainForm)
   // ===========================================================================
   TITLE_RG_SCANNER                   = 'ReplayGain scanner';
   TITLE_RG_SCAN_COMPLETE             = 'Scan complete';
@@ -443,7 +442,7 @@ const
   //    Severity ([INFO] / [WARNING] / [ERROR]) is added by AddLog / AddWarning,
   //    so a message never contains its own severity tag.
   // =========================================================================
-  // ---> AulumicNS: back from Aulumic for TMainForm.AppException
+  // For TMainForm.AppException
   FMT_LOG_UNHANDLED_EXCEPTION = '[Unhandled Exception] %s: %s';
   LOG_UNHANDLED_NO_OBJECT     = '[Unhandled Exception] (no exception object)';
   FMT_LOG_EXCEPTION_SENDER    = ' (Sender: %s)';
@@ -457,7 +456,7 @@ const
   FMT_LOG_PAUSED              = '[Paused] "%s"';
   FMT_LOG_RESUMED             = '[Resumed] "%s"';
   LOG_PREFIX_ENGINE_FATAL     = '[Engine Fatal Error] ';
-  // ---> ADDED: Technical details of an unexpected audio engine exception
+  // Technical details of an unexpected audio engine exception
   FMT_LOG_ENGINE_ERROR_DETAIL = '[Engine Fatal Error] Details: %s';
   FMT_LOG_DB_LOAD_FAILED      = '[Library Manager] Failed to load library database: %s';
   FMT_LOG_DB_BACKUP           = '[Library Manager] Original database preserved as "%s".';
@@ -489,16 +488,16 @@ const
   FMT_LOG_META_BATCH_PARTIAL  = '[Metadata] Batch finished. %d of %d files updated, %d could not be updated (see the messages above).';
   FMT_LOG_META_BATCH_DONE     = '[Metadata] Batch finished successfully. %d files updated.';
 
-  // ---> ADDED: Settings log (uSettingsLog). Names as in the Preferences window
+  // Settings log (uSettingsLog). Names as in the Preferences window
   LOG_SET_AUDIO               = 'Audio settings:';
   LOG_SET_RESAMPLER           = 'Resampler settings:';
   LOG_SET_SYSTEM              = 'System settings:';
   FMT_LOG_SET_ITEM            = '%s: %s';
   LOG_PURGED_NOTICE           = '--- [Older log lines removed to save memory] ---';
-  // ---> ADDED: Log window > Save to File...
+  // Log window > Save to File...
   DIALOG_TITLE_SAVE_LOG       = 'Save log';
   DIALOG_FILTER_TEXT_FILES    = 'Text Files (*.txt)|*.txt';
-  FMT_LOG_SAVE_FILE_NAME      = 'AulumicNSLog_%s.txt';   // ---> AulumicNS: the program's name
+  FMT_LOG_SAVE_FILE_NAME      = 'AulumicNSLog_%s.txt';   // %s = the date and time
   FMT_ERR_SAVE_LOG            = 'The log could not be saved to "%s".'#13#10#13#10'%s';
   ERR_LOG_EMPTY               = 'The log is empty.';
   FMT_LOG_PREF_CHANGED        = 'Preferences: %s changed from %s to %s';
@@ -508,7 +507,7 @@ const
   LBL_SET_ON                  = 'ON';
   LBL_SET_OFF                 = 'OFF';
   LBL_SET_DEVICE              = 'Output device';
-  // ---> AulumicNS: the output interface
+  // The output interface
   LBL_SET_OUTPUT_API          = 'Output interface';
   LBL_SET_API_WASAPI          = 'WASAPI exclusive';
   LBL_SET_API_ASIO            = 'ASIO';
@@ -536,7 +535,7 @@ const
   LBL_SET_MMCSS               = 'Enable MMCSS';
   LBL_SET_KEEP_AWAKE          = 'Keep music drives awake during playback';
 
-  // ---> ADDED: Output format lines of the audio engine (AuLog)
+  // Output format lines of the audio engine (AuLog)
   FMT_LOG_OUT_PCM             = 'Output to DAC: %s, %s (PCM%s)';
   FMT_LOG_OUT_DOP             = 'Output to DAC: native %s (%s MHz) via DoP';
   FMT_LOG_OUT_NATIVE_DSD      = 'Output to DAC: native %s (%s MHz) over ASIO';
@@ -545,21 +544,21 @@ const
   FMT_LOG_OUT_RESAMPLED       = ', resampled from %s';
   LOG_OUT_FROM_DSD            = ', converted from DSD';
 
-  // ---> ADDED: Drive keep-alive (logged once per change)
+  // Drive keep-alive (logged once per change)
   FMT_LOG_KEEPALIVE_LOST      = '[Keep-Alive] Drive "%s" cannot be reached; Aulumic keeps trying.';
   FMT_LOG_KEEPALIVE_BACK      = '[Keep-Alive] Drive "%s" is reachable again.';
   FMT_LOG_KEEPALIVE_START_FAILED = '[Keep-Alive] Could not start: %s. Playback continues without it.';
-  // ---> ADDED: Sample rate fallback dialog
+  // Sample rate fallback dialog
   FMT_LOG_FALLBACK_REFUSED    = '[Playback] The DAC did not accept %s.';
   FMT_LOG_FALLBACK_RESAMPLE   = '[Playback] Sample rate fallback: resampling to %s.';
   LOG_FALLBACK_CANCELLED      = '[Playback] Sample rate fallback cancelled; the track was not played.';
-  // ---> ADDED: Why the next track is not gapless
+  // Why the next track is not gapless
   FMT_LOG_GAPLESS_RATE        = '[Playback] Next track "%s" is %s (current %s): the stream is reopened, so this change is not gapless.';
   FMT_LOG_GAPLESS_DSD_RATE    = '[Playback] Next track "%s" has another DSD rate: the stream is reopened, so this change is not gapless.';
   FMT_LOG_GAPLESS_DSD_PCM     = '[Playback] Next track "%s" switches between DSD and PCM: the stream is reopened, so this change is not gapless.';
   // Phase timing in seconds as whole seconds + milliseconds (dot, like the durations)
   FMT_LOG_DB_LOADED_DETAIL    = 'Library Database Loaded (%d tracks; read %d.%.3ds, parse %d.%.3ds, dictionary %d.%.3ds)';
-  // ---> ADDED: Counterpart of the load line (build = under the library lock,
+  // Counterpart of the load line (build = under the library lock,
   // write = temporary file, flush and replace; together the pause in the UI)
   FMT_LOG_DB_SAVED_DETAIL     = '[Library Manager] Library database saved (%d tracks, %d.%d MB; build %d.%.3ds, write %d.%.3ds)';
   FMT_LOG_RG_PARTIAL_DECODE   = '[ReplayGain scanner] "%s" decoded only %d of %d frames; skipped.';
@@ -571,7 +570,7 @@ const
   LOG_RG_ABORTED              = '[ReplayGain scanner] Scan aborted by the user.';
   FMT_LOG_RG_FINISHED         = '[ReplayGain scanner] Scan finished. Harvested tracks: %d. Stale/Missing files: %d.';
   FMT_LOG_STATS_LOAD_FAILED   = '[UserStats] Failed to load user stats database: %s';
-  // ---> AulumicNS: automatic headroom (ALHeadroom)
+  // Automatic headroom (ALHeadroom)
   FMT_LOG_HEADROOM_LOAD_FAILED = '[Headroom] The learned peaks could not be read (%s). They will be learned again.';
   FMT_LOG_HEADROOM_SAVE_FAILED = '[Headroom] The learned peaks could not be saved: %s';
   FMT_LOG_STATS_BACKUP        = '[UserStats] Original stats file preserved as "%s".';
@@ -629,7 +628,7 @@ const
     (DisplayName: 'Genre • Artist • Album';        DataStr: '[%first_genre% • ][%first_albumartist% • ]%album%')
   );
 
-  // Trimmed to 9 items (0..8) — uses [ • %resolution%] without %codec% or parentheses
+  // 9 items (0..8) — uses [ • %resolution%] without %codec% or parentheses
   TRACK_FORMAT_OPTIONS: array[0..8] of TFormatDef = (
     // Title-First (Grouped Views)
     (DisplayName: 'Title';                        DataStr: '%title%'),
@@ -696,7 +695,7 @@ const
   );
 
   BANDWIDTH_OPTIONS: array[0..2] of TFormatDef = (
-    (DisplayName: 'Slow roll-off (default)'; DataStr: '0'),     // ---> AulumicNS: no libsoxr any more
+    (DisplayName: 'Slow roll-off (default)'; DataStr: '0'),
     (DisplayName: 'Medium roll-off'; DataStr: '1'),
     (DisplayName: 'Fast roll-off'; DataStr: '2')
   );
@@ -744,8 +743,8 @@ const
     (DisplayName: '-6.0 dB'; DataStr: '-6')
   );
 
-  // ---> AulumicNS (2026-11-12): the one Headroom setting of Preferences >
-  // Volume: Automatic (TPlaybackConfig.AutoHeadroom, PreampDB 0) or a fixed
+  // The one Headroom setting of Preferences >
+  // Volume: Automatic (TManagerConfig.AutoHeadroom, PreampDB 0) or a fixed
   // preamp (AutoHeadroom off). The fixed values are PREAMP_DB_OPTIONS'.
   HEADROOM_AUTO = 'auto';
   HEADROOM_OPTIONS: array[0..7] of TFormatDef = (
@@ -759,7 +758,7 @@ const
     (DisplayName: '-6.0 dB'; DataStr: '-6')
   );
 
-  // ---> AulumicNS: ReplayGain scan, tracks of an album measured at the same time
+  // ReplayGain scan, tracks of an album measured at the same time
   RG_THREADS_OPTIONS: array[0..4] of TFormatDef = (
     (DisplayName: '1 track (coolest)'; DataStr: '1'),
     (DisplayName: '2 tracks'; DataStr: '2'),
@@ -776,8 +775,8 @@ const
     (DisplayName: '250 Hz'; DataStr: '250')
   );
 
-  // ---> AulumicNS: five bands (2026-11-14). The three middle bands share out
-  // the range the one Mid band had (220 Hz .. 3 kHz), so they never cross.
+  // Five bands. The three middle bands share out
+  // the range 220 Hz .. 3 kHz, so they never cross.
   TONE_LOWMID_HZ_OPTIONS: array[0..4] of TFormatDef = (
     (DisplayName: '220 Hz'; DataStr: '220'),
     (DisplayName: '300 Hz'; DataStr: '300'),

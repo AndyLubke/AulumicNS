@@ -10,13 +10,12 @@ unit uUserStatsManager;
   Stores / Loads the UserStats database (date added, number of times played,
   ratings etc.).
 
-  ---> AulumicNS: stored in the Aulos format (uDbStore): a snapshot
+  Stored in the format of uDbStore: a snapshot
   (stats.adb) and a journal (stats.jnl). Every change (LogPlay, SetRating,
   SetFavorite, MigrateStats) appends the new state of its entry to the
   journal at once, so a play or a rating survives a crash; SaveToFile writes
   a new snapshot and starts a new journal (also when the journal has grown
-  past STATS_JOURNAL_COMPACT_BYTES). Aulumic's text file (UserStats.db) is
-  not read (AulumicNS has no import).
+  past STATS_JOURNAL_COMPACT_BYTES).
   =============================================================================}
 
 interface
@@ -29,8 +28,8 @@ type
   TUserTrackStats = record
     IsFavorite  : Boolean;
     Rating      : Integer;  // 0..5 (or 0..10)
-    PlayCount   : Integer;  // Ready for Step 5
-    LastPlayed  : Int64;    // Ready for Step 5
+    PlayCount   : Integer;
+    LastPlayed  : Int64;
   end;
 
   { TUserStatsManager }
@@ -40,14 +39,14 @@ type
     FFilePath        : string;
     FCriticalSection : TCriticalSection;
     FIsDirty         : Boolean;
-    // ---> AUDIT FIX U1: Prevents overwriting a valid stats file if LoadFromFile failed
+    // Prevents overwriting a valid stats file if LoadFromFile failed
     FLoadFailed      : Boolean;
-    // ---> AulumicNS: the journal of the changes since the snapshot
+    // The journal of the changes since the snapshot
     FJournal         : TDbJournal;
     FGeneration      : QWord;
 
     procedure ClearLedger;
-    // ---> AulumicNS: appends the state of one entry (under the lock)
+    // Appends the state of one entry (under the lock)
     procedure JournalEntry(const Fingerprint: string; Stats: PUserTrackStats);
     procedure ApplyJournalRecord(const AData: TBytes);
     function  EntryOf(const Key: string): PUserTrackStats;
@@ -76,7 +75,7 @@ type
     procedure SetFavorite(const Fingerprint: string; AIsFavorite: Boolean);
     function ToggleFavorite(const Fingerprint: string): Boolean;
 
-    // ---> AulumicNS: writable like TLibraryManager.IsDirty (tests: False =
+    // Writable like TLibraryManager.IsDirty (tests: False =
     // the destructor writes no snapshot, as after a crash)
     property IsDirty: Boolean read FIsDirty write FIsDirty;
   end;
@@ -95,8 +94,8 @@ const
   STATS_JOURNAL_COMPACT_BYTES  = 1024 * 1024;  // a new snapshot when the journal is larger
   JR_STATS_ENTRY               = 1;            // journal record: the state of one entry
 
-// ---> AUDIT FIX U2: Strips control characters (#0..#31, especially Tab #9, CR, LF)
-// so fingerprints can never corrupt tab-separated lines in the stats database!
+// Strips control characters (#0..#31, especially Tab #9, CR, LF), so a
+// fingerprint never contains a tab or a line break.
 function SanitizeFingerprintToken(const S: string): string;
 var
   I, WriteIdx, Len: Integer;
@@ -154,9 +153,9 @@ begin
   FStatsLedger.Sorted        := True;
   FStatsLedger.Duplicates    := dupIgnore;
   FStatsLedger.CaseSensitive := False;
-  // ---> AUDIT FIX: Plain (non-locale) comparison. The keys are fingerprints
-  // that are already lower case and accent-free; the locale comparison (UTF-16
-  // conversion + Windows call per comparison) made every PeekStats slow, e.g.
+  // Plain (non-locale) comparison. The keys are fingerprints that are
+  // already lower case and accent-free; the locale comparison (UTF-16
+  // conversion + Windows call per comparison) makes every PeekStats slow, e.g.
   // for 'last played' auto-playlists over the whole library.
   FStatsLedger.UseLocale     := False;
 
@@ -378,7 +377,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX U3: Modify Stats fields under FCriticalSection
+// The Stats fields are modified under FCriticalSection
 procedure TUserStatsManager.LogPlay(const Fingerprint: string);
 var
   Stats: PUserTrackStats;
@@ -469,7 +468,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: the snapshot (stats.adb), then the journal of its
+// Reads the snapshot (stats.adb), then the journal of its
 // generation. Snapshot body: count, then per entry fingerprint, favorite,
 // rating, play count, last played (Unix time).
 procedure TUserStatsManager.LoadFromFile;
@@ -527,7 +526,7 @@ begin
     end;
     if Err <> '' then
     begin
-      // ---> AUDIT FIX U1: an unreadable file is never overwritten by an empty
+      // An unreadable file is never overwritten by an empty
       // ledger: kept as a backup first
       FLoadFailed := True;
       AddLog(SafeFormat(FMT_LOG_STATS_LOAD_FAILED, [Err]), False, True);
@@ -572,7 +571,7 @@ begin
   try
     if not FIsDirty then
       Exit;
-    // ---> AUDIT FIX U1: Never overwrite an existing stats file after a failed
+    // Never overwrite an existing stats file after a failed
     // load unless it was backed up first (FIsDirty stays True)
     if FLoadFailed and FileExists(FFilePath) then
       Exit;

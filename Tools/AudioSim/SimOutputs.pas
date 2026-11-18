@@ -19,7 +19,7 @@ unit SimOutputs;
     (AsioPeriod frames) at exact times and takes one period from the real
     TOutputRing (ALOutputRing) of the engine; an empty ring is an underrun.
     The ring is sized as the engine sizes it (RingPeriodsFor) or with a fixed
-    number of periods (3 = before the fix).
+    number of periods (3 = a ring of three periods).
 
   Both can stall the play thread on purpose (Jitter: JitterMs about every
   JitterEveryMs, after its wait for the device) to show how much a delay the
@@ -28,13 +28,13 @@ unit SimOutputs;
   fill before a take), how long the play thread needs per buffer, and the
   audio that was handed over but not played when the output was closed (the
   cut: WASAPI the rest of the buffers queued, ASIO the ring's fill).
-  Prefill / Drain False = the engine before the fix (one buffer before Start,
-  closed at once at the end of the stream), to compare.
+  Prefill / Drain False = one buffer before Start and closed at once at the
+  end of the stream, to compare.
 
   TRealAsioProbe - no simulation: the real TAsioOutput with the real ASIO
     driver and DAC (play silent files!), measured from outside: the ring's
     underruns and least fill, the cut at Close. AsioRingPeriods > 0 opens it
-    with the ring before the fix (3 periods); stalls as above.
+    with a ring of that many periods (e.g. 3); stalls as above.
   ============================================================================}
 
 interface
@@ -942,7 +942,7 @@ var
   BufMs: Integer;
   F: TAudioOutputFormat;
 begin
-  { ring=N: the ring before the fix (RingPeriodsFor makes 3 periods of 1 ms) }
+  { ring=N: a small fixed ring (RingPeriodsFor makes 3 periods of 1 ms) }
   if FRec.Settings.AsioRingPeriods > 0 then BufMs := 1 else BufMs := ABufferMs;
   FStopSeen := False;
   Result := inherited Open(ADeviceId, ARate, AChannels, AIsDoP, BufMs, AError, AErrorText);

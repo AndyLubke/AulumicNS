@@ -65,12 +65,11 @@ var
 
 const
   AccentCount = 6;
-  { ---> AulumicNS: six hue families around the colour wheel, pastel in the
-    dark theme (agreed with the user, 2026-11-11: Violet / Teal / Green were
-    too alike, Blue and Violet nearly the same for red-green colour
-    blindness). Checked by simulating protanopia, deuteranopia and
-    tritanopia (Machado 2009): the closest two stay >= 8 apart (CIEDE2000;
-    the old palette: 0.9) - see AccentDark / AccentLight. }
+  { six hue families around the colour wheel, pastel in the
+    dark theme, chosen to stay apart for colour blindness.
+    Checked by simulating protanopia, deuteranopia and
+    tritanopia (Machado 2009): the closest two stay >= 8 apart (CIEDE2000)
+    - see AccentDark / AccentLight. }
   AccentNames: array[0..AccentCount - 1] of string = ('Blue', 'Mint', 'Yellow', 'Peach', 'Rose', 'Lilac');
 
 var
@@ -119,7 +118,7 @@ procedure SetWindowCloak(H: HWND; ACloak: Boolean);
 procedure PaintAndUncloak(H: HWND);
 
 var
-  { ---> AulumicNS: called by SetTheme before the colours change (AuForms
+  { called by SetTheme before the colours change (AuForms
     takes a picture of every window then, to fade over from) }
   OnThemeChanging: TProcedure = nil;
 
@@ -148,7 +147,7 @@ const
     background 5.9 .. 13.2; the light theme: the same hues darker, contrast
     on white 3.2 (Yellow) .. 8.1. Closest pair (CIEDE2000) with normal sight
     / protanopia / deuteranopia / tritanopia: dark 20.1 / 11.3 / 8.2 / 11.1,
-    light 20.2 / 9.8 / 9.8 / 10.6 (was dark 14.5 / 2.6 / 0.9 / 3.6). }
+    light 20.2 / 9.8 / 9.8 / 10.6. }
   AccentDark: array[0..AccentCount - 1] of TARGB = ($FF75A3E1, $FF6CE0BD, $FFF0DC94, $FFECAA81, $FFCD7A98, $FFE2C7FD);
   AccentLight: array[0..AccentCount - 1] of TARGB = ($FF006DCA, $FF069463, $FFB48B07, $FFBE6243, $FF9C466A, $FF584584);
 
@@ -234,7 +233,7 @@ begin
   if Result < 1 then Result := 1;
 end;
 
-{ ---> AulumicNS: the cut of Segoe UI Variable for a text size (unscaled, as
+{ the cut of Segoe UI Variable for a text size (unscaled, as
   Windows 11 uses them: Small for captions up to 12, Text for normal text,
   Display from 20 on) }
 function OpticalFor(ASize: Single): Integer;
@@ -415,7 +414,7 @@ begin
     clAccent := A;
     clAccentHi := Blend(A, $FFFFFFFF, 0.14);
     clAccentLo := Blend(A, $FF000000, 0.18);
-    clAccentText := A;              // pastel: readable as it is (was lightened 12 %)
+    clAccentText := A;              // pastel: readable as it is
     clSelection := Blend(clBg, A, 0.26);
     clSelectionDim := Blend(clBg, clText, 0.10);
   end
@@ -482,7 +481,7 @@ end;
 procedure PaintAndUncloak(H: HWND);
 
 var
-  { ---> AulumicNS: called by SetTheme before the colours change (AuForms
+  { called by SetTheme before the colours change (AuForms
     takes a picture of every window then, to fade over from) }
   OnThemeChanging: TProcedure = nil;
 

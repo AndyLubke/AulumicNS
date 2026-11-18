@@ -71,12 +71,12 @@ type
     FallbackFingerprint : string;
   end;
 
-  // ---> ADDED: Copies of library records (TLibraryManager.SnapshotTracks)
+  // Copies of library records (TLibraryManager.SnapshotTracks)
   TTrackInfoArray = array of TTrackInfo;
 
   { TTrackList }
 
-  // ---> ADDED: A list of track records that it owns. Add stores a copy;
+  // A list of track records that it owns. Add stores a copy;
   // Clear and Free dispose the copies. The items are PTrackInfo, so the sort
   // functions below work on it. The library's GetTracks... methods fill it
   // with copies of their records: these stay valid for as long as the caller
@@ -95,14 +95,14 @@ type
     // Adds copies of all tracks of ASource at the end
     procedure AddList(ASource: TTrackList);
     procedure Clear;
-    // ---> CHANGED: With SortTracks_ByArtist / ByAlbum / ByFolder it sorts
+    // With SortTracks_ByArtist / ByAlbum / ByFolder it sorts
     // with SortTracksFast (the same order, much faster); any other compare
     // function sorts the list directly
     procedure Sort(ACompare: TListSortCompare);
     property Count: Integer read GetCount;
     property Items[AIndex: Integer]: PTrackInfo read GetItem; default;
-    // The PTrackInfo items as a TList, for code that takes one (e.g. the
-    // playlist's LoadFromTrackList). Reading and reordering are fine; never
+    // The PTrackInfo items as a TList, for code that takes one.
+    // Reading and reordering are fine; never
     // add or delete through it: the TTrackList owns the items.
     property List: TList read FList;
   end;
@@ -114,7 +114,7 @@ type
 function NaturalCompareText(const S1, S2: string): integer;
 function SmartTrackCompare(T1, T2: PTrackInfo): integer;
 
-// ---> ADDED: Compares two names the way the library pane sorts them. The
+// Compares two names the way the library pane sorts them. The
 // pane's lists (TStringList, CaseSensitive = False, UseLocale = True) use
 // AnsiCompareText, which Lazarus' LazUTF8 turns into Windows' language-aware
 // comparison of the UTF-8 text (UTF8CompareText: UTF-16, CompareStringW), so
@@ -123,7 +123,7 @@ function SmartTrackCompare(T1, T2: PTrackInfo): integer;
 // CompareText first (most comparisons in a sort are within one album).
 function CompareLibraryNames(const S1, S2: string): Integer;
 
-// ---> ADDED: As CompareLibraryNames, and numbers by their value ('CD2'
+// As CompareLibraryNames, and numbers by their value ('CD2'
 // before 'CD10', as NaturalCompareText): Windows' comparison with
 // SORT_DIGITSASNUMBERS (CompareStringW, LOCALE_USER_DEFAULT, NORM_IGNORECASE).
 // Equal numbers with other leading zeros: the one with more zeros first
@@ -132,11 +132,11 @@ function CompareLibraryNames(const S1, S2: string): Integer;
 function CompareLibraryNamesNatural(const S1, S2: string): Integer;
 
 type
-  // ---> ADDED: The orders of SortTracks_ByArtist / ByAlbum / ByFolder and
-  // (---> ADDED) of CompareTrackInfo, the library order (tsoLibrary)
+  // The orders of SortTracks_ByArtist / ByAlbum / ByFolder and
+  // of CompareTrackInfo, the library order (tsoLibrary)
   TTrackSortOrder = (tsoArtist, tsoAlbum, tsoFolder, tsoLibrary);
 
-// ---> ADDED: Sorts AList (PTrackInfo) exactly like AList.Sort with the
+// Sorts AList (PTrackInfo) exactly like AList.Sort with the
 // compare function of AOrder (SortTracks_By..., CompareTrackInfo), but fast:
 // the Windows sort key of every distinct name is made once (LCMapStringW,
 // LCMAP_SORTKEY with the flags of the comparison: LOCALE_USER_DEFAULT,
@@ -145,7 +145,7 @@ type
 // compared
 procedure SortTracksFast(AList: TList; AOrder: TTrackSortOrder);
 
-// TList sort functions (items are PTrackInfo). ---> CHANGED: the names
+// TList sort functions (items are PTrackInfo). The names
 // (album artist, album, folder) are compared with CompareLibraryNames, so a
 // playlist that gets several albums or folders at once orders them as the
 // library pane shows them
@@ -153,8 +153,8 @@ function SortTracks_ByArtist(Item1, Item2: Pointer): Integer;
 function SortTracks_ByAlbum(Item1, Item2: Pointer): Integer;
 function SortTracks_ByFolder(Item1, Item2: Pointer): Integer;
 // Library order: folder, album artist, album, then SmartTrackCompare.
-// ---> CHANGED: the names compared with CompareLibraryNamesNatural (accents
-// with their letter, numbers by value); the file names as before
+// The names are compared with CompareLibraryNamesNatural (accents with
+// their letter, numbers by value)
 function CompareTrackInfo(Item1, Item2: Pointer): integer;
 
 // True when TargetItem is one of the ';'-separated items of RawString (case-
@@ -228,7 +228,7 @@ procedure TTrackList.Sort(ACompare: TListSortCompare);
 begin
   if FList.Count < 2 then
     Exit;
-  // ---> CHANGED: The library orders go through SortTracksFast: the same
+  // The library orders go through SortTracksFast: the same
   // order, but with sort keys instead of a Windows comparison per step
   // (50,000 tracks: about 0.2 s instead of 1.3-1.7 s)
   if ACompare = @SortTracks_ByArtist then
@@ -288,7 +288,7 @@ type
   PFastSortItem = ^TFastSortItem;
 
 // The Windows sort key of S ('' = an empty key) with AFlags (NORM_IGNORECASE,
-// ---> ADDED: for the library order also AL_SORT_DIGITSASNUMBERS; should
+// for the library order also AL_SORT_DIGITSASNUMBERS; should
 // Windows refuse that flag, the key is made without it)
 function NameSortKey(const S: string; AFlags: DWORD): TBytes;
 var
@@ -416,7 +416,7 @@ begin
             else
               N := ExtractFileDir(T^.FilePath);
             end;
-          tsoLibrary:  // ---> ADDED: CompareTrackInfo
+          tsoLibrary:  // CompareTrackInfo
             case K of
               0: N := T^.FolderDir;
               1: N := T^.AlbumArtist;
@@ -595,8 +595,8 @@ begin
   T1 := PTrackInfo(Item1);
   T2 := PTrackInfo(Item2);
 
-  // ---> CHANGED: CompareLibraryNamesNatural (was NaturalCompareText, which
-  // put accented names after Z); TTrackList.Sort runs this order as
+  // CompareLibraryNamesNatural (NaturalCompareText would put accented
+  // names after Z); TTrackList.Sort runs this order as
   // SortTracksFast(tsoLibrary)
   Result := CompareLibraryNamesNatural(T1^.FolderDir, T2^.FolderDir);
   if Result <> 0 then

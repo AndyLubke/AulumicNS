@@ -15,18 +15,18 @@ unit TestDriveWake;
   DriveWakeProc (a test function that sleeps); the real wake is used only on
   the temporary folder. heaptrc's "0 unfreed memory blocks" shows that no
   worker is left behind.
-  ---> ADDED: A thread blocked in a file access that Windows can abort
+  A thread blocked in a file access that Windows can abort
   (CancelSynchronousIo), simulated by reading an empty pipe: Cancel and
   SetThreadAside abort it, so it ends at once and is freed.
-  ---> ADDED: An abort that takes long (CancelSynchronousIo waits for a USB
+  An abort that takes long (CancelSynchronousIo waits for a USB
   disk that is spinning up; simulated with FileAccessCancelProc): Cancel and
   SetThreadAside still return at once, a helper thread aborts the access.
-  ---> ADDED: Whether a network drive's server answers: ServerOfDrive, and
+  Whether a network drive's server answers: ServerOfDrive, and
   ServerAnswers against a port on this PC that listens or refuses, the
   reserved address 192.0.2.1 that never answers, a name that does not exist.
   A share that does not answer (simulated with DriveAnswerProc) is reported
   and never touched. All other tests switch the network check off.
-  ---> AulumicNS: a drive that answered a moment ago is not woken again
+  A drive that answered a moment ago is not woken again
   (NoteDriveAnswered); SetUp forgets the answers (ForgetAnsweredDrives).
   =============================================================================}
 
@@ -129,7 +129,7 @@ begin
     raise Exception.Create('CreatePipe failed');
 end;
 
-// ---> ADDED: An abort that takes long, as CancelSynchronousIo does for a USB
+// An abort that takes long, as CancelSynchronousIo does for a USB
 // disk that is spinning up (it waits until the read has returned). Runs on
 // the helper thread of CancelThreadFileAccess.
 var
@@ -154,14 +154,14 @@ begin
   CloseHandle(PipeRead);
 end;
 
-// ---> ADDED: The network check switched off (the drives in most tests are
+// The network check switched off (the drives in most tests are
 // made-up letters; their real check could take time on some PCs)
 function NoNetworkDrive(const ADrive: string): TShareAnswer;
 begin
   Result := saNotChecked;
 end;
 
-// ---> ADDED: '\\DEAD\Music' does not answer, other shares do
+// '\\DEAD\Music' does not answer, other shares do
 function DeadShareAnswer(const ADrive: string): TShareAnswer;
 begin
   if SameText(ADrive, '\\DEAD\Music') then
@@ -185,7 +185,7 @@ begin
     raise Exception.Create('WSAStartup failed');
 end;
 
-// ---> ADDED: A TCP port on this PC that listens (the caller closes the socket;
+// A TCP port on this PC that listens (the caller closes the socket;
 // closed at once, nothing listens there and a connection is refused)
 function OpenListener(out APort: Word): TSocket;
 var
@@ -364,7 +364,7 @@ begin
     FWaitCalls >= 10);
 end;
 
-// ---> AulumicNS: the memory of drives that answered a moment ago
+// The memory of drives that answered a moment ago
 procedure TTestDriveWake.ADriveThatJustAnsweredIsNotWokenAgain;
 var
   Paths: TStringList;
@@ -539,7 +539,7 @@ begin
   end;
 end;
 
-// ---> ADDED: Cancel while the worker's access cannot be aborted quickly (a USB
+// Cancel while the worker's access cannot be aborted quickly (a USB
 // disk spinning up): the wait still ends at once; the helper thread aborts
 // the access later, then the worker ends and is freed
 procedure TTestDriveWake.CancelDoesNotWaitForTheAbort;
@@ -574,7 +574,7 @@ begin
   end;
 end;
 
-// ---> ADDED: The same for a thread set aside (a playback worker at exit)
+// The same for a thread set aside (a playback worker at exit)
 procedure TTestDriveWake.SetThreadAsideDoesNotWaitForTheAbort;
 var
   Reader: TBlockedReader;

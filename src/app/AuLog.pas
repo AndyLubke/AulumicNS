@@ -5,8 +5,8 @@ unit AuLog;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The application log of AulumicNS - Aulumic's log (uFormAppLog) without its
-  window: the same lines ("hh:nn:ss - [INFO]  ..."), the separate error
+  The application log of AulumicNS, without a
+  window: the lines ("hh:nn:ss - [INFO]  ..."), the separate error
   history, the purge of old lines (the startup block stays), the engine's
   log events (WM_AUDIO_ENGINE_LOG) and the saved log: at exit
   AulumicNSLog_<date>.txt when errors were logged, or AulumicNSLog.txt every
@@ -25,7 +25,7 @@ const
   WM_AUDIO_ENGINE_LOG = WM_USER + 100;
 
 type
-  { the log events the audio engine posts (as in Aulumic's uFormAppLog) }
+  { the log events the audio engine posts }
   TAudioLogEvent = (
     alUnknown,
     alRecoveryTriggered,
@@ -40,7 +40,7 @@ type
     alDeviceReopened,
     alStreamSource,          // source note for the next format line
     alPlayThreadStopTimeout, // see TAudioEngine.Stop (LParam = ms)
-    // ---> AulumicNS: TPlayThread.CheckOutputHealth / LogStreamSummary (packed
+    // TPlayThread.CheckOutputHealth / LogStreamSummary (packed
     // 64-bit LParams, formatted in EngineMessage)
     alOutputDropout,
     alOutputStats,
@@ -110,7 +110,7 @@ type
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
 
-{ the procedures the ported Aulumic units call }
+{ the procedures the other units call }
 procedure AddLog(const AMessage: string; ShowDate: Boolean = False; IsError: Boolean = False); overload;
 procedure AddLog(const AMessage: string; StartTick: QWord; ShowDate: Boolean = False; IsError: Boolean = False); overload;
 procedure AddWarning(const AMessage: string; ShowDate: Boolean = False);
@@ -330,7 +330,7 @@ begin
   if AEvent in [alWasapiFormatDoP, alOutputNativeDsd] then
   begin
     { DoP carries 16 DSD bits per PCM frame: a 176.4 kHz carrier = DSD64
-      (---> AulumicNS: both DSD families, DsdRateName) }
+      (both DSD families, DsdRateName) }
     if Rate > 0 then DsdName := DsdRateName(Integer(Rate * 16))
     else DsdName := 'DSD';
     MHz := IntToStr((Rate * 16) div 1000000);
@@ -393,7 +393,7 @@ begin
       False, (Code and $FFFF) > 0);
     Exit;
   end;
-  { ---> AulumicNS: count (bits 0..19), the second in the track (20..39) }
+  { count (bits 0..19), the second in the track (20..39) }
   if Ev = alOutputDropout then
   begin
     Q := Int64(ACode);
@@ -402,7 +402,7 @@ begin
       Integer(Q and $FFFFF)]), False, True);
     Exit;
   end;
-  { ---> AulumicNS: dropouts (0..19), least buffered ms + 1 (20..39; 0 = not
+  { dropouts (0..19), least buffered ms + 1 (20..39; 0 = not
     known), the longest fill in 10 us (40..59); a stream with dropouts is
     logged as an error (the log file is written) }
   if Ev = alOutputStats then

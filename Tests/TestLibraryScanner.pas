@@ -119,7 +119,7 @@ begin
   Result := FLib.TryGetTrack(APath, T);
 end;
 
-// ---> AulumicNS: "has ReplayGain" = a track gain and an album gain; a track
+// "Has ReplayGain" = a track gain and an album gain; a track
 // without an album tag cannot get an album gain: its track gain is enough
 procedure TTestLibraryScanner.ReplayGainNeedsAnAlbumGainOnlyWithAnAlbumTag;
 var
@@ -203,7 +203,7 @@ end;
 // reads every file again, also one whose date did not change, which a
 // refresh keeps as it is. Each track keeps its "date added". (The rebuild
 // also empties the thumbnail cache: in the test that is the Cache\Thumbs
-// folder next to the test program, not Aulumic's.)
+// folder next to the test program, not the program's.)
 procedure TTestLibraryScanner.FullRebuildRereadsUnchangedFiles;
 const
   OLD_DATE_ADDED = 1500000000; // 14 Jul 2017
@@ -221,7 +221,7 @@ begin
   AssertEquals('Sample rate before', 44100, T.SampleRate);
 
   // An old "date added" for this track (as in a library that has existed for
-  // years). ---> AulumicNS: written as Aulumic's text with the old date,
+  // years): written as the tests' text library with the old date,
   // imported, saved as AulumicNS' snapshot and loaded again
   SL := TStringList.Create;
   try

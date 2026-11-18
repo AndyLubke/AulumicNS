@@ -5,9 +5,8 @@ unit AuPropertiesForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Properties dialog (Aulumic's uFormTagEditor; Main menu > Tools > Edit
-  Properties..., Alt+Enter, the library and playlist menus) in the Aulos
-  layout:
+  The Properties dialog (the tag editor; Main menu > Tools > Edit
+  Properties..., Alt+Enter, the library and playlist menus):
     left        the files (a dot marks a changed one, ! one whose tag could
                 not be read - it is never saved)
     Tags        Title, Artist, Album Artist, Album, Genre, Year, Track, Disc,
@@ -18,8 +17,8 @@ unit AuPropertiesForm;
   With several files selected a field that differs shows "Multiple Values";
   Title and Track stay unique per track. Only the fields the user changes
   are written. Save hands the changed files to the metadata custodian
-  (background thread, as Aulumic) and closes.
-  ---> AulumicNS: sizable (Layout); it opens at the size it had.
+  (background thread) and closes.
+  The dialog is sizable (Layout); it opens at the size it had.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -57,7 +56,7 @@ type
     FItems: TList;                    // PTagEditNodeData
     FList: TAuListView;
     FTabs: TAuTabs;
-    { ---> AulumicNS: the Tags page scrolls when the window is low (was a panel) }
+    { the Tags page scrolls when the window is low }
     FPageTags: TAuScrollBox;
     FTags: TWinControl;               // its content: the fields and the cover column
     FPageInspector: TAuPanel;
@@ -68,7 +67,7 @@ type
     FCoverInfo, FCoverLbl, FCoverNote, FTagsNote: TAuLabel;
     FBtnLoad, FBtnWeb, FBtnClear, FBtnSave, FBtnCancel: TAuButton;
     FInsTitle: TAuLabel;
-    // ---> AulumicNS: a read-only memo like the Comment field (was a list of lines)
+    // a read-only memo like the Comment field
     FInsMemo: TAuMemo;
     FStatus: TAuLabel;
     FMixed: TTagFields;
@@ -110,15 +109,15 @@ type
   end;
 
 const
-  { ---> AulumicNS: the size it opens with the first time (then the size it
-    had; sizable since 2026-11-11). The height was 650 (708 with the title
-    bar: too high for 1920 x 1080 at 150 %, which leaves 688); 612 fits
+  { the size it opens with the first time (then the size it
+    had). With the title bar the height must fit 1920 x 1080 at 150 %,
+    which leaves 688; 612 fits
     1280 x 720 at 100 % too. }
   DLG_W = 1000;
   DLG_H = 612;
   MIN_W = 920;                     // the fields keep about 360 px
   MIN_H = 440;
-  COMMENT_H = 80;                  // the comment memo at its smallest (was 110)
+  COMMENT_H = 80;                  // the comment memo at its smallest
   LIST_W = 260;
   PX = LIST_W + 44;                // the right part
   COVER_W = 204;                   // the cover column (at the right of the Tags page)
@@ -162,7 +161,7 @@ begin
 end;
 {$POP}
 
-{ Aulumic's CompareTagNodes: disc, track, then the file name (natural) }
+{ the order of the files: disc, track, then the file name (natural) }
 function CompareNodes(Item1, Item2: Pointer): Integer;
 var
   D1, D2: PTagEditNodeData;
@@ -256,7 +255,7 @@ var
   end;
 
 begin
-  { ---> AulumicNS: sizable; the size it had last time (96-DPI units), else
+  { sizable; the size it had last time (96-DPI units), else
     DLG_W x DLG_H; at most the screen (FitToWorkArea) }
   W := AppSettings.Data.PropsWinW;
   H := AppSettings.Data.PropsWinH;
@@ -412,8 +411,8 @@ begin
   inherited Destroy;
 end;
 
-{ ---> AulumicNS: every position from the window's size (sizable since
-  2026-11-11): the file list and the Inspector grow with the height, the
+{ every position from the window's size (the dialog is
+  sizable): the file list and the Inspector grow with the height, the
   fields with the width; the Comment memo takes the rest of the width and
   all the extra height. Below TAGS_MIN_H the Tags page scrolls (1920 x 1080
   at 175 % leaves about 590 px; the default height is 612). }
@@ -562,7 +561,7 @@ begin
   if FTabs.TabIndex = 1 then RefreshInspector;
 end;
 
-{ ---- the selection into the fields (Aulumic's SyncUIToSelection) ---- }
+{ ---- the selection into the fields ---- }
 
 procedure TPropertiesForm.SyncUIToSelection;
 var
@@ -668,7 +667,7 @@ begin
   end;
 end;
 
-{ an edit of the user goes into every selected file (Aulumic's EditorChange) }
+{ an edit of the user goes into every selected file }
 procedure TPropertiesForm.EditorChange(Sender: TObject);
 var
   F, Field: TTagField;
@@ -792,15 +791,14 @@ begin
   MarkRows;
 end;
 
-{ a bitmap as JPEG bytes (---> AulumicNS: encoded in memory; it went through a
-  temporary file while GDI+ did it) }
+{ a bitmap as JPEG bytes (encoded in memory) }
 function TPropertiesForm.JpegFromBitmap(B: TGfxBitmap; out ABytes: TBytes): Boolean;
 begin
   ABytes := BitmapToBytes(B, True);
   Result := Length(ABytes) > 0;
 end;
 
-{ Aulumic's TryLoadCoverFromFile: JPEG and PNG up to 1500 px are taken as
+{ a cover from a file: JPEG and PNG up to 1500 px are taken as
   they are, anything else (larger, BMP) becomes a JPEG of at most 1500 px }
 function TPropertiesForm.LoadCoverFile(const AFileName: string): Boolean;
 var
@@ -906,7 +904,7 @@ begin
   end;
 end;
 
-{ an image search for the album in the browser (Aulumic) }
+{ an image search for the album in the browser }
 procedure TPropertiesForm.WebClick(Sender: TObject);
 var
   Sel: TIntegerArray;
@@ -1095,7 +1093,7 @@ begin
   FInsTitle.Caption := LBL_INSPECTOR_MULTI_SELECTION;
 end;
 
-{ ---- saving (Aulumic's pnlBtnSaveAllClick) ---- }
+{ ---- saving ---- }
 
 procedure TPropertiesForm.InvalidateThumb(const Artist, AlbumArtist, Album, FolderPath: string);
 var

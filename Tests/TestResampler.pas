@@ -7,7 +7,7 @@ unit TestResampler;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  Tests of the built-in resampler (AuResample, replaces libsoxr). Everything
+  Tests of the built-in resampler (AuResample). Everything
   is computed, nothing is played:
     TTestResamplerFilters: the prototype filters (DesignPrototype) of the three
       phase responses: the same magnitude in the pass band (flat within
@@ -498,7 +498,7 @@ begin
   end;
 end;
 
-{ ---> 2026-11-11: the FFT form of the stages (2x up, 2:1 down, the short
+{ The FFT form of the stages (2x up, 2:1 down, the short
   upsampling stages): the ratios below take it }
 procedure TTestResamplerSignals.FftStagesAreUsed;
 const

@@ -71,7 +71,7 @@ function PdfEngineAvailable: Boolean;
 implementation
 
 uses
-  AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 type
   HSTRING = Pointer;
@@ -178,7 +178,7 @@ var
   CreateRandomAccessStreamOnFile: TCreateRAStreamOnFile;
   CreateRandomAccessStreamOverStream: TCreateRAStreamOverStream;
 
-{ ---> AulumicNS: a PDF whose path has 260 characters or more.
+{ a PDF whose path has 260 characters or more.
   CreateRandomAccessStreamOnFile takes no such path, so the file is read into
   memory here (the \\?\ form) and the engine gets a stream over that memory. }
 function LongPathPdfStream(const AFileName: string; out AStream: Pointer): HRESULT;
@@ -429,7 +429,7 @@ begin
       Check(Doc.get_PageCount(Count), 'Page count');
       Sizes := nil;
       SetLength(Sizes, Count);
-      // ---> AulumicNS: Count and I are unsigned: no loop for a PDF without
+      // Count and I are unsigned: no loop for a PDF without
       // pages (Count - 1 would be 4294967295)
       if Count > 0 then
       for I := 0 to Count - 1 do

@@ -9,12 +9,10 @@ unit TestAutoPlaylist;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for uAutoPlaylist:
-    (TTestAutoPlaylistFile, the tests of Aulumic's .apq files, went with
-    that code on 2026-11-12.)
     TTestAutoPlaylistOrder : SortAutoPlaylistByDate: "added" and "last
                              played" auto-playlists newest first, flat and
                              grouped by album / folder, and when it leaves the
-                             list alone; ---> ADDED: groups with the same date
+                             list alone; groups with the same date
                              in the library order (accents, numbers)
   Only files in a temporary folder are used.
   =============================================================================}
@@ -146,9 +144,9 @@ begin
   AssertEquals('Folders newest first, files in order', 'D1,A1,A2,B1,C1', Titles);
 end;
 
-// ---> ADDED: Groups added at exactly the same time (e.g. by one scan) follow
+// Groups added at exactly the same time (e.g. by one scan) follow
 // the library order: accented names with their letter, numbers by value
-// (CompareText put 'Ánimals' after Z and 'CD10' before 'CD2')
+// (CompareText would put 'Ánimals' after Z and 'CD10' before 'CD2')
 procedure TTestAutoPlaylistOrder.GroupsWithTheSameDateInLibraryOrder;
 const
   GROUPINGS: array[0..1] of TGroupingMode = (gmFolder, gmAlbum);

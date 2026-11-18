@@ -11,13 +11,11 @@ unit uLibraryManager;
 // the background TLibraryScannerThread, and handles committing the physical
 // database to disk.
 //
-// ---> CHANGED (split): the track record and sort functions are in
-// uLibraryTypes, the auto-playlist filter in uLibraryQuery and the scanner
-// thread in uLibraryScanner. (Aulumic's Library.db line format,
-// uLibraryDatabase, is in the Tests folder: only the tests read it.)
+// The track record and sort functions are in uLibraryTypes, the
+// auto-playlist filter in uLibraryQuery and the scanner thread in
+// uLibraryScanner.
 //
-// ---> AulumicNS: stored in the Aulos format (uDbStore) instead of the
-// Library.db text file: a snapshot (library.adb: string pool, library
+// Stored in the format of uDbStore: a snapshot (library.adb: string pool, library
 // folders, virtual folders, tracks) and a journal (library.jnl) of the
 // records changed since (UpdateRecord, the ReplayGain flags). SaveDatabase
 // writes a new snapshot and starts a new journal, all under the library lock.
@@ -28,8 +26,8 @@ interface
 uses
   Classes, SysUtils, SyncObjs, StrUtils,
   Dialogs, DateUtils, uTagParser, uUserStatsManager, AuDialogs, uDbStore,
-  // ---> CHANGED: TTrackInfo, the scan events and the sort / compare
-  // functions are in uLibraryTypes now; the scanner thread in uLibraryScanner
+  // TTrackInfo, the scan events and the sort / compare
+  // functions are in uLibraryTypes; the scanner thread in uLibraryScanner
   uLibraryTypes, uLibraryScanner;
 
 type
@@ -43,17 +41,16 @@ type
     FScanFolders       : TStringList;
     FDatabaseFile      : string;
 
-    // The names of the Artists / Genres / Albums nodes (ValidateCaches).
-    // ---> AulumicNS: only the names (their counts, album lists and the folder
-    // list were built for every track but never read)
+    // The names of the Artists / Genres / Albums nodes (ValidateCaches):
+    // only the names, no counts or album lists
     FArtistSummaryCache : TStringList;
     FGenreSummaryCache  : TStringList;
     FAlbumSummaryCache  : TStringList;
     FCachesValid        : boolean;
 
     // Virtual folders (.aullink files) of the library: link file -> TStringList
-    // of target folders (owned). Filled by the scan, stored in Library.db as
-    // ?LINK? lines, so the tree never has to read the link files.
+    // of target folders (owned). Filled by the scan, stored in the snapshot
+    // (library.adb), so the tree never has to read the link files.
     FLinks                  : TStringList;
     // Links created, edited or deleted while a scan was running: their
     // current state wins over the scan result
@@ -67,10 +64,10 @@ type
     FUnavailableRoots       : TStringList;
 
     FScannerThread    : TLibraryScannerThread;
-    // ---> AUDIT FIX S1: Holds completed scanner thread for deferred destruction
-    // outside its own OnTerminate (Synchronize) handler!
+    // Holds the completed scanner thread for deferred destruction
+    // outside its own OnTerminate (Synchronize) handler
     FFinishedScanner  : TLibraryScannerThread;
-    // ---> AUDIT FIX (deadlock): The scanner whose OnTerminate (Synchronize) is
+    // Against a deadlock: the scanner whose OnTerminate (Synchronize) is
     // currently executing. CleanupFinishedScanner must never WaitFor this thread,
     // because it cannot exit until HandleScannerFinished returns.
     FTerminatingScanner : TLibraryScannerThread;
@@ -78,18 +75,18 @@ type
 
     FPendingScanRequested   : boolean;
     FPendingScanFullRebuild : boolean;
-    // ---> ADDED: Set by BeginShutdown; StartScan does nothing from then on
+    // Set by BeginShutdown; StartScan does nothing from then on
     FShuttingDown           : boolean;
 
-    // ---> AUDIT FIX: Paths whose record was updated (tag editor) while a scan
+    // Paths whose record was updated (tag editor) while a scan
     // was running. The scanner may already have copied the old record, so these
     // records are carried over into the new track list when the scan finishes.
     FUpdatedDuringScan      : TStringList;
 
     FIsDirty            : boolean;
-    // ---> AUDIT FIX D1: Prevents overwriting a valid database file if LoadDatabase failed
+    // Prevents overwriting a valid database file if LoadDatabase failed
     FDatabaseLoadFailed : boolean;
-    // ---> AUDIT FIX: True when the last scan skipped a library folder that was
+    // True when the last scan skipped a library folder that was
     // not reachable (at the start or during the scan); read in OnScanDone
     FLastScanHadUnavailableRoots : boolean;
 
@@ -99,14 +96,14 @@ type
     // Phase timing of the last LoadDatabase (milliseconds), for the log line
     FLoadReadMs, FLoadParseMs, FLoadDictMs : QWord;
 
-    // ---> AulumicNS: the journal of the records changed since the snapshot
+    // The journal of the records changed since the snapshot
     // of generation FGeneration
     FJournal    : TDbJournal;
     FGeneration : QWord;
 
     FStartTick : QWord;
 
-    // ---> AulumicNS: appends the record (under the lock); a new snapshot when
+    // Appends the record (under the lock); a new snapshot when
     // the journal has grown
     procedure JournalTrack(Track: PTrackInfo);
     function  BuildSnapshotBody: TBytes;
@@ -121,34 +118,33 @@ type
     procedure CleanupFinishedScanner(Data: PtrInt);
     procedure RebuildTrackDictionary;
     procedure ExecuteAsyncSave(Data: PtrInt);
-    // ---> ADDED: The scanner's progress (main thread); passes it on to
+    // The scanner's progress (main thread); passes it on to
     // OnScanProgress as it is at the moment of the call
     procedure DoScanProgress(const ScanMsg, CurrentFolder: string;
       TrackCount, TotalTracks: Integer);
-    // ---> CHANGED (phase 4): Was the public GetTrackByPath. The library's own
+    // The library's own
     // record of APath (nil = not in the library). Only valid while
     // FCriticalSection is held: a finished scan disposes all records. Other
     // units use TryGetTrack / ContainsTrack (copies / a yes-no answer).
     function  FindTrack(const APath: string): PTrackInfo;
 
   private
-    // ---> CHANGED: Private (was public). Guards FTracks, FTrackDict and the
-    // records. Other units use the thread-safe methods below (TryGetTrack,
-    // SnapshotTracks, SetReplayGainFlag, ...); TLibraryScannerThread in this
-    // unit still takes it directly.
+    // Guards FTracks, FTrackDict and the records. Other units use the
+    // thread-safe methods below (TryGetTrack, SnapshotTracks,
+    // SetReplayGainFlag, ...); TLibraryScannerThread (uLibraryScanner)
+    // is handed it when it is created.
     FCriticalSection: TCriticalSection;
 
   public
     constructor Create(const ADbFile: string);
     destructor Destroy; override;
 
-    // ---> CHANGED (phase 4): Track lists are copies. The GetTracks... methods,
+    // Track lists are copies. The GetTracks... methods,
     // GetAllTracks and SearchLibrary fill a TTrackList (uLibraryTypes) with
     // copies of the library's records; TryGetTrack and SnapshotTracks return
-    // copies as well. The library's own records (and the AllTracks list /
-    // GetTrackByPath pointers that exposed them) are no longer handed out: a
+    // copies as well. The library's own records are never handed out: a
     // finished scan disposes all of them, so a pointer kept across anything
-    // that processes messages pointed to freed memory. The copies stay valid
+    // that processes messages would point to freed memory. The copies stay valid
     // as long as the caller keeps them and need no lock.
 
     // Number of tracks in the library
@@ -158,7 +154,7 @@ type
 
     procedure LoadDatabase;
     procedure SaveDatabase;
-    // ---> AulumicNS: replaces the whole library - the records (completed as
+    // Replaces the whole library - the records (completed as
     // after a scan: search fields, fingerprints), the library folders and the
     // virtual folders (ALinks: the link files, Objects = a TStrings of each
     // one's target folders or nil) - and marks it changed. For tools and
@@ -174,7 +170,7 @@ type
 
     procedure StartScan(FullRebuild: boolean = False);
     procedure StopScan;
-    // ---> ADDED: Aulumic is closing: no new scan may start any more (e.g. a
+    // AulumicNS is closing: no new scan may start any more (e.g. a
     // queued scan dispatched while the teardown waits for a worker thread)
     procedure BeginShutdown;
     function  IsScanning: boolean;
@@ -192,7 +188,7 @@ type
     function  GetVirtualLinkTargets(const ALinkPath: string; ATargets: TStringList;
       AOnlyWithMusic: Boolean = False): Boolean;
     // Reads a .aullink file again after it was created / edited / deleted in
-    // Aulumic (a deleted file is removed from the library)
+    // AulumicNS (a deleted file is removed from the library)
     procedure RefreshVirtualLink(const ALinkPath: string);
     // Library folder reachable? Drive letters via GetLogicalDrives (no disk
     // access), network folders from the last scan
@@ -214,8 +210,7 @@ type
     procedure GetTracksByGenreAndAlbum(const GenreName, AlbumName: string;
       ATracks: TTrackList);
 
-    // ---> ADDED (phase 4): True when APath is in the library (replaces
-    // Assigned(GetTrackByPath(...)))
+    // True when APath is in the library
     function ContainsTrack(const APath: string): Boolean;
     // Tracks matching an auto-playlist query (copies). ASort = False skips the
     // default sort (the caller sorts the copies itself, e.g. with
@@ -226,7 +221,7 @@ type
 
     procedure UpdateRecord(const UpdatedData: TTrackInfo);
 
-    // ---> ADDED: Thread-safe access for other units (any thread). The lock is
+    // Thread-safe access for other units (any thread). The lock is
     // taken inside; results are copies, so they stay valid after a scan.
     // A copy of the track with this path; False (and an empty record) when it
     // is not in the library
@@ -237,7 +232,7 @@ type
     // files that are not in the library are not counted
     function  AnyTrackMissingReplayGain(AFiles: TStrings): Boolean;
     // Sets HasReplayGain of the track APath; with AFileTime > 0 also its date
-    // and size (after Aulumic saved the file). Marks the library changed when
+    // and size (after AulumicNS saved the file). Marks the library changed when
     // anything changed. False when the track is not in the library.
     function  SetReplayGainFlag(const APath: string; AHasReplayGain: Boolean;
       AFileTime: Int64 = 0; AFileSize: Int64 = 0): Boolean;
@@ -274,10 +269,10 @@ implementation
 uses
   Windows, forms, contnrs, uAppStrings, uAppConsts, uEngineStateManager, uAudioUtils,
   uMetaUtils, uOSUtils, AuLog,
-  uLibraryQuery;     // ---> CHANGED: EvaluateTrack (auto-playlist filter) moved there
+  uLibraryQuery;     // EvaluateTrack (auto-playlist filter)
 
 const
-  // ---> AulumicNS: the snapshot and the journal (see LoadDatabase)
+  // The snapshot and the journal (see LoadDatabase)
   LIB_MAGIC                  = 'AUNSLIBR';
   LIB_JOURNAL_MAGIC          = 'AUNSLJNL';
   LIB_JOURNAL_COMPACT_BYTES  = 4 * 1024 * 1024;
@@ -288,12 +283,12 @@ const
 { TNameSet }
 
 type
-  // ---> AulumicNS: distinct strings (exact spelling) in the order they were
+  // Distinct strings (exact spelling) in the order they were
   // noted first. The library's name lists (artists, albums, genres, folders)
   // are sorted with Windows' language-aware comparison, which is slow; with
-  // this set that comparison runs once per distinct name instead of several
+  // this set that comparison runs once per distinct name, not several
   // times per track (ValidateCaches, SearchLibrary). AddTo gives the same
-  // list as adding every name of every track to it did.
+  // list as adding every name of every track to it would.
   TNameSet = class
   private
     FSeen : TFPDataHashTable;
@@ -391,9 +386,9 @@ begin
   FTrackDict.Sorted                    := True;
   FTrackDict.Duplicates                := dupIgnore;
   FTrackDict.CaseSensitive             := False;
-  // ---> AUDIT FIX: Plain (non-locale) comparison for the path dictionary.
-  // Sorting it with the locale comparison took ~1.3 s for 46,000 tracks on
-  // the NUC. Case-insensitive for A..Z only, which is fine for file paths.
+  // Plain (non-locale) comparison for the path dictionary. Sorting it
+  // with the locale comparison would take over a second for a large
+  // library. Case-insensitive for A..Z only, which is fine for file paths.
   FTrackDict.UseLocale                 := False;
   FIsDirty                             := False;
   FDatabaseLoadFailed                  := False;
@@ -498,10 +493,10 @@ begin
   inherited Destroy;
 end;
 
-// ---> AUDIT FIX S1: Deferred scanner destruction outside OnTerminate
+// Deferred scanner destruction outside OnTerminate
 procedure TLibraryManager.CleanupFinishedScanner(Data: PtrInt);
 begin
-  // ---> AUDIT FIX (deadlock): Skip the scanner that is still inside its own
+  // Against a deadlock: skip the scanner that is still inside its own
   // OnTerminate handler (e.g. HandleScannerFinished -> TryDispatchPendingQueue ->
   // StartScan, or a modal dialog pumping async calls). HandleScannerFinished
   // re-queues this cleanup once it has returned.
@@ -579,7 +574,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -670,7 +665,7 @@ begin
         end;
       end;
     except
-      // ---> AUDIT FIX: Clean up AlbumBuckets if an exception occurs mid-build
+      // Clean up AlbumBuckets if an exception occurs mid-build
       for I := 0 to AlbumBuckets.Count - 1 do
         if Assigned(AlbumBuckets[I]) then
           TObject(AlbumBuckets[I]).Free;
@@ -732,8 +727,8 @@ var
   I, J: integer;
   Track: PTrackInfo;
   Txt, RTok, CTok: string;
-  // ---> AulumicNS: was four sorted lists filled for every hit (a search with
-  // 18,000 hits: 0.24 s, nearly all of it in Windows' string comparison)
+  // Name sets, not sorted lists filled for every hit (with many hits
+  // nearly all the time would go into Windows' string comparison)
   Artists, Albums, Genres, Folders: TNameSet;
   CleanTokens: TStringList;
   IsMatch, TokenFound: Boolean;
@@ -815,7 +810,7 @@ begin
       FCriticalSection.Leave;
     end;
 
-    // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+    // Copies, so sorted after the lock is released
     MatchTracks.Sort(@CompareTrackInfo);
 
     SortedNames(Artists, MatchArtists);
@@ -870,7 +865,7 @@ begin
   end;
 end;
 
-// ---> AUDIT FIX D5: Normalize scan folders and prevent overlapping/subfolder duplicates
+// Normalizes the scan folder and prevents overlapping / subfolder duplicates
 procedure TLibraryManager.AddScanFolder(const AFolder: string);
 var
   CleanNew, NewWithSep, ExistingWithSep: string;
@@ -907,7 +902,7 @@ begin
   end;
 end;
 
-{ ---- ---> AulumicNS: the snapshot and the journal (uDbStore) ----
+{ ---- The snapshot and the journal (uDbStore) ----
 
   Snapshot body (format 1):
     string pool
@@ -983,7 +978,7 @@ begin
   T.HasReplayGain := R.Bool;
 end;
 
-{ the derived search fields and fingerprints (as Aulumic's LoadDatabase) }
+{ the derived search fields and fingerprints }
 // what is made of the search forms and the path: the file name, the fingerprints
 procedure FinishDerived(var T: TTrackInfo);
 begin
@@ -1013,7 +1008,7 @@ begin
   FinishDerived(T);
 end;
 
-{ ---> AulumicNS: the texts that repeat from track to track (folder, artist,
+{ The texts that repeat from track to track (folder, artist,
   album, genre ...) are ONE string in memory, and so are the search forms made
   of them (Clean...). ACache: the search form per pool id. With 45,000 tracks
   the library takes about half the memory. }
@@ -1352,7 +1347,7 @@ begin
 
     if Err <> '' then
     begin
-      // ---> AUDIT FIX D1: SaveDatabase refuses to overwrite a database that
+      // SaveDatabase refuses to overwrite a database that
       // could not be read, unless it was kept as a backup first
       FDatabaseLoadFailed := True;
       AddLog(SafeFormat(FMT_LOG_DB_LOAD_FAILED, [Err]), False, True);
@@ -1374,8 +1369,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: was ImportAulumicDatabase (Aulumic's Library.db text; the
-// reader of that format is with the tests now, which fill a library this way)
+// The tests fill a library this way (Tests\uLibraryDatabase.pas)
 function TLibraryManager.ReplaceContent(const ATracks: TTrackInfoArray;
   AFolders, ALinks: TStrings): Integer;
 var
@@ -1458,7 +1452,7 @@ begin
   if FIsScanning then
     Exit;
 
-  // ---> AUDIT FIX D1: Never overwrite an existing database file after a failed
+  // Never overwrite an existing database file after a failed
   // load unless LoadDatabase managed to preserve it as a backup first
   if FDatabaseLoadFailed and FileExists(FDatabaseFile) then
   begin
@@ -1467,7 +1461,7 @@ begin
   end;
 
   StartTick := GetTickCount64;
-  // ---> AulumicNS: under the lock from the snapshot to the new journal, so
+  // Under the lock from the snapshot to the new journal, so
   // no change of another thread falls in between
   FCriticalSection.Enter;
   try
@@ -1533,7 +1527,7 @@ end;
 
 procedure TLibraryManager.HandleScannerFinished(Sender: TObject);
 
-  // ---> AUDIT FIX: Says WHY a library folder is unavailable, so a disconnected
+  // Says WHY a library folder is unavailable, so a disconnected
   // drive or a changed drive letter is easy to recognise in the log
   function UnavailableReason(const AFolder: string): string;
   var
@@ -1586,7 +1580,7 @@ begin
         TracksAdded    := DeadScanner.TracksAdded;
         TracksModified := DeadScanner.TracksModified;
 
-        // ---> AUDIT FIX: An aborted scan never replaces the library. Its partial
+        // An aborted scan never replaces the library. Its partial
         // results are disposed below (LHasChanges stays False).
         if DeadScanner.ScanFailed or Assigned(DeadScanner.FatalException) then
         begin
@@ -1615,7 +1609,7 @@ begin
 
         if LHasChanges then
         begin
-          // ---> AUDIT FIX: Keep a copy of the records that were updated while
+          // Keep a copy of the records that were updated while
           // the scan ran (the scanner may hold their old version)
           SavedRecs := TTrackList.Create;
           try
@@ -1634,9 +1628,9 @@ begin
             FTracks.Capacity := 0;
             ClearCaches;
 
-            // ---> AulumicNS: into this thread's memory, the texts that
-            // repeat as one string, as after loading the database (a repair
-            // left the library at twice its size until the next start)
+            // Into this thread's memory, the texts that repeat as one
+            // string, as after loading the database (without it a repair
+            // would leave the library at twice its size until the next start)
             TakeOverScannedTracks(DeadScanner.ScannedTracks, FTracks);
             DeadScanner.ScannedTracks.Clear;
             DeadScanner.ScannedTracks.Capacity := 0;
@@ -1683,7 +1677,7 @@ begin
         FCriticalSection.Leave;
       end;
 
-      // ---> AUDIT FIX: Report scan folders that went offline during the scan
+      // Report scan folders that went offline during the scan
       FLastScanHadUnavailableRoots :=
         (Assigned(DeadScanner.RootsLostDuringScan) and (DeadScanner.RootsLostDuringScan.Count > 0)) or
         (Assigned(DeadScanner.RootsOfflineAtStart) and (DeadScanner.RootsOfflineAtStart.Count > 0));
@@ -1698,8 +1692,8 @@ begin
           AddWarning(SafeFormat(FMT_LOG_LIB_ROOT_OFFLINE, [DeadScanner.RootsOfflineAtStart[I],
                      UnavailableReason(DeadScanner.RootsOfflineAtStart[I])]));
 
-      // ---> AUDIT FIX S1: Defer freeing DeadScanner via QueueAsyncCall so we
-      // never destroy the thread instance inside its own OnTerminate (Synchronize) call!
+      // DeadScanner is freed later via QueueAsyncCall: the thread instance is
+      // never destroyed inside its own OnTerminate (Synchronize) call
       CleanupFinishedScanner(0);
       FFinishedScanner := DeadScanner;
       if Assigned(Application) then
@@ -1713,7 +1707,7 @@ begin
 
   if ScanFailed then
   begin
-    // ---> AUDIT FIX: Report the aborted scan; the library was left untouched
+    // Report the aborted scan; the library is left untouched
     AddLog(LOG_LIB_SCAN_ABORTED, FStartTick, False, True);
   end
   else if LHasChanges then
@@ -1846,9 +1840,7 @@ begin
     FCriticalSection.Leave;
   end;
 
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
-  // (SortTrackList, which sorted under the lock, is gone: callers sort their
-  // copies with CompareTrackInfo)
+  // Copies, so sorted after the lock is released
   if ASort then
     ATracks.Sort(@CompareTrackInfo);
 end;
@@ -1877,8 +1869,8 @@ begin
       OldPrimary  := Track^.PrimaryFingerprint;
       OldFallback := Track^.FallbackFingerprint;
 
-      // ---> AUDIT FIX D3: Use ExcludeTrailingPathDelimiter(ExtractFileDir(...))
-      // so FolderDir never gains a trailing backslash after a tag edit!
+      // ExcludeTrailingPathDelimiter(ExtractFileDir(...)), so FolderDir
+      // never gains a trailing backslash after a tag edit
       Track^.FolderDir    := ExcludeTrailingPathDelimiter(ExtractFileDir(Track^.FilePath));
       Track^.FileNameOnly := ExtractFileName(Track^.FilePath);
 
@@ -1948,7 +1940,7 @@ begin
       FIsDirty := True;
       JournalTrack(Track);
 
-      // ---> AUDIT FIX: The running scan may already hold the old record
+      // The running scan may already hold the old record
       if FIsScanning then
         FUpdatedDuringScan.Add(Track^.FilePath);
     end;
@@ -2036,7 +2028,7 @@ begin
     end;
 
     // The date and size the scanner will see, so the next scan does not take
-    // Aulumic's own save for a change
+    // AulumicNS's own save for a change
     if (AFileTime > 0) and
        ((Track^.LastModified <> AFileTime) or (Track^.FileSize <> AFileSize)) then
     begin
@@ -2157,7 +2149,7 @@ begin
   UserStatsManager.SaveToFile;
 end;
 
-// ---> AUDIT FIX S4: Pop esLibraryBusy if FIsScanning was True when StopScan is called
+// Pops esLibraryBusy if FIsScanning was True when StopScan is called
 procedure TLibraryManager.StopScan;
 var
   WasScanning: Boolean;
@@ -2226,7 +2218,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2270,7 +2262,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2305,7 +2297,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2337,7 +2329,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2352,7 +2344,7 @@ begin
   TempList            := TStringList.Create;
   TempList.Sorted     := True;
   TempList.Duplicates := dupIgnore;
-  // ---> AUDIT FIX: Ensure TempList is freed inside try..finally
+  // TempList is freed in the try..finally
   try
     FCriticalSection.Enter;
     try
@@ -2388,7 +2380,7 @@ begin
   TempList            := TStringList.Create;
   TempList.Sorted     := True;
   TempList.Duplicates := dupIgnore;
-  // ---> AUDIT FIX: Ensure TempList is freed inside try..finally
+  // TempList is freed in the try..finally
   try
     FCriticalSection.Enter;
     try
@@ -2436,7 +2428,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2463,7 +2455,7 @@ begin
   finally
     FCriticalSection.Leave;
   end;
-  // ---> CHANGED (phase 4): Copies, so sorted after the lock is released
+  // Copies, so sorted after the lock is released
   ATracks.Sort(@CompareTrackInfo);
 end;
 
@@ -2716,7 +2708,7 @@ end;
 
 // Puts the links found by the scan in place (main thread, under
 // FCriticalSection). Keeps the existing links the scan could not read, and
-// the links changed in Aulumic during the scan. True when anything changed.
+// the links changed in AulumicNS during the scan. True when anything changed.
 function TLibraryManager.MergeScannedLinks(AScanner: TLibraryScannerThread): Boolean;
 
   function CopyTargets(ASource: TObject): TStringList;
@@ -2762,13 +2754,12 @@ begin
   ClearFolderIndex;
 end;
 
-// ---> AulumicNS: the names for the Artists / Albums / Genres nodes. Was: one
-// language-aware sorted list per kind, searched and filled for every track
-// (IndexOf / Add: a Windows comparison per step, 0.7 s for 46,000 tracks on the
-// UI thread at the first opening of such a node and after every change of the
-// library), with a count and an album list per name that nothing read. Now
-// the distinct spellings are collected first (TNameSet) and only those go
-// into the sorted lists: the same lists as before.
+// The names for the Artists / Albums / Genres nodes. The distinct spellings
+// are collected first (TNameSet) and only those go into the language-aware
+// sorted lists: searching and filling such a list for every track (IndexOf /
+// Add: a Windows comparison per step) would take most of a second on the UI
+// thread for a large library, at the first opening of such a node and after
+// every change of the library.
 procedure TLibraryManager.ValidateCaches;
 var
   Albums, Artists, Genres: TNameSet;

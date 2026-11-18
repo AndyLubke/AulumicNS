@@ -11,8 +11,7 @@ unit ALAudioEngine;
   the output devices (WASAPI endpoints and ASIO drivers) and takes the
   settings. Plays WAV, FLAC, DSF and DFF files; FLAC is decoded by the
   built-in decoder (AuDecFlac), no DLL is used.
-  ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic: file
-  names, device ids and names, error texts are UTF-8; the device ids and
+  File names, device ids and names, error texts are UTF-8; the device ids and
   names Windows returns (UTF-16) are converted where they are read.
   =============================================================================}
 
@@ -20,11 +19,11 @@ interface
 
 uses
   Classes, SysUtils, Windows, ActiveX, ComObj, ALReaders, ALAudioThread,
-  ALWasapiApi,      // ---> ADDED (phase 7a): the device list's COM declarations (moved there)
-  ALSourceFactory,  // ---> ADDED (phase 7b): TPlayThreadConfig, TPreparedNext (moved there)
-  ALOutputAsio,     // ---> AulumicNS: the ASIO driver list
+  ALWasapiApi,      // the device list's COM declarations
+  ALSourceFactory,  // TPlayThreadConfig, TPreparedNext
+  ALOutputAsio,     // the ASIO driver list
   ALAudioTypes, AuLog,
-  uAudioUtils;      // ---> AulumicNS: TSignalInfo
+  uAudioUtils;      // TSignalInfo
 
 type
 
@@ -33,17 +32,17 @@ type
   TAudioEngine = class
   private
     FCurrentThread      : TPlayThread;
-    // ---> AulumicNS: when the last stream closed (Stop: the thread's
+    // When the last stream closed (Stop: the thread's
     // ClosedTick); Play gives the next one SETTLE_MS when that is recent
     FLastCloseTick      : QWord;
-    // ---> ADDED: Changes on every Play; a source prepared for an earlier play
+    // Changes on every Play; a source prepared for an earlier play
     // thread (TPreparedNext.StreamId) is never handed to a newer one
     FStreamId           : integer;
-    // ---> ADDED: Changes on every seek and every new stream, so the peak
+    // Changes on every seek and every new stream, so the peak
     // meter can drop slices from before it (UI thread only)
     FMeterEpoch         : integer;
     FNotifyHandle       : THandle;
-    // ---> AulumicNS: 0 WASAPI, 1 ASIO; DSD as DSD over ASIO
+    // 0 WASAPI, 1 ASIO; DSD as DSD over ASIO
     FOutputApi          : integer;
     FAsioNativeDsd      : boolean;
     FVolume             : integer;
@@ -67,12 +66,12 @@ type
     FDisableVolume      : Boolean;
     FPreampDB           : Double;
     FEnableSoftClipping : Boolean;
-    FAutoHeadroom       : Boolean;   // ---> AulumicNS: see TPlayThread.RunGain
+    FAutoHeadroom       : Boolean;   // see TPlayThread.RunGain
 
     FUpsamplePhase      : integer;
     FDownsamplePhase    : integer;
 
-    // Advanced SoX Parameters
+    // Advanced resampler parameters
     FResampleBandWidth  : double;
     FResampleAntiAlias  : double;
 
@@ -107,7 +106,7 @@ type
     destructor Destroy; override;
     class procedure CheckLibraries;
     class procedure EnumerateDevices(Devices: TStrings; out DefaultIndex: integer);
-    // ---> AulumicNS: the installed ASIO drivers ('Name|CLSID')
+    // The installed ASIO drivers ('Name|CLSID')
     class procedure EnumerateAsioDevices(Devices: TStrings);
     // Friendly name (UTF-8) of any known endpoint, also when it is switched off
     // or unplugged; '' when Windows does not know the device
@@ -118,11 +117,11 @@ type
     procedure Pause;
     procedure Resume;
     procedure Seek(Percent: double);
-    // ---> AUDIT FIX: False = rejected because an unconsumed gapless swap is pending
+    // False = rejected because an unconsumed gapless swap is pending
     function  SetNextFile(const FileName: string): Boolean;
-    // ---> ADDED: Snapshot for PrepareNextSource; False while nothing plays
+    // Snapshot for PrepareNextSource; False while nothing plays
     function  GetNextPrepareParams(out AParams: TNextPrepareParams): Boolean;
-    // ---> ADDED: Queues a source built by PrepareNextSource. Takes ownership of
+    // Queues a source built by PrepareNextSource. Takes ownership of
     // APrep.Source in every case (one of another stream is freed). Result as
     // SetNextFile.
     function  SetPreparedNext(var APrep: TPreparedNext): Boolean;
@@ -131,9 +130,9 @@ type
     procedure SetRateMapping(const Maps: array of TRateMap);
     procedure ForceGaplessSwap;
     procedure GetAndClearPeaks(out L, R: double; out cL, cR: boolean);
-    // ---> ADDED: HasL / HasR: a new block was measured since the last read
+    // HasL / HasR: a new block was measured since the last read
     procedure ReadPeaks(out L, R: double; out HasL, HasR: boolean; out cL, cR: boolean);
-    // ---> ADDED: Meter slices measured since the previous call (oldest first)
+    // Meter slices measured since the previous call (oldest first)
     procedure ReadMeterSlices(var Dest: array of TMeterSlice; out Count: Integer);
 
     function IsPlaying         : boolean;
@@ -149,14 +148,14 @@ type
     function GetErrorMessage   : string;
     function GetErrorType      : TAudioErrorType;
     function GetFailedSampleRate: Integer;
-    // ---> ADDED: Technical details of an unexpected engine exception ('' if none)
+    // Technical details of an unexpected engine exception ('' if none)
     function GetErrorDetail    : string;
 
     function GetAppliedReplayGain : double;
     function GetBitDepth          : integer;
-    function IsBitPerfect         : boolean;  // ---> ADDED
+    function IsBitPerfect         : boolean;
     function GetChannels          : integer;
-    // ---> AulumicNS: the stages of the signal path (Valid = False: no stream)
+    // The stages of the signal path (Valid = False: no stream)
     function GetSignalInfo        : TSignalInfo;
 
     property NotifyHandle: THandle read FNotifyHandle write SetNotifyHandle;
@@ -202,14 +201,15 @@ type
     property UpsamplePhase: integer read FUpsamplePhase write FUpsamplePhase;
     property DownsamplePhase: integer read FDownsamplePhase write FDownsamplePhase;
 
-    // SoX Quality properties
+    // Resampler quality properties
     property ResampleBandWidth: double read FResampleBandWidth write FResampleBandWidth;
     property ResampleAntiAlias: double read FResampleAntiAlias write FResampleAntiAlias;
   end;
 
-// ---> ADDED: True while a play thread that did not stop in time (see
-// TAudioEngine.Stop) is still running. Aulumic.lpr then leaves libsoxr / libFLAC
-// loaded, because that thread still uses them when it ends. UI thread only.
+// True while a play thread that did not stop in time (see
+// TAudioEngine.Stop) is still running. The shutdown then leaves alone what
+// that thread may still use when it ends (the headroom book; see
+// uAppLifetime.EndProcessIfThreadsLeft). UI thread only.
 function PlayThreadsStillRunning: Boolean;
 
 implementation
@@ -217,15 +217,15 @@ implementation
 uses uAppStrings, uAppConsts;
 
 const
-  // ---> AulumicNS: how long the stream after a just-closed one may wait for
-  // the device (TPlayThreadConfig.SettleMs). Measured: a FiiO K11's WASAPI
-  // endpoint is gone for 0.5 - 0.7 s after native DSD over ASIO.
+  // How long the stream after a just-closed one may wait for
+  // the device (TPlayThreadConfig.SettleMs). The WASAPI endpoint of some
+  // DACs is gone for 0.5 - 0.7 s after native DSD over ASIO.
   SETTLE_MS = 3000;
 
 var
-  // ---> ADDED: Play threads that did not end within PLAY_THREAD_STOP_TIMEOUT_MS
+  // Play threads that did not end within PLAY_THREAD_STOP_TIMEOUT_MS
   // after Stop (stuck in a file read on an unreachable drive, or in the audio
-  // driver). They are set aside instead of freezing the window, and freed as
+  // driver). They are set aside, so the window does not freeze, and freed as
   // soon as they have ended. UI thread only.
   RetiredThreads: TList = nil;
 
@@ -324,7 +324,7 @@ class procedure TAudioEngine.CheckLibraries;
 begin
   if not FLibraryChecked then
   begin
-    // ---> AulumicNS: FLAC decoder and resampler are built in
+    // FLAC decoder and resampler are built in
     FResamplerAvailable := True;
     FFlacAvailable      := True;
     FLibraryChecked     := True;
@@ -345,13 +345,13 @@ var
   CurrentId       : string;
   PropKeyName     : TPropertyKey;
   AddedIndex      : integer;
-  Entry           : string;  // ---> CHANGED (ObjFPC switch): 'Name|Id', UTF-8
+  Entry           : string;  // 'Name|Id', UTF-8
   HrCoInit        : HRESULT;
 begin
   Devices.Clear;
   DefaultIndex := -1;
   DefaultId    := '';
-  // ---> AUDIT FIX: Initialize PV up front to silence compiler hint
+  // Initialize PV up front to silence compiler hint
   PV           := Default(TPropVariant);
 
   // Ensure COM is initialized on the calling thread
@@ -366,19 +366,20 @@ begin
       begin
         if Succeeded(DefaultEndpoint.GetId(IdStr)) then
         begin
-          // ---> CHANGED (ObjFPC switch): the UTF-16 id as UTF-8
+          // The UTF-16 id as UTF-8
           DefaultId := UTF8Encode(UnicodeString(IdStr));
           CoTaskMemFree(IdStr);
         end;
       end;
 
-      // ---> AulumicNS: FIX (the freeze on the user's NUC): Count and I are
+      // Count and I are
       // unsigned, so with no active playback device (Count = 0) "Count - 1"
-      // was 4294967295 and the loop called Item 4.3 billion times on the UI
-      // thread (minutes, "Not responding"). That happens during native DSD
+      // would be 4294967295 and the loop would call Item 4.3 billion times on
+      // the UI thread (minutes, "Not responding"): hence "Count > 0". No
+      // device happens during native DSD
       // over ASIO when the DAC's WASAPI endpoint is gone and it is the only
       // playback device of the PC; the device button and Preferences' Output
-      // page list the devices. Also a failed GetCount left Count undefined.
+      // page list the devices. A failed GetCount leaves Count at 0.
       Count := 0;
       if Succeeded(EnumObj.EnumAudioEndpoints(0, 1, Collection)) and
          Succeeded(Collection.GetCount(Count)) and (Count > 0) then
@@ -391,7 +392,7 @@ begin
           begin
             if Succeeded(Endpoint.GetId(IdStr)) then
             begin
-              // ---> CHANGED (ObjFPC switch): the UTF-16 id and name as UTF-8
+              // The UTF-16 id and name as UTF-8
               CurrentId := UTF8Encode(UnicodeString(IdStr));
               CoTaskMemFree(IdStr);
               if Succeeded(Endpoint.OpenPropertyStore(STGM_READ, Props)) then
@@ -571,7 +572,7 @@ begin
 
   Config.NotifyHandle       := FNotifyHandle;
   Config.StartVolume        := FVolume;
-  // ---> AulumicNS: a stream closed just now (a switch of the output or a
+  // A stream closed just now (a switch of the output or a
   // setting during a track: RestartCurrent; the next track after the last
   // one ended): the device may still be changing over
   if (FLastCloseTick <> 0) and (GetTickCount64 - FLastCloseTick < SETTLE_MS) then
@@ -586,10 +587,10 @@ begin
   FCurrentThread.Start;
 end;
 
-// ---> CHANGED: Waits at most PLAY_THREAD_STOP_TIMEOUT_MS for the play thread
-// (before: without a limit, via TThread.WaitFor). See TPlayThread.StopAndWait:
-// the wait no longer runs other threads' Synchronize / Queue calls in between,
-// and a stuck thread no longer freezes the window or the shutdown. It is set
+// Waits at most PLAY_THREAD_STOP_TIMEOUT_MS for the play thread
+// (never without a limit, as TThread.WaitFor would). See TPlayThread.StopAndWait:
+// the wait runs no other threads' Synchronize / Queue calls in between,
+// and a stuck thread does not freeze the window or the shutdown. It is set
 // aside (RetiredThreads), logged, and freed once it has ended.
 procedure TAudioEngine.Stop;
 var
@@ -696,7 +697,7 @@ begin
   FDsdGain := Value;
   if Assigned(FCurrentThread) then
   begin
-    // ---> AUDIT FIX 3.1: Do not overwrite FCurrentThread.DsdGainDB before
+    // Do not overwrite FCurrentThread.DsdGainDB before
     // calling SetDSDGain(Value)! SetDSDGain updates FConfig.DsdGainDB under
     // FLock and needs the previous value to calculate DeltaDB for ReplayGain.
     FCurrentThread.SetDSDGain(Value);
@@ -874,7 +875,7 @@ begin
 end;
 
 finalization
-  // ---> ADDED: Only the list. A play thread that is still running at this point
+  // Only the list. A play thread that is still running at this point
   // is left alone (it owns all its data); Windows ends it with the process.
   FreeAndNil(RetiredThreads);
 

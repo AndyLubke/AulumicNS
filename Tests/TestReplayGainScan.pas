@@ -15,9 +15,9 @@ unit TestReplayGainScan;
                             selected album completed with its other library
                             tracks, each file once), "missing only", the album
                             group list owning its lists
-  The library is a Library.db of six tracks in a temporary folder; no audio
-  file is read. ---> AulumicNS: the text library is imported into the
-  AulumicNS store (ImportAulumicDatabase), as the other library tests do.
+  The library is a text library of six tracks in a temporary folder; no audio
+  file is read. It is imported into the library's store
+  (ImportAulumicDatabase), as the other library tests do.
   =============================================================================}
 
 interface

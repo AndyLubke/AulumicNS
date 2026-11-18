@@ -16,12 +16,11 @@ unit TestReplayGainThread;
     * an album with a missing file: file missing, the rest "album incomplete"
     * the album name falls back to the folder name (no library, no tags)
     * progress events arrive; Detach stops the events
-    * ---> ADDED: a folder and a file with non-ASCII names (TestHelpers.
+    * a folder and a file with non-ASCII names (TestHelpers.
       NonAsciiName) are measured, the album name comes back intact
-    * ---> AulumicNS: the album gain gates the blocks of all tracks together
+    * the album gain gates the blocks of all tracks together
       (a -23 and a -33 dBFS tone: -25.6 LUFS, +7.6 dB)
-  ---> AulumicNS: the loudness is measured by the built-in EBU R128 meter
-  (AuLoudness), so no DLL is needed and no test is skipped.
+  The loudness is measured by the built-in EBU R128 meter (AuLoudness).
   The thread ends on its own; the test waits with CheckSynchronize (its
   events and log lines are delivered with Synchronize).
   =============================================================================}
@@ -47,7 +46,7 @@ type
     // Runs a scan of AGroups (the thread owns them) and waits for its end
     // (fails after 60 s); returns the stale file count
     function  RunScan(AGroups: TRGAlbumGroups; ADetach: Boolean = False): Integer;
-    // ---> AulumicNS: the files as one album; every WAV file among them gets
+    // The files as one album; every WAV file among them gets
     // an album tag (the name of its folder) unless FLooseTracks is set
     function  Group(const AFiles: array of string): TStringList;
     function  FindResult(const AFileName: string): PRGScanResult;
@@ -180,7 +179,7 @@ begin
   end;
 end;
 
-// ---> AulumicNS: loose tracks (no album tag) are no album: each one that
+// Loose tracks (no album tag) are no album: each one that
 // can be analysed is saved with its track gain, none gets an album gain, and
 // a broken one among them holds nothing back
 procedure TTestReplayGainThread.TracksWithoutAnAlbumTagGetTheirTrackGainOnly;
@@ -329,7 +328,7 @@ begin
   AssertEquals('No results handed over (freed with the thread)', 0, FResults.Count);
 end;
 
-// ---> ADDED: A folder and a file whose names are not plain ASCII: measured,
+// A folder and a file whose names are not plain ASCII: measured,
 // and the album name (the folder's) comes back intact
 procedure TTestReplayGainThread.NonAsciiNamesAreScanned;
 var
@@ -337,7 +336,7 @@ var
   Rel: string;
   R: PRGScanResult;
 begin
-  // ---> AulumicNS: without an album tag (the test's tag writer is Latin-1
+  // Without an album tag (the test's tag writer is Latin-1
   // only): the name shown is the folder's, the track gets its track gain
   FLooseTracks := True;
   Rel := NonAsciiName + '\01 ' + NonAsciiName + '.wav';
@@ -354,7 +353,7 @@ begin
   AssertEquals('Track gain: -18 - (-23 LUFS)', 5.0, R^.TrackGain, GAIN_DELTA);
 end;
 
-// ---> AulumicNS: the album loudness over the blocks of both tracks: energies
+// The album loudness over the blocks of both tracks: energies
 // E and E/10 in equal parts, both above the relative gate: -23 + 10 log10(0.55)
 procedure TTestReplayGainThread.AlbumGainGatesAllTracksTogether;
 var
@@ -376,7 +375,7 @@ begin
   AssertEquals('Album peak: the louder one', A^.TrackPeak, B^.AlbumPeak, 0.000001);
 end;
 
-// ---> AulumicNS: the tracks of an album measured by several threads at once
+// The tracks of an album measured by several threads at once
 // (ThreadCount): the same results, bit for bit and in the same order, as with
 // one thread - two albums, tracks of different level, length and format
 procedure TTestReplayGainThread.SeveralThreadsGiveTheSameResults;

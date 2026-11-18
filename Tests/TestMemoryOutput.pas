@@ -7,7 +7,7 @@ unit TestMemoryOutput;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  ---> ADDED (output split, step 3a): An output device for the playback tests
+  An output device for the playback tests
   (TestPlayback). TMemoryOutput is a TAudioOutput (ALAudioOutput) that keeps
   every buffer the play thread hands over in memory instead of playing it, and
   asks for the next buffer at once (no real time: seconds of audio play in
@@ -24,8 +24,7 @@ unit TestMemoryOutput;
   Thread-safe: the play thread writes, the test reads while the thread holds
   or after it has ended.
 
-  ---> CHANGED (ObjFPC switch, step 1): ObjFPC like ALAudioOutput (device id
-  and error text are UTF-8 strings).
+  Device id and error text are UTF-8 strings, as in ALAudioOutput.
   =============================================================================}
 
 interface

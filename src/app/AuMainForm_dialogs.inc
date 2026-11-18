@@ -5,7 +5,7 @@
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   AuMainForm_dialogs.inc - TMainForm: the tools that work on files: the
-  metadata custodian (tag writing on a background thread, as Aulumic),
+  metadata custodian (tag writing on a background thread),
   Properties (the tag editor) from the library, the playlist or the main
   menu, the cover of a playlist group, and the ReplayGain scan with its
   notice in the status line. Debug build: the self-test of the drive wait
@@ -27,7 +27,7 @@ begin
 end;
 
 { before the playback and the library go: the job being written ends, the
-  ones still queued are dropped (as Aulumic) }
+  ones still queued are dropped }
 procedure TMainForm.FreeCustodian;
 begin
   if AppStateManager <> nil then
@@ -43,13 +43,13 @@ begin
 end;
 
 { a batch of tag / ReplayGain writes is done: the library is saved, the
-  playlist takes the new tags, the tree and the banner follow (Aulumic) }
+  playlist takes the new tags, the tree and the banner follow }
 procedure TMainForm.BackgroundIOBatchFinished;
 begin
   if FShuttingDown then Exit;
-  { ---> AulumicNS: FIX the status strip kept "Finalizing updates..." and the
-    nearly full bar after a tag or ReplayGain save (only a library scan that
-    followed - the folder watcher - cleared it); a running scan keeps its own }
+  { the status strip's "Finalizing updates..." and its nearly full bar are
+    cleared after a tag or ReplayGain save (otherwise only a library scan
+    that follows would clear them); a running scan keeps its own }
   if (FLibrary = nil) or not FLibrary.IsScanning then
   begin
     FStatus.Progress := -1;
@@ -170,7 +170,7 @@ begin
   else MnPlProperties(Sender);
 end;
 
-{ ---- the cover viewer from a playlist header (Aulumic's ShowGroupCover) ---- }
+{ ---- the cover viewer from a playlist header ---- }
 
 { the click (in the list's mouse down): the viewer opens once it is handled }
 procedure TMainForm.PlCoverClick(Sender: TObject; AEntry: Integer);
@@ -222,7 +222,7 @@ begin
     ShowCoverViewer(Self, Meta, '');
 end;
 
-{ ---- ReplayGain (Aulumic's scanner, the built-in EBU R128 meter) ---- }
+{ ---- ReplayGain (the scanner with the built-in EBU R128 meter) ---- }
 
 { Main menu > Tools: the whole library }
 procedure TMainForm.MnReplayGain(Sender: TObject);

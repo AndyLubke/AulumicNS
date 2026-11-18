@@ -7,10 +7,10 @@ unit AuMenus;
 
   Themed popup / context menus with icons, check marks, shortcuts and sub
   menus. Fully keyboard operable (arrows, Enter, Escape, Left / Right).
-  ---> AulumicNS (2026-11-12): a menu that is higher than the screen has room
+  A menu that is higher than the screen has room
   for is as high as fits and scrolls (scroll bar, mouse wheel, touch, the
-  arrow keys, Home / End, Page Up / Down). It ran off the screen before: with
-  many playlists the lower ones could not be reached.
+  arrow keys, Home / End, Page Up / Down), so that with many playlists the
+  lower ones can be reached.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -75,13 +75,13 @@ type
     FHot: TAuHotFade;                  // the highlight fading from item to item
     FSubTimer: TTimer;
     FPopup: TAuMenuPopup;
-    // ---> AulumicNS: a button was pressed inside this list (MouseDown); only
+    // a button was pressed inside this list (MouseDown); only
     // then does its release choose an item. A menu opened on a right press
-    // (the library tree, the playlist) got that press's release: near the
+    // (the library tree, the playlist) gets that press's release: near the
     // bottom of the screen the menu opens upwards and its last item lies
-    // under the cursor - it was run at once.
+    // under the cursor - it would be run at once.
     FPressInList: Boolean;
-    // ---> AulumicNS: a menu too high for the screen scrolls (pixels)
+    // a menu too high for the screen scrolls (pixels)
     FScroll: TAuScrollBar;
     FOffset: Integer;
     procedure ScrollChanged(Sender: TObject);
@@ -233,7 +233,7 @@ begin
   FLastClose := GetTickCount64;
 end;
 
-{ ---> AulumicNS: the height a menu of AHeight gets at Y: all of it where it
+{ the height a menu of AHeight gets at Y: all of it where it
   fits below Y or (AAboveY >= 0) above AAboveY - TAuPopup.ShowAt then puts
   it there -, else what the larger of the two has room for; the list scrolls.
   AAboveY < 0: the menu may be moved up, so the whole work area counts. }
@@ -271,13 +271,10 @@ begin
   P := TAuMenuPopup.CreateMenu(Self, nil);
   P.OnClosed := @PopupClosed;
   FPopup := P;
-  { ---> AulumicNS: below the point where it fits there, else above it where
+  { below the point where it fits there, else above it where
     it fits there. A menu that is too high for either side but not for the
     screen is moved up as far as needed (it then lies over the point, as a
-    Windows menu does): before, it got the larger side's height and a scroll
-    bar - a long menu opened in the middle of the screen scrolled although
-    the screen had room for all of it. Only a menu higher than the screen
-    scrolls. }
+    Windows menu does). Only a menu higher than the screen scrolls. }
   H := P.FList.ContentHeight;
   WA := Screen.MonitorFromPoint(Point(X, Y)).WorkareaRect;
   Edge := S(8);
@@ -494,7 +491,7 @@ var
 begin
   G.FillRect(0, 0, Width, Height, clCard);
   HotSet(FHot, FHoverIdx, Self);
-  { ---> AulumicNS: scrolled by FOffset; the scroll bar takes its strip }
+  { scrolled by FOffset; the scroll bar takes its strip }
   W := Width;
   if FScroll.Visible then Dec(W, FScroll.Width);
   T := S(5) - FOffset;

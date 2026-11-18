@@ -22,7 +22,7 @@ unit uDriveKeepAlive;
     * The file is opened read-only with full sharing and closed right away, so
       it never blocks a tag save or the player.
 
-  ---> ADDED: WakeDrives / FindOfflineDrives: before the UI thread reads files
+  WakeDrives / FindOfflineDrives: before the UI thread reads files
   on drives that may be asleep (Properties, Add Files, playlist import, ...),
   a short-lived worker thread wakes them (or checks they can be reached)
   while the window keeps responding. A thread that does not end in time (a
@@ -30,16 +30,16 @@ unit uDriveKeepAlive;
   blocked by a drive) is set aside (SetThreadAside): its file access is
   aborted where Windows can (CancelSynchronousIo) and it is freed once it
   has ended, never by itself; FinishSetAsideThreads at exit.
-  ---> CHANGED: The abort runs on a helper thread (TFileAccessCanceller):
+  The abort runs on a helper thread (TFileAccessCanceller):
   CancelSynchronousIo waits until a USB disk that is spinning up has answered,
-  and on the UI thread that froze Aulumic after Cancel. The UI thread never
+  which would freeze the UI thread after Cancel. The UI thread never
   calls it.
-  ---> ADDED: A network drive (a share or a mapped drive letter) whose server
+  A network drive (a share or a mapped drive letter) whose server
   does not answer at all (switched off, no network) is found within
   NAS_ANSWER_TIMEOUT_MS by a short connection attempt (ServerAnswers) and is
   not touched: Windows would wait 20-60 s for every access to it. WakeDrives
   reports it, so the caller does not read its files either.
-  ---> AulumicNS: a drive that answered in the last DRIVE_ANSWER_MEMORY_MS is
+  A drive that answered in the last DRIVE_ANSWER_MEMORY_MS is
   not woken again (NoteDriveAnswered / DriveAnsweredRecently: the wake
   worker, the keep-alive read and the main window note it). LastWakeReport
   says what the last wake waited for (server check, first read), for the log.
@@ -90,15 +90,15 @@ type
     function LostDrive: string;
   end;
 
-// ---> ADDED: Reads the first block of APath uncached (normal read as
+// Reads the first block of APath uncached (normal read as
 // fallback), so a sleeping drive spins up now. Blocks until the drive answers;
 // call it from a worker thread only. False when nothing could be read.
 function WakeFile(const APath: string): Boolean;
 
 // =============================================================================
-// ---> ADDED: Waking drives before the UI thread reads them. While a sleeping
+// Waking drives before the UI thread reads them. While a sleeping
 // USB disk or NAS spins up, the first access blocks for seconds; done on the
-// UI thread, Aulumic stops responding (Windows then shows a "Not Responding"
+// UI thread, the program stops responding (Windows then shows a "Not Responding"
 // stand-in of its windows). These run that first access on a worker thread
 // and let the window handle messages meanwhile, so it stays responsive and
 // Cancel works; afterwards the UI thread's own reads are fast.
@@ -112,7 +112,7 @@ type
   // Tests only: replaces the access that wakes one path (see DriveWakeProc)
   TDriveWakeProc = function(const APath: string): Boolean;
 
-  // ---> ADDED: Whether the server of a network drive answers (ServerAnswers)
+  // Whether the server of a network drive answers (ServerAnswers)
   TShareAnswer = (
     saAnswers,     // it answered (connected or refused): the machine is there
     saNoAnswer,    // its name was found, but nothing answered in time
@@ -122,7 +122,7 @@ type
   // Tests only: replaces the answer check of one drive (see DriveAnswerProc)
   TDriveAnswerProc = function(const ADrive: string): TShareAnswer;
 
-  // ---> ADDED: Tests only: replaces the abort of a thread's file access
+  // Tests only: replaces the abort of a thread's file access
   // (see FileAccessCancelProc)
   TFileAccessCancelProc = function(AThreadHandle: THandle): Boolean;
 
@@ -130,14 +130,14 @@ type
 // ('' for a relative path)
 function DriveOfPath(const APath: string): string;
 
-// ---> ADDED: The server of a drive as DriveOfPath gives it: '\\NAS\Music' ->
+// The server of a drive as DriveOfPath gives it: '\\NAS\Music' ->
 // 'NAS'; a drive letter mapped to a share -> the server of that share
 // (Windows answers this from its own list; the server is not contacted).
 // '' = not checked: a local drive, '\\?\' and '\\.\' device paths, WebDAV
 // names ('\\server@SSL\...').
 function ServerOfDrive(const ADrive: string): string;
 
-// ---> ADDED: Worker thread only. Does AServer answer on one of APorts within
+// Worker thread only. Does AServer answer on one of APorts within
 // ATimeoutMs? One connection attempt per address and port, all at once; a
 // port that connects or refuses means the machine is there (the connection is
 // closed again at once, nothing is sent). saNotChecked when the name cannot
@@ -150,14 +150,14 @@ function ServerAnswers(const AServer: string; const APorts: array of Word;
 // The first path of each drive / network share among APaths, in list order
 procedure OnePathPerDrive(APaths, AResult: TStrings);
 
-// ---> ADDED: The drives of ADrives for a message, in list order:
+// The drives of ADrives for a message, in list order:
 // 'E:, \\NAS\Music' ('' for none)
 function DriveListText(ADrives: TStrings): string;
 
 // UI thread. Wakes the drives of APaths (files or folders; one access per
 // drive or share) on a worker thread while AOnWait runs every 20 ms. True when
 // done, also when a drive could not be reached (the caller's own read finds
-// that out, quickly now). ---> ADDED: A network drive whose server does not
+// that out, quickly now). A network drive whose server does not
 // answer at all (ServerAnswers) is not touched and goes into AUnreachable (may
 // be nil) as DriveOfPath gives it ('\\NAS\Music', 'Z:'): the caller must not
 // read its files either (each read would wait 20-60 s). False when AOnWait
@@ -167,14 +167,14 @@ function WakeDrives(APaths: TStrings; AOnWait: TDriveWaitFunc;
   AUnreachable: TStrings = nil): Boolean;
 
 // UI thread. The drives / shares of APaths that cannot be reached (their root
-// folder does not answer: a USB disk switched off, a NAS that is down; ---> ADDED:
+// folder does not answer: a USB disk switched off, a NAS that is down;
 // a network drive whose server does not answer at all is found within
 // NAS_ANSWER_TIMEOUT_MS), each once in AOffline ('E:', '\\NAS\Music'), checked
 // on a worker thread while AOnWait runs as above. False when AOnWait stopped
 // it (AOffline is then empty).
 function FindOfflineDrives(APaths, AOffline: TStrings; AOnWait: TDriveWaitFunc): Boolean;
 
-// ---> AulumicNS: drives that answered a moment ago. Waking a drive costs a
+// Drives that answered a moment ago. Waking a drive costs a
 // worker thread and, for a network drive, a name lookup and a connection to
 // its server - a second or more on some networks, at every click on a cover,
 // although the NAS had just delivered the last one or was playing. WakeDrives
@@ -184,13 +184,13 @@ procedure NoteDriveAnswered(const APath: string);
 function DriveAnsweredRecently(const APath: string): Boolean;
 procedure ForgetAnsweredDrives;
 
-// ---> ADDED: Asks Windows to abort the file access AThread is blocked in
+// Asks Windows to abort the file access AThread is blocked in
 // (CancelSynchronousIo). Works for network shares; a local disk that is
 // spinning up mostly finishes first. The aborted call simply fails, so only
 // for a thread that is being stopped.
-// ---> CHANGED: UI thread; returns at once. CancelSynchronousIo waits until
+// UI thread; returns at once. CancelSynchronousIo waits until
 // the aborted call has returned, for a USB disk that is spinning up the whole
-// spin-up (on the UI thread Aulumic stopped responding after Cancel). So a
+// spin-up (the UI thread would stop responding after Cancel). So a
 // helper thread does it, again and again until AThread has ended (a thread
 // that was between two calls may start a new one). The helper holds its own
 // handle of AThread (AThread may be freed first) and is freed like a thread
@@ -205,8 +205,8 @@ procedure CancelThreadFileAccess(AThread: TThread);
 procedure SetThreadAside(AThread: TThread);
 
 // True while a thread set aside may still be running, also after
-// FinishSetAsideThreads had to leave one: libFLAC / libsoxr stay loaded then
-// (it may be inside them)
+// FinishSetAsideThreads had to leave one (uAppLifetime then ends the process
+// itself)
 function SetAsideThreadsRunning: Boolean;
 
 // At exit (uAppLifetime.FreeAppSingletons): waits up to ATimeoutMs for the
@@ -220,14 +220,14 @@ var
   // Tests only: the access that wakes one path (nil = the normal one: a block
   // of a file, the entries of a folder)
   DriveWakeProc: TDriveWakeProc = nil;
-  // ---> ADDED: Tests only: the answer check of one drive (nil = the normal
+  // Tests only: the answer check of one drive (nil = the normal
   // one: ServerOfDrive, then ServerAnswers on the file sharing ports)
   DriveAnswerProc: TDriveAnswerProc = nil;
-  // ---> ADDED: Tests only: the abort of CancelThreadFileAccess, called on its
+  // Tests only: the abort of CancelThreadFileAccess, called on its
   // helper thread with the helper's handle of the thread (nil = the normal
   // one: CancelSynchronousIo)
   FileAccessCancelProc: TFileAccessCancelProc = nil;
-  // ---> AulumicNS: UI thread. What the last WakeDrives that ran to its end
+  // UI thread. What the last WakeDrives that ran to its end
   // spent its time on, per drive (for the log; '' = nothing had to be woken)
   LastWakeReport: string = '';
 
@@ -236,7 +236,7 @@ implementation
 uses
   AuAudioTypes, Windows, WinSock2, uAppConsts;
 
-// ---> AUDIT FIX: Per-thread error mode (Windows 7+). Without
+// Per-thread error mode (Windows 7+). Without
 // SEM_FAILCRITICALERRORS, touching a removable drive without media (card
 // reader, optical drive) can show the system "There is no disk in the drive"
 // dialog. Only this thread is affected.
@@ -273,7 +273,7 @@ begin
   // Normally Shutdown has already been called. A thread that did not stop in
   // time is set aside and freed only after it has ended (Finished is then
   // True), so it never waits here.
-  // ---> AUDIT FIX: "not Suspended" as in TThread.Destroy: when the
+  // "not Suspended" as in TThread.Destroy: when the
   // constructor fails before Start, the thread never ran and WaitFor would
   // wait forever.
   if (not Finished) and (not Suspended) then
@@ -323,7 +323,7 @@ begin
   Result := Windows.WaitForSingleObject(Handle, ATimeoutMs) = WAIT_OBJECT_0;
 end;
 
-// ---> MODIFIED: Shared by the keep-alive rounds and WakeFile. Opens APath,
+// Shared by the keep-alive rounds and WakeFile. Opens APath,
 // reads one block at the offset for ARound and closes it again: first
 // uncached (so the read really reaches the drive or NAS), then once more as a
 // normal read when the uncached open or read fails (a file system that refuses
@@ -419,13 +419,13 @@ begin
 end;
 
 // =============================================================================
-// ---> ADDED: Waking drives before the UI thread reads them
+// Waking drives before the UI thread reads them
 // =============================================================================
 
 const
   DRIVE_WAKE_POLL_MS = 20;  // how often the waiting UI thread handles messages
 
-  // ---> ADDED: The ports a file server listens on: Windows file sharing (SMB;
+  // The ports a file server listens on: Windows file sharing (SMB;
   // 139 = its older form), NFS, WebDAV (http, https). One that answers is enough.
   SHARE_PORTS: array[0..4] of Word = (445, 139, 2049, 80, 443);
   SHARE_MAX_ADDRESSES = 4;    // addresses of one name that are tried (IPv4, IPv6)
@@ -455,7 +455,7 @@ type
     destructor Destroy; override;
   end;
 
-  { ---> ADDED: TFileAccessCanceller: aborts the file access of one thread that
+  { TFileAccessCanceller: aborts the file access of one thread that
     is being stopped (CancelThreadFileAccess), again and again until that
     thread has ended. Its own thread, because CancelSynchronousIo waits until
     the aborted call has returned (for a USB disk that is spinning up: the
@@ -472,7 +472,7 @@ type
     destructor Destroy; override;
   end;
 
-  // ---> ADDED: ADDRINFOW of GetAddrInfoW (ws2tcpip.h); not in FPC's WinSock2
+  // ADDRINFOW of GetAddrInfoW (ws2tcpip.h); not in FPC's WinSock2
   PAddrInfoW = ^TAddrInfoW;
   TAddrInfoW = record
     ai_flags    : Integer;
@@ -485,7 +485,7 @@ type
     ai_next     : PAddrInfoW;
   end;
 
-// ---> ADDED: Name lookup (Windows Vista+) and the share of a mapped drive letter
+// Name lookup (Windows Vista+) and the share of a mapped drive letter
 function AL_GetAddrInfoW(pNodeName, pServiceName: PWideChar; pHints: PAddrInfoW;
   var ppResult: PAddrInfoW): Integer; stdcall; external 'ws2_32.dll' name 'GetAddrInfoW';
 procedure AL_FreeAddrInfoW(pAddrInfo: PAddrInfoW); stdcall;
@@ -500,11 +500,11 @@ var
   // FinishSetAsideThreads had to leave a thread running
   LeftRunningAtExit: Boolean = False;
 
-// ---> ADDED: Aborts the synchronous I/O a thread is blocked in (Windows Vista+)
+// Aborts the synchronous I/O a thread is blocked in (Windows Vista+)
 function AL_CancelSynchronousIo(hThread: THandle): BOOL; stdcall;
   external 'kernel32.dll' name 'CancelSynchronousIo';
 
-// ---> AulumicNS: the drives that answered a moment ago (NoteDriveAnswered)
+// The drives that answered a moment ago (NoteDriveAnswered)
 const
   ANSWERED_SLOTS = 16;
 
@@ -609,7 +609,7 @@ begin
 end;
 
 // =============================================================================
-// ---> ADDED: Does the server of a network drive answer?
+// Does the server of a network drive answer?
 // =============================================================================
 
 function ServerOfDrive(const ADrive: string): string;
@@ -857,7 +857,7 @@ begin
     if Terminated then
       Exit;
     try
-      // ---> ADDED: A network drive whose server does not answer at all is
+      // A network drive whose server does not answer at all is
       // not touched (Windows would wait 20-60 s for it); it is reported
       Root := DriveOfPath(FPaths[I]);
       T0   := GetTickCount64;
@@ -883,7 +883,7 @@ begin
           Reachable := DriveWakeProc(FPaths[I])
         else
           Reachable := WakePath(FPaths[I]);
-        // ---> AulumicNS: it answered: awake for the next moments, and where
+        // It answered: awake for the next moments, and where
         // the time went (the server check of a network drive: looking up its
         // name and connecting to it; then the first read)
         if Reachable then
@@ -945,8 +945,8 @@ begin
         (Windows.WaitForSingleObject(FTarget, DRIVE_WAKE_POLL_MS) <> WAIT_TIMEOUT);
 end;
 
-// ---> CHANGED: Starts a TFileAccessCanceller instead of calling
-// CancelSynchronousIo here (it could wait for seconds). Not when one is still
+// Starts a TFileAccessCanceller; CancelSynchronousIo is never called
+// here (it could wait for seconds). Not when one is still
 // running for this thread (TPlaybackManager calls this, then SetThreadAside).
 procedure CancelThreadFileAccess(AThread: TThread);
 var
@@ -1004,7 +1004,7 @@ begin
   // could do so while the program is already being taken down)
   AThread.FreeOnTerminate := False;
   AThread.Terminate;
-  // ---> CHANGED: Returns at once (a helper thread aborts the access). Before
+  // Returns at once (a helper thread aborts the access). Before
   // AThread is in the list: nothing frees it meanwhile.
   CancelThreadFileAccess(AThread);
   if not Assigned(SetAsideList) then
@@ -1037,7 +1037,7 @@ end;
 
 // A started worker for the first path of each drive of APaths; nil when
 // there is nothing to do or the thread could not be created (the caller then
-// simply goes on: its own reads wake the drives, as before)
+// simply goes on: its own reads wake the drives)
 function NewWaker(APaths: TStrings; AMode: TDriveWakeMode): TDriveWaker;
 var
   Paths: TStringList;
@@ -1119,7 +1119,7 @@ begin
   if (not Assigned(APaths)) or (APaths.Count = 0) then
     Exit;
 
-  // ---> AulumicNS: a drive that answered a moment ago is awake - no worker,
+  // A drive that answered a moment ago is awake - no worker,
   // no server check, no window
   Todo := TStringList.Create;
   try
@@ -1173,7 +1173,7 @@ begin
   if not Assigned(SetAsideList) then
     Exit;
 
-  // ---> CHANGED: Only waits. Each thread set aside has a helper that keeps
+  // Only waits. Each thread set aside has a helper that keeps
   // aborting its file access (SetThreadAside); calling CancelSynchronousIo
   // here could wait for a disk that is spinning up, past ATimeoutMs.
   Start := GetTickCount64;
@@ -1205,7 +1205,7 @@ begin
   Result := True;
   if ReadFileBlock(APath, FRound, ABuffer, Opened) or Opened then
   begin
-    NoteDriveAnswered(APath);   // ---> AulumicNS: awake, as far as WakeDrives cares
+    NoteDriveAnswered(APath);   // awake, as far as WakeDrives cares
     Exit;
   end;
   Result := DirectoryExists(IncludeTrailingPathDelimiter(ExtractFileDrive(APath)));
@@ -1248,7 +1248,7 @@ begin
       try
         if (Nxt <> '') and (not ReadBlock(Nxt, Buffer)) then
           Lost := ExtractFileDrive(Nxt);
-        // ---> AUDIT FIX: Closing while a read was stuck: stop at once, do
+        // Closing while a read was stuck: stop at once, do
         // nothing more than needed after the program has shut down
         if Terminated then
           Break;

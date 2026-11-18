@@ -31,7 +31,7 @@ type
     icInfo, icWarning, icDocument, icImage, icEdit, icTrash, icRefresh, icNote,
     icSpeaker, icHeadphones, icWave, icSortAsc, icSortDesc, icFilter, icClock, icTag,
     icSliders, icBolt, icDisc, icDrive, icFit,
-    { added for AulumicNS }
+    { the program's own }
     icLocate, icEye, icLink, icGlobe, icTriRight, icTriDown, icBook, icEqualizer,
     icExport, icImport, icHelp, icPower, icBug, icLog, icStopSolid, icComposer,
     icPerformer, icGenre, icFunnel, icScan, icCopy, icPaste, icKey, icCpu);

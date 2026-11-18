@@ -71,13 +71,13 @@ program AudioSim;
     compare=FILE     bench: compares the output sample by sample with such a dump
     bufms=250        the PCM buffer (DSD: dsdbufms=500)
     period=512       ASIO period (frames); ring=0 (the engine's rule) or a fixed count
-                     (realasio: the driver's period; ring>0 = the 3 periods before the fix)
+                     (realasio: the driver's period; ring>0 = a ring of three periods)
     jitter=0:0       rt: a stall of MS about every EVERY ms (EVERY:MS)
     load=0           rt: busy threads at normal priority
-    prefill=1        rt: ASIO starts with about 40 ms (0: one period, as before the fix)
-    drain=1          rt: the outputs play out before Close (0: closed at once, as before)
+    prefill=1        rt: ASIO starts with about 40 ms (0: one period only)
+    drain=1          rt: the outputs play out before Close (0: closed at once)
     fade=1           rt, out=asio: the fade-out before a Close in the middle of the music
-                     (0: cut, as before); prints END last_sample_dbfs= last_period_peak_dbfs=
+                     (0: cut); prints END last_sample_dbfs= last_period_peak_dbfs=
     from=0           rt: start at this part of the track (0..1; 0.98 = near the end,
                      to see the end of the stream: cut_last_ms)
   Output: one line "RESULT key=value ..." (parsed by Tools\AudioSim\RunMatrix.ps1).
@@ -172,11 +172,11 @@ begin
   C.DownsamplePhase := OptInt('down', VAL_DEF_DOWNSAMPLE_PHASE);
   C.ResampleBandWidth := OptFloat('bw', VAL_DEF_BANDWIDTH_FLOAT);
   C.ResampleAntiAlias := OptFloat('aa', VAL_DEF_ANTI_ALIAS_FLOAT);
-  { ---> 2026-11-12: the gain stage of the play thread (--floatpeak=1 uses it):
+  { the gain stage of the play thread (--floatpeak=1 uses it):
     ReplayGain 0 off / 1 track / 2 album from the file's tags, the preamp }
   C.ReplayGainMode := OptInt('rg', 0);
   C.PreampDB := OptFloat('preamp', 0);
-  { ---> 2026-11-12: automatic headroom (rt prints GAIN headroom= clipped= headroom_db=) }
+  { automatic headroom (rt prints GAIN headroom= clipped= headroom_db=) }
   C.AutoHeadroom := OptInt('headroom', 0) = 1;
   C.RGTrackTags := RG_TAGS_TRACK_GAIN;
   C.RGAlbumTags := RG_TAGS_ALBUM_GAIN;
@@ -399,7 +399,7 @@ begin
   if OptInt('floatpeak', 0) = 1 then
   begin
     Probe := TFloatProbe.Create;
-    { ---> 2026-11-12: the gain of the play thread's DSP (ApplyDSP /
+    { the gain of the play thread's DSP (ApplyDSP /
       ApplyResamplerFloatDSP): volume (squared curve) x ReplayGain factor
       with the preamp and the peak protection (CalcRGFactor) x the DSD gain
       for DSD converted to PCM (the converter works at 0 dB); --gain adds dB }
@@ -528,7 +528,7 @@ begin
     if RefFS <> nil then
       WriteLn(Format('RESULT2 compared_samples=%d differing=%d max_diff_lsb32=%d first_diff_sample=%d',
         [SampleNo, Diffs, MaxDiff, FirstDiff]));
-    { --> 2026-11-12: levels (the user heard distortion in loud passages) }
+    { levels (clipping is heard as distortion in loud passages) }
     if FsFirst >= 0 then
       WriteLn(Format('LEVEL peak_dbfs=%s fullscale=%d fullscale_runs=%d first_fullscale_s=%s',
         [DbFs(MaxAbs / 2147483648.0), FsCount, FsRuns, Fx(FsFirst / Ch / OutRate, '0.00')]))
@@ -548,7 +548,7 @@ begin
   end;
 end;
 
-{ ---- rgcheck (2026-11-12) ----
+{ ---- rgcheck ----
   The stored ReplayGain tags of an album against a fresh measurement, read
   only. As TReplayGainThread.ScanFile and its album step: the same readers
   (FLAC, WAV, DSD converted at 0 dB), TAuLoudnessMeter per track, the album
@@ -557,8 +557,8 @@ end;
   (track and album mode, no DSD gain taken off). One line per track and one
   for the album; the folder is the album (with its sub folders). }
 
-{ --ebur128=<libebur128.dll>: the same samples also through libebur128 (as
-  Aulumic used it: mode I + M + sample peak, float frames), for comparison }
+{ --ebur128=<libebur128.dll>: the same samples also through libebur128
+  (mode I + M + sample peak, float frames), for comparison }
 type
   TEbInit = function(Channels, Rate: Cardinal; Mode: Integer): Pointer; cdecl;
   TEbDestroy = procedure(var St: Pointer); cdecl;
@@ -1161,7 +1161,7 @@ begin
         Break;
       end;
       PumpLog(ALog);
-      { ---> 2026-11-12: what the automatic headroom takes off (the lowest seen) }
+      { what the automatic headroom takes off (the lowest seen) }
       Info := Th.GetSignalInfo;
       if Info.HeadroomDB < HeadDb then HeadDb := Info.HeadroomDB;
     until GetTickCount64 >= Deadline;
@@ -1298,7 +1298,7 @@ begin
         Exit;
       end;
       { as TAudioEngine.Play gives it after a stream that closed just now
-        (--settle=0: as before the fix) }
+        (--settle=0: no settling time) }
       C.SettleMs := OptInt('settle', 3000);
       RunPhase(C, Rec, Log, Secs - SwitchAfter, 0, Ended, Err, RunUs);
       PrintPhase('2', Opt('switchto', ''), DevName, Rec, RunUs, Ended, Err);
@@ -1704,12 +1704,12 @@ begin
   end;
 end;
 
-{ tonebench <rate> [--secs=10]: the tone control with all three bands on, a
+{ tonebench <rate> [--secs=10]: the tone control with three bands on (bass, mid, treble), a
   stereo stream of <rate> Hz. "inline" is what the play thread does
   (ProcessSampleL / R inlined, the filters inside them too); "calls" runs the
   same filter arithmetic with one function call per filter and sample - how
-  it was compiled before the fix of 2026-11-12 (the compiler could not inline
-  the filter into another unit). Prints the time per second of audio. }
+  it is compiled when the compiler cannot inline the filter into another
+  unit. Prints the time per second of audio. }
 type
   TBenchBiquad = record
     b0, b1, b2, a1, a2, s1, s2: Double;
@@ -1913,8 +1913,8 @@ begin
     if Opt('simd', 'auto') = 'pascal' then SetResampleSimd(rsPascal)
     else if Opt('simd', 'auto') = 'sse2' then SetResampleSimd(rsSSE2)
     else if Opt('simd', 'auto') = 'avx' then SetResampleSimd(rsAVX);
-    { --fft=0: every resampler stage in direct form (the output before the
-      FFT stages, 2026-11-11) }
+    { --fft=0: every resampler stage in direct form (the output without
+      FFT stages) }
     SetResampleFft(OptInt('fft', 1) = 1);
     try
       if Mode = 'bench' then Bench(F)

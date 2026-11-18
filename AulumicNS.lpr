@@ -6,16 +6,15 @@ program AulumicNS;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   AulumicNS - bit-perfect music player (WASAPI exclusive / ASIO).
-  The layout and functions of Aulumic with the self-contained GUI library of
-  Aulos: one executable, no external DLLs besides Windows itself, no .lfm
-  files, vector icons, live dark / light theme.
+  A self-contained GUI library: one executable, no external DLLs besides
+  Windows itself, no .lfm files, vector icons, live dark / light theme.
   =============================================================================}
 
 {$mode objfpc}{$H+}
 
 uses
   SysUtils, Windows,
-  { ---> AulumicNS: the drawing layer (Direct2D) before the LCL: units are
+  { the drawing layer (Direct2D) before the LCL: units are
     closed in the reverse order, so it is still there while the LCL destroys
     the windows at the end (a window may paint once more then) }
   AuD2D, AuGfx,
@@ -28,11 +27,11 @@ uses
   uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuPlaylistPane, AuToneForm, AuVolumePopup,
   uCrashTracer, uHangWatch, uDriveKeepAlive, uInputBlock, uEngineStateManager, uFileLockRegistry, uMetadataPayloads, uMetaUtils,
   uOSUtils, uPlaybackIOWorker, {$IFDEF DEBUG}AuTouchProbe,{$ENDIF}
-  { the engine (Aulumic's, with the built-in decoders and resampler) }
+  { the engine (with the built-in decoders and resampler) }
   ALAudioTypes, ALAudioOutput, ALWasapiApi, ALOutputWasapi, ALOutputAsio, ALOutputRing, ALMetadata, ALReaders,
   ALReaderFLAC, ALReaderWAV, ALReaderDSF, ALReaderDFF, ALSourceFactory, ALHeadroom, ALAudioThread, ALAudioEngine,
   AuAudioTypes, AuDecoder, AuDecFlac, AuDecWav, AuDecDsd, AuResample, uToneControl, uAudioUtils,
-  { the library (Aulumic's, stored in the Aulos format) }
+  { the library (stored by uDbStore) }
   uDbStore, uLibraryTypes, uLibraryQuery, uTagParser, uUserStatsManager,
   uLibraryScanner, uLibraryManager, uLibraryWatcher, AuLogForm, AuDebugQueue, AuPrefs, uSettingsLog, AuPlaylistEditor, AuPlaylistManager, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuLoudness, uReplayGainScan, uReplayGainThread, AuReplayGainForm, AuVirtualFolderForm, uLastFmScraper, AuCoverViewer, AuArtistInfo, AuPdf, AuBooklet, AuSignalPath, AuDemoLibrary, AuHelp, uVersionHelper, AuAbout,
   uPlaylistFile, uPlaylistRows, uAutoPlaylist, uPlaylistImport, uPlaylistStore,
@@ -126,10 +125,10 @@ begin
     AnimSlowFactor := StrToIntDef(Application.GetOptionValue('anim-slow'), 1);
   {$ENDIF}
   { one AulumicNS at a time (it uses the audio device exclusively): a second
-    start activates the first copy and hands over its files. ---> AulumicNS:
-    not the tool modes of the debug build (they play nothing and use the data
-    next to their own exe): a screenshot run with AulumicNS open handed over
-    and made no pictures - MakeHelpShots then emptied help\shots. }
+    start activates the first copy and hands over its files. Not the tool
+    modes of the debug build (they play nothing and use the data next to
+    their own exe): a screenshot run with AulumicNS open would hand over
+    and make no pictures - MakeHelpShots would then empty help\shots. }
   if {$IFDEF DEBUG}not (Application.HasOption('shots') or Application.HasOption('ui-bench') or
     Application.HasOption('touch-probe') or Application.HasOption('test-drive-wait')) and {$ENDIF} OtherInstanceRunning then
   begin
@@ -173,7 +172,7 @@ begin
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
   { all windows and the play thread are gone: the global objects (settings,
-    log, ...) as Aulumic frees them; a thread still blocked by a sleeping
+    log, ...) are freed; a thread still blocked by a sleeping
     drive ends with the process. Traced as the rest of the close
     (uCrashTracer: ShutdownTraceLog.txt only when something fails). }
   try

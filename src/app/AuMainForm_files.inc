@@ -11,7 +11,7 @@
     MnAddFiles, MnAddFolder, MnPlaySelected, MnRemoveSelected, MnClearList,
     MnShowInExplorer
   Files go into the playlist on screen (an auto-playlist on
-  screen: the Default playlist, as Aulumic); an Explorer drop over the
+  screen: the Default playlist); an Explorer drop over the
   playlist is inserted there; the play queue is made from the shown
   playlist and stays with it (FPlayingPl).
   =============================================================================}
@@ -61,8 +61,8 @@ var
 begin
   L := TStringList.Create;
   try
-    { ---> AulumicNS: busy from here (was: only once the files were known -
-      looking through a large or slow folder is the long part) }
+    { busy from here, not only once the files are known:
+      looking through a large or slow folder is the long part }
     BeginBusy;
     try
       for I := 0 to High(Paths) do
@@ -120,7 +120,7 @@ begin
   BeginBusy;         // (the whole list becomes the queue)
   try
     FPlayback.ClearQueue;
-    { the queue is this playlist (Aulumic's StartQueueFromNode) }
+    { the queue is this playlist }
     FPlayingPl := FShownPl;
     for I := 0 to FPl.EntryCount - 1 do
     begin
@@ -226,7 +226,7 @@ begin
   end;
 end;
 
-{ Aulumic: switches to the playlist that plays, opens the track's group }
+{ switches to the playlist that plays, opens the track's group }
 procedure TMainForm.JumpToNowPlaying;
 begin
   if FPlayingPath = '' then Exit;
@@ -302,9 +302,9 @@ begin
   if Length(Sel) > 0 then RevealPath(FPl.Entry(Sel[0]).FilePath);
 end;
 
-{ ---> AulumicNS: Explorer at a file or folder. Its drive is woken first on a
+{ Explorer at a file or folder. Its drive is woken first on a
   worker thread ("Waiting for drive..." with Cancel when it takes a moment):
-  RevealFileInExplorer's FileExists froze the window while a NAS woke up. A
+  RevealFileInExplorer's FileExists would freeze the window while a NAS wakes up. A
   network drive that does not answer gets a note instead. }
 procedure TMainForm.RevealPath(const APath: string);
 var

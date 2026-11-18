@@ -5,7 +5,7 @@ unit AuDebugQueue;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Debug Queue window (Aulumic's uDebugQueue, Main menu > Tools > Show
+  The Debug Queue window (Main menu > Tools > Show
   Debug Queue, Ctrl+D): the play queue of the playback manager in play
   order (shuffled when shuffle is on), the playing track highlighted and
   kept in view. The title shows the state, the index and the count. Stays
@@ -88,7 +88,7 @@ begin
   FormStyle := fsStayOnTop;
   Constraints.MinWidth := S(260);
   Constraints.MinHeight := S(200);
-  FitToWorkArea;          // ---> AulumicNS: a small screen at a large scaling
+  FitToWorkArea;          // a small screen at a large scaling
   FManager := AManager;
   FLastRevision := -1;
   FLastIndex := -2;
