@@ -14,7 +14,7 @@ unit TestLibraryDatabase;
   tabs / line breaks / a literal '<br>' in tags, and that nothing is written
   when nothing changed. Only files in a temporary folder are used.
   The hand-written file is the tests' text format (uLibraryDatabase), loaded
-  with ImportAulumicDatabase and saved as the library's snapshot before
+  with ImportTextDatabase and saved as the library's snapshot before
   each test loads it. TTestLibraryStore: the journal (an edit survives
   without a save, a journal of an older snapshot and a torn record are
   ignored), a damaged snapshot is kept as a backup, the user stats journal,
@@ -166,7 +166,7 @@ begin
       '1700000100', 'False', '123456789', 'Live<tab>1985', 'Antonín Dvořák', '']));
 end;
 
-// The sample as a text file (for ImportAulumicDatabase)
+// The sample as a text file (for ImportTextDatabase)
 procedure WriteSampleText(const AFile: string);
 var
   SL: TStringList;
@@ -181,7 +181,7 @@ begin
 end;
 
 // The sample library in AulumicNS' own format at AFile:
-// the text imported (ImportAulumicDatabase) and saved as a snapshot, so
+// the text imported (ImportTextDatabase) and saved as a snapshot, so
 // every test that loads AFile reads the snapshot written by SaveDatabase
 procedure WriteSampleLibrary(const AFile: string);
 var
@@ -192,7 +192,7 @@ begin
   WriteSampleText(Txt);
   Lib := TLibraryManager.Create(AFile);
   try
-    if ImportAulumicDatabase(Lib, Txt) <> 2 then
+    if ImportTextDatabase(Lib, Txt) <> 2 then
       raise Exception.Create('The sample library could not be imported');
     Lib.SaveDatabase;
     if Lib.IsDirty then
@@ -762,7 +762,7 @@ begin
       else
         SL[I] := StringReplace(SL[I], #9'So What'#9, #9'So What (Take 2)'#9, []);
     SL.SaveToFile(FDir + 'Edited.txt', TEncoding.UTF8);
-    AssertEquals('Imported', 1, ImportAulumicDatabase(FLib, FDir + 'Edited.txt'));
+    AssertEquals('Imported', 1, ImportTextDatabase(FLib, FDir + 'Edited.txt'));
 
     AssertEquals('Library reloaded', 1, FLib.GetTrackCount);
     AssertTrue('Track 1 still there', FLib.TryGetTrack(TRACK1_PATH, T));

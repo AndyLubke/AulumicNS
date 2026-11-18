@@ -21,7 +21,7 @@ unit uLibraryDatabase;
 
   A unit of the test program only. AulumicNS stores its library in its own
   format (uDbStore); the tests write a library by hand as this text
-  and load it with ImportAulumicDatabase, which hands the records to
+  and load it with ImportTextDatabase, which hands the records to
   TLibraryManager.ReplaceContent. Covered by Tests\TestLibraryLogic.pas.
   =============================================================================}
 
@@ -40,7 +40,7 @@ const
 // Replaces the content of ALib with the text file AFile (folders, virtual
 // folders, tracks with their dates added) and marks it changed. Returns the
 // number of tracks, -1 when the file could not be read or a scan runs.
-function ImportAulumicDatabase(ALib: TLibraryManager; const AFile: string): Integer;
+function ImportTextDatabase(ALib: TLibraryManager; const AFile: string): Integer;
 
 function EncodeDbField(const S: string): string;
 function DecodeDbField(const S: string): string;
@@ -58,7 +58,7 @@ implementation
 uses
   StrUtils, DateUtils, uAppConsts, uMetaUtils;
 
-function ImportAulumicDatabase(ALib: TLibraryManager; const AFile: string): Integer;
+function ImportTextDatabase(ALib: TLibraryManager; const AFile: string): Integer;
 var
   SL, Folders, Links: TStringList;
   Tracks: TTrackInfoArray;

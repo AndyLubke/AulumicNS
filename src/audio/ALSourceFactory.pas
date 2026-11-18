@@ -350,7 +350,7 @@ function CreateSourceFor(const ACfg: TPlayThreadConfig; ADsdGainDB: Integer;
 var
   Res, TempResampler: TAudioSource;
   FinalRate: integer;
-  SoxCfg: TSoXConfig;
+  ResamplerCfg: TResamplerConfig;
 begin
   Result  := nil;
   InRate  := 0;
@@ -425,18 +425,18 @@ begin
     if (FinalRate > 0) and (FinalRate <> InRate) then
     begin
       // The resampler is built in (AuResample): always there
-      SoxCfg := DefaultSoXConfig;
+      ResamplerCfg := DefaultResamplerConfig;
 
-      SoxCfg.Quality         := ACfg.ResampleQuality;
-      SoxCfg.UpsamplePhase   := ACfg.UpsamplePhase;
-      SoxCfg.DownsamplePhase := ACfg.DownsamplePhase;
-      SoxCfg.Bandwidth       := ACfg.ResampleBandWidth;
-      SoxCfg.AntiAlias       := ACfg.ResampleAntiAlias;
+      ResamplerCfg.Quality         := ACfg.ResampleQuality;
+      ResamplerCfg.UpsamplePhase   := ACfg.UpsamplePhase;
+      ResamplerCfg.DownsamplePhase := ACfg.DownsamplePhase;
+      ResamplerCfg.Bandwidth       := ACfg.ResampleBandWidth;
+      ResamplerCfg.AntiAlias       := ACfg.ResampleAntiAlias;
 
       // TResamplerSource.Create takes ownership of Res
       // immediately on entry (and frees Res via TResamplerSource.Destroy if
       // an exception occurs inside the constructor). Do not double-free Res!
-      TempResampler := TResamplerSource.Create(Res, FinalRate, SoxCfg);
+      TempResampler := TResamplerSource.Create(Res, FinalRate, ResamplerCfg);
       TResamplerSource(TempResampler).OnFloatDSP := AFloatDSP;
       Res := TempResampler;
     end;

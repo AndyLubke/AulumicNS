@@ -68,7 +68,7 @@ type
     procedure MonoBecomesStereo;
     procedure PreparedSourceGetsItsReplayGainFactor;
     procedure UnsupportedAndMissingFiles;
-    procedure TheTestsRunInUtf8LikeAulumic;
+    procedure TheTestsRunInUtf8LikeTheProgram;
     procedure NonAsciiNameReadsTheReplayGainTags;
     procedure NonAsciiNameIsPrepared;
   end;
@@ -402,7 +402,7 @@ end;
 // AulumicNS runs with UTF-8 as its code page (Lazarus' LazUTF8):
 // every `string` outside the audio units is UTF-8. The tests with non-ASCII
 // file names mean something only when the test program does the same.
-procedure TTestTrackSource.TheTestsRunInUtf8LikeAulumic;
+procedure TTestTrackSource.TheTestsRunInUtf8LikeTheProgram;
 begin
   AssertEquals('The system code page is UTF-8', CP_UTF8, Integer(DefaultSystemCodePage));
   AssertEquals('File names are UTF-8', CP_UTF8, Integer(DefaultFileSystemCodePage));

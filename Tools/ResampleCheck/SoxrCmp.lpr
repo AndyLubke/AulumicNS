@@ -114,7 +114,7 @@ end;
 
 constructor TConv.Create(AEng: TEngine; const C: TCase);
 var
-  Cfg: TSoXConfig;
+  Cfg: TResamplerConfig;
   Io: soxr_io_spec_t;
   Qs: soxr_quality_spec_t;
   Err: Pointer;
@@ -123,7 +123,7 @@ begin
   Ratio := C.OutR / C.InR;
   if Eng = enAu then
   begin
-    Cfg := DefaultSoXConfig;
+    Cfg := DefaultResamplerConfig;
     Cfg.Quality := C.Q;
     Cfg.UpsamplePhase := C.Ph;
     Cfg.DownsamplePhase := C.Ph;
@@ -378,13 +378,13 @@ end;
 { each stage of our converter alone (x real time of the input) }
 procedure StageSpeed(const C: TCase; Secs: Double);
 var
-  Cfg: TSoXConfig;
+  Cfg: TResamplerConfig;
   R: TAuResampler;
   Frames, Pos, Chunk, N, Mid, MidLen: Integer;
   T0, T1, T2: Double;
   Tmp, MidBuf: TDoubleArray;
 begin
-  Cfg := DefaultSoXConfig;
+  Cfg := DefaultResamplerConfig;
   Cfg.Quality := C.Q;
   Cfg.UpsamplePhase := C.Ph;
   Cfg.DownsamplePhase := C.Ph;
@@ -619,7 +619,7 @@ end;
 procedure TrainTest;
 var
   C: TCase;
-  Cfg: TSoXConfig;
+  Cfg: TResamplerConfig;
   R: TAuStreamResampler;
   Inp, Outp: TDoubleArray;
   Frames, Pos, InDone, OutDone, DL, I, PkI, Chunk: Integer;
@@ -630,7 +630,7 @@ begin
   FS.DecimalSeparator := '.';
   C.InR := StrToInt(OptS('inr', '44100'));
   C.OutR := StrToInt(OptS('outr', '705600'));
-  Cfg := DefaultSoXConfig;
+  Cfg := DefaultResamplerConfig;
   Cfg.Quality := StrToInt(OptS('q', '2'));
   Cfg.UpsamplePhase := StrToInt(OptS('ph', '0'));
   Cfg.DownsamplePhase := Cfg.UpsamplePhase;

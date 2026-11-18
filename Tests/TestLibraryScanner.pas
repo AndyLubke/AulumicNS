@@ -240,7 +240,7 @@ begin
   finally
     SL.Free;
   end;
-  AssertEquals('Imported', 3, ImportAulumicDatabase(FLib, FDir + 'Edited.txt'));
+  AssertEquals('Imported', 3, ImportTextDatabase(FLib, FDir + 'Edited.txt'));
   FLib.SaveDatabase;
   FLib.LoadDatabase;
   AssertTrue('Found after loading', FLib.TryGetTrack(Path, T));

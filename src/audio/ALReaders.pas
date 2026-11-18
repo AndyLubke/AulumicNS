@@ -173,7 +173,7 @@ type
   private
     FBaseSource: TAudioSource;
     // The built-in converter (AuResample)
-    FSoxrState: TAuStreamResampler;
+    FResamplerState: TAuStreamResampler;
     FInputBufferFloat: array of double;
     FOutputBufferFloat: array of double;
     FInternalBufferInt: array of byte;
@@ -184,13 +184,13 @@ type
     FEndFlushed: Boolean;
     FRatio: double;
     FTargetRate: cardinal;
-    FConfig: TSoXConfig;
+    FConfig: TResamplerConfig;
     FDitherSeed: cardinal;
     FOnFloatDSP: TResamplerFloatDSPProc;
-    procedure CreateSoxrState;
+    procedure CreateResamplerState;
   public
     constructor Create(Base: TAudioSource; TargetRate: Cardinal;
-                       const Config: TSoXConfig);
+                       const Config: TResamplerConfig);
     destructor Destroy; override;
     function GetSampleRate: cardinal; override;
     function GetChannels: word; override;
@@ -337,12 +337,12 @@ const
   RESAMP_IN_BUF_SAMPLES  = 16384;
   RESAMP_OUT_BUF_SAMPLES = 65536;
   RESAMP_INT_BUF_BYTES   = RESAMP_IN_BUF_SAMPLES * 4;
-  SOXR_LOOKAHEAD_FRAMES  = 512;
+  RESAMPLER_LOOKAHEAD_FRAMES  = 512;
 
-  SOXR_MIN_BANDWIDTH     = 70.0;
-  SOXR_MAX_BANDWIDTH     = 99.0;
-  SOXR_MIN_ANTIALIAS     = 100.0;
-  SOXR_MAX_ANTIALIAS     = 120.0;
+  RESAMPLER_MIN_BANDWIDTH     = 70.0;
+  RESAMPLER_MAX_BANDWIDTH     = 99.0;
+  RESAMPLER_MIN_ANTIALIAS     = 100.0;
+  RESAMPLER_MAX_ANTIALIAS     = 120.0;
 
   CONV_TEMP_BUF_BYTES    = 65536;           // 64 KB L2-cache-friendly slice buffer
 
@@ -1013,7 +1013,7 @@ end;
 { TResamplerSource }
 
 constructor TResamplerSource.Create(Base: TAudioSource; TargetRate: Cardinal;
-  const Config: TSoXConfig);
+  const Config: TResamplerConfig);
 begin
   inherited Create;
 
@@ -1025,17 +1025,17 @@ begin
   FConfig.UpsamplePhase   := Config.UpsamplePhase;
   FConfig.DownsamplePhase := Config.DownsamplePhase;
 
-  if Config.Bandwidth < SOXR_MIN_BANDWIDTH then
+  if Config.Bandwidth < RESAMPLER_MIN_BANDWIDTH then
     FConfig.Bandwidth := VAL_DEF_BANDWIDTH_FLOAT
-  else if Config.Bandwidth > SOXR_MAX_BANDWIDTH then
-    FConfig.Bandwidth := SOXR_MAX_BANDWIDTH
+  else if Config.Bandwidth > RESAMPLER_MAX_BANDWIDTH then
+    FConfig.Bandwidth := RESAMPLER_MAX_BANDWIDTH
   else
     FConfig.Bandwidth := Config.Bandwidth;
 
-  if Config.AntiAlias < SOXR_MIN_ANTIALIAS then
+  if Config.AntiAlias < RESAMPLER_MIN_ANTIALIAS then
     FConfig.AntiAlias := VAL_DEF_ANTI_ALIAS_FLOAT
-  else if Config.AntiAlias > SOXR_MAX_ANTIALIAS then
-    FConfig.AntiAlias := SOXR_MAX_ANTIALIAS
+  else if Config.AntiAlias > RESAMPLER_MAX_ANTIALIAS then
+    FConfig.AntiAlias := RESAMPLER_MAX_ANTIALIAS
   else
     FConfig.AntiAlias := Config.AntiAlias;
 
@@ -1044,7 +1044,7 @@ begin
   else
     FRatio := 2.0;
 
-  CreateSoxrState;
+  CreateResamplerState;
 
   SetLength(FInternalBufferInt, RESAMP_INT_BUF_BYTES);
   SetLength(FInputBufferFloat,  RESAMP_IN_BUF_SAMPLES);
@@ -1101,10 +1101,10 @@ begin
        (Self.FBaseSource.GetSampleRate = PrevUp.FBaseSource.GetSampleRate) and
        (Self.FBaseSource.GetChannels = PrevUp.FBaseSource.GetChannels) then
     begin
-      FreeAndNil(Self.FSoxrState);
+      FreeAndNil(Self.FResamplerState);
 
-      Self.FSoxrState   := PrevUp.FSoxrState;
-      PrevUp.FSoxrState := nil;
+      Self.FResamplerState   := PrevUp.FResamplerState;
+      PrevUp.FResamplerState := nil;
       Self.FDitherSeed  := PrevUp.FDitherSeed;
 
       // Clamp against pre-allocated FLeftoverBuffer capacity (Zero SetLength)
@@ -1125,19 +1125,19 @@ end;
 // knows: precision from the quality, the phase response for up- or
 // downsampling, the pass band end (bandwidth) and the stop band start
 // (anti-aliasing).
-procedure TResamplerSource.CreateSoxrState;
+procedure TResamplerSource.CreateResamplerState;
 begin
   try
-    FSoxrState := TAuStreamResampler.Create(FBaseSource.GetSampleRate, FTargetRate,
+    FResamplerState := TAuStreamResampler.Create(FBaseSource.GetSampleRate, FTargetRate,
       FBaseSource.GetChannels, FConfig);
   except
     on E: Exception do
-      raise EAudioEngineError.CreateTyped(aeAudioFail, ERR_SOXR_INIT + ' ' + E.Message);
+      raise EAudioEngineError.CreateTyped(aeAudioFail, ERR_RESAMPLER_INIT + ' ' + E.Message);
   end;
 end;
 destructor TResamplerSource.Destroy;
 begin
-  FreeAndNil(FSoxrState);
+  FreeAndNil(FResamplerState);
 
   FBaseSource.Free;
   inherited;
@@ -1182,10 +1182,10 @@ begin
 
   // The converter starts again (the designed filter is kept
   // in the cache, so this costs nothing)
-  if FSoxrState <> nil then
-    FSoxrState.Reset
+  if FResamplerState <> nil then
+    FResamplerState.Reset
   else
-    CreateSoxrState;
+    CreateResamplerState;
   FLeftoverCount := 0;
   FEndFlushed := False;
 end;
@@ -1214,9 +1214,9 @@ begin
   if len <= 0 then
     Exit(0);
 
-  // If FSoxrState is nil, return 0 (EOF) rather than
+  // If FResamplerState is nil, return 0 (EOF) rather than
   // feeding mismatched sample rate / bit depth bytes into the WASAPI buffer.
-  if FSoxrState = nil then
+  if FResamplerState = nil then
     Exit(0);
 
   Channels := FBaseSource.GetChannels;
@@ -1258,7 +1258,7 @@ begin
 
     // Clamp Int64 Trunc before narrowing to Integer
     SamplesNeeded := EnsureRange(Trunc(TargetFramesOut / FRatio), 0, MaxReadFrames) +
-                     SOXR_LOOKAHEAD_FRAMES - FLeftoverCount;
+                     RESAMPLER_LOOKAHEAD_FRAMES - FLeftoverCount;
     if SamplesNeeded > MaxReadFrames then
       SamplesNeeded := MaxReadFrames;
     if SamplesNeeded < 0 then
@@ -1279,10 +1279,10 @@ begin
       // output (input 0). A gapless next track continues the converter.
       if not FEndFlushed then
       begin
-        FSoxrState.Flush;
+        FResamplerState.Flush;
         FEndFlushed := True;
       end;
-      if FSoxrState.Pending = 0 then
+      if FResamplerState.Pending = 0 then
         Break;
     end;
 
@@ -1332,7 +1332,7 @@ begin
     idone := 0;
     odone := 0;
 
-    FSoxrState.Process(@FInputBufferFloat[0], TotalFramesToProcess, ProcIn,
+    FResamplerState.Process(@FInputBufferFloat[0], TotalFramesToProcess, ProcIn,
       @FOutputBufferFloat[0], TargetFramesOut, ProcOut);
     idone := SizeUInt(ProcIn);
     odone := SizeUInt(ProcOut);

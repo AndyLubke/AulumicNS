@@ -429,7 +429,7 @@ begin
   end;
   // The text library imported (the store is library.adb)
   FLib := TLibraryManager.Create(FDir + 'library.adb');
-  ImportAulumicDatabase(FLib, FDir + 'Library.db');
+  ImportTextDatabase(FLib, FDir + 'Library.db');
 end;
 
 procedure TTestImportTracks.TearDown;

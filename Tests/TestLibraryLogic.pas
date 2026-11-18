@@ -84,7 +84,7 @@ type
 
   TTestTagReaders = class(TTestCase)
   published
-    procedure EveryAulumicFormatHasARealReader;
+    procedure EveryFormatHasARealReader;
     procedure WavFileIsReadWithItsFormat;
     // The DFF reader (file_dff)
     procedure DffFileIsReadWithItsFormat;
@@ -752,7 +752,7 @@ end;
 
 { TTestTagReaders }
 
-procedure TTestTagReaders.EveryAulumicFormatHasARealReader;
+procedure TTestTagReaders.EveryFormatHasARealReader;
 var
   Exts : TStringList;
   I    : Integer;

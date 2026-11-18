@@ -96,7 +96,7 @@ type
     aeBufferUnaligned,
     aeAccessDenied,
     aeAudioFail,
-    aeLibSoxMissing,
+    aeResamplerMissing,
     aeNotDSD,
     aeDsdHeader,
     aeFlacDecoder,
@@ -146,7 +146,7 @@ type
     constructor CreateTyped(Err: TAudioErrorType; const Msg: string; Rate: Integer = 0);
   end;
 
-  TSoXConfig = record
+  TResamplerConfig = record
     Quality         : Integer;
     UpsamplePhase   : Integer;
     DownsamplePhase : Integer;
@@ -154,7 +154,7 @@ type
     AntiAlias       : Double;
   end;
 
-  function DefaultSoXConfig: TSoXConfig; // Helper function
+  function DefaultResamplerConfig: TResamplerConfig; // Helper function
 
 implementation
 
@@ -207,7 +207,7 @@ begin
     (S.TrebleDB <> 0);
 end;
 
-function DefaultSoXConfig: TSoXConfig;
+function DefaultResamplerConfig: TResamplerConfig;
 begin
   Result.Quality         := VAL_DEF_RESAMPLE_QUAL;
   Result.UpsamplePhase   := VAL_DEF_UPSAMPLE_PHASE;

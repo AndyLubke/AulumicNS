@@ -158,7 +158,7 @@ type
     FS1, FS2: TAuPolyStage;
     FTmp: TDoubleArray;
   public
-    constructor Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TSoXConfig);
+    constructor Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TResamplerConfig);
     destructor Destroy; override;
     function Process(Src: PDouble; SrcFrames: Integer; var Dst: TDoubleArray): Integer;
     { end of the input for now: writes what is still due to Dst (see
@@ -185,7 +185,7 @@ type
     FFifoPos, FFifoLen: Integer;  // in frames
     FTmp: TDoubleArray;
   public
-    constructor Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TSoXConfig);
+    constructor Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TResamplerConfig);
     destructor Destroy; override;
     { uses up to InFrames frames of InBuf (InDone) and writes up to OutFrames
       frames to OutBuf (OutDone); the unused input stays with the caller }
@@ -1684,7 +1684,7 @@ end;
 
 { ---- TAuResampler ---- }
 
-constructor TAuResampler.Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TSoXConfig);
+constructor TAuResampler.Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TResamplerConfig);
 var
   Lo, Pass, Stop, Atten: Double;
   Phase: TAuPhase;
@@ -1793,7 +1793,7 @@ end;
 
 { ---- TAuStreamResampler ---- }
 
-constructor TAuStreamResampler.Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TSoXConfig);
+constructor TAuStreamResampler.Create(InRate, OutRate: Cardinal; Channels: Integer; const Config: TResamplerConfig);
 begin
   inherited Create;
   FCh := Channels;

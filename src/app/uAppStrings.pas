@@ -240,7 +240,7 @@ const
   FMT_LOG_TAGEDIT_SKIPPED     = 'Tag editor: %d file(s) could not be read and were not changed.';
   ERR_DECODE_DSF_RATE         = 'Invalid or corrupted DSF sample rate.';
   ERR_DECODE_DSF_STEREO       = 'DSD-to-PCM requires a 2-channel stereo DSF file.';
-  ERR_SOXR_INIT               = 'Failed to initialize the resampler.';   // the built-in resampler (AuResample)
+  ERR_RESAMPLER_INIT               = 'Failed to initialize the resampler.';   // the built-in resampler (AuResample)
   ERR_INVALID_FILE_PATH       = 'Invalid file path.';
   FMT_ERR_OS_ERROR            = 'OS Error %d: %s';
   ERR_RENAME_FAILED           = 'RenameFile failed.';

@@ -17,7 +17,7 @@ unit TestReplayGainScan;
                             group list owning its lists
   The library is a text library of six tracks in a temporary folder; no audio
   file is read. It is imported into the library's store
-  (ImportAulumicDatabase), as the other library tests do.
+  (ImportTextDatabase), as the other library tests do.
   =============================================================================}
 
 interface
@@ -154,7 +154,7 @@ begin
   end;
 
   FLib := TLibraryManager.Create(FDir + 'library.adb');
-  AssertEquals('imported', 6, ImportAulumicDatabase(FLib, FDir + 'Library.db'));
+  AssertEquals('imported', 6, ImportTextDatabase(FLib, FDir + 'Library.db'));
 end;
 
 procedure TTestReplayGainAlbums.TearDown;

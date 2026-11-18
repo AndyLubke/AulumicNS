@@ -76,9 +76,9 @@ const
   BANDWIDTH  = 95.0;         // % of the lower Nyquist frequency
   ANTI_ALIAS = 100.0;
 
-function Config(APhase, AQuality: Integer): TSoXConfig;
+function Config(APhase, AQuality: Integer): TResamplerConfig;
 begin
-  Result := Default(TSoXConfig);
+  Result := Default(TResamplerConfig);
   Result.Quality := AQuality;
   Result.UpsamplePhase := APhase;
   Result.DownsamplePhase := APhase;
