@@ -1,10 +1,16 @@
 unit AuDecDsd;
 
-{ DSD decoders: DSF (Sony) and DFF / DSDIFF (Philips, uncompressed DSD).
+{ ==============================================================================
+  AulumicNS - AuDecDsd
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  DSD decoders: DSF (Sony) and DFF / DSDIFF (Philips, uncompressed DSD).
   Both deliver interleaved bytes, one per channel per frame, with the earliest
   DSD sample in the most significant bit. ReplayGain from the ID3v2 tag
   (DSF metadata chunk, DFF 'ID3 ' chunk). DST compressed DFF files are
-  reported as unsupported. }
+  reported as unsupported.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$R-}{$Q-}

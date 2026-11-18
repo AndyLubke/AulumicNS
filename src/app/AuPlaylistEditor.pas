@@ -1,13 +1,19 @@
 unit AuPlaylistEditor;
 
-{ The Playlist Editor (Aulumic's uFormPlaylistEditor) in the Aulos layout:
+{ ==============================================================================
+  AulumicNS - AuPlaylistEditor
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Playlist Editor (Aulumic's uFormPlaylistEditor) in the Aulos layout:
   the name, the grouping and the two formats of a playlist ("Use Global
   Preferences" = the defaults of Preferences > Playlists); for an
   auto-playlist also the rules: a ready-made template or own rules made
   with the query builder (tag, operator, value; a track must match all
   rules, OR in a value gives alternatives).
   AulumicNS: the playlists are kept in uPlaylistStore, so a name only has to
-  be new and not "Default" (no file name rules). }
+  be new and not "Default" (no file name rules).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

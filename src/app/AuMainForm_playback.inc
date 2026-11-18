@@ -1,5 +1,10 @@
 {%MainUnit AuMainForm.pas}
-{ AuMainForm_playback.inc - TMainForm: the engine (Aulumic's TPlaybackManager)
+{ ==============================================================================
+  AulumicNS - AuMainForm_playback.inc
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AuMainForm_playback.inc - TMainForm: the engine (Aulumic's TPlaybackManager)
   and everything that shows or changes playback:
     InitPlayback, UpdateManagerConfig, UiTimerTick, UpdateTimerPace,
     UpdatePosition, UpdateMeter, UpdateEngineStatus, CheckOpeningUI,
@@ -9,7 +14,8 @@
     (ManagerTrackChange ... ManagerBackgroundRequest), PlayPause,
     StopPlayback, NextTrack, PrevTrack, SeekBy, ChangeVolume, ToggleMute,
     ShowTone, ToneChanged, VolumeChanged, VolumeMuted, DeviceClick,
-    DevicePick, BannerRate, RatePick, VolumeClick, SeekChange, SeekEnd }
+    DevicePick, BannerRate, RatePick, VolumeClick, SeekChange, SeekEnd
+  =============================================================================}
 
 { ---> AulumicNS: what the rate line shows, in one string: a change of any of
   it (a restart with other settings, the next track at another rate) shows

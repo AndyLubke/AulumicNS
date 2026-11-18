@@ -1,13 +1,19 @@
 unit AuGroupList;
 
-{ TAuGroupList - owner-drawn list of groups and items for the playlist pane
+{ ==============================================================================
+  AulumicNS - AuGroupList
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  TAuGroupList - owner-drawn list of groups and items for the playlist pane
   (replaces the VirtualTreeView of Aulumic's playlist). A row is either a
   group header (an album: cover, one or two lines of text) or an item (a
   track). Items of a collapsed group are hidden. The list holds only the row
   structure and an owner value per row; the owner paints the content
   (OnDrawRow) - the list paints selection, hover, the collapse triangle,
   the three dots menu button and the drop marker.
-  Scrolling is in pixels because headers are higher than items. }
+  Scrolling is in pixels because headers are higher than items.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

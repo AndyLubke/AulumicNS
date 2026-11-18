@@ -1,12 +1,18 @@
 unit AuFolderPicker;
 
-{ Themed folder picker (replaces the system folder dialog).
+{ ==============================================================================
+  AulumicNS - AuFolderPicker
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Themed folder picker (replaces the system folder dialog).
 
   The list shows the sub folders of the current folder, or the drives at the
   top level ("This PC"). Double click / Enter opens a folder, Backspace or
   the Up button goes one level up. Selecting a row puts its path in the path
   field; "Select folder" returns the path in the field. The path can also be
-  typed or pasted. }
+  typed or pasted.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$WARN SYMBOL_PLATFORM OFF}

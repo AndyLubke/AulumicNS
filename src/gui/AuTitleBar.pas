@@ -1,6 +1,11 @@
 unit AuTitleBar;
 
-{ A title bar drawn by the program instead of Windows: the icon, the window
+{ ==============================================================================
+  AulumicNS - AuTitleBar
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  A title bar drawn by the program instead of Windows: the icon, the window
   caption and the minimize / maximize / close buttons in the colours of the
   current theme, switching live with it.
 
@@ -22,7 +27,8 @@ unit AuTitleBar;
     11 show its snap layouts there. Clicks on HTMAXBUTTON are handled here,
     so Windows never draws its own button.
   The window procedures are replaced with SetWindowLongPtr (the LCL handles
-  the non-client messages in its own way) and put back at WM_NCDESTROY. }
+  the non-client messages in its own way) and put back at WM_NCDESTROY.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

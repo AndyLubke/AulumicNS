@@ -3,8 +3,9 @@ unit ALHeadroom;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: ALHeadroom
+  AulumicNS - ALHeadroom
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Automatic headroom: what the play thread has learned about the peaks of the
   albums it played.

@@ -1,13 +1,19 @@
 unit AuTree;
 
-{ TAuTreeView - owner-drawn tree for the library pane (replaces the
+{ ==============================================================================
+  AulumicNS - AuTree
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  TAuTreeView - owner-drawn tree for the library pane (replaces the
   VirtualTreeView of Aulumic). Nodes are small objects owned by the tree;
   their children can be loaded lazily (OnExpanding) so that a library with
   tens of thousands of folders opens instantly. Features: multi-selection,
   accordion mode, dimmed (unavailable) and accent (category) nodes, a three
   dots row menu for touch screens, type-ahead search, Ctrl + mouse wheel
   text size and dragging the selection to another control (LCL drag and
-  drop: the target receives this tree as Source). }
+  drop: the target receives this tree as Source).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

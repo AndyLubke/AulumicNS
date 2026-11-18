@@ -1,12 +1,18 @@
 unit AuSettings;
 
-{ Where AulumicNS keeps its data (portable):
+{ ==============================================================================
+  AulumicNS - AuSettings
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Where AulumicNS keeps its data (portable):
     <exe>\Data\    settings (AulumicNS.ini), library, playlists, artist info, log
     <exe>\Cache\   thumbnails, cover cache
   When the folder of the exe cannot be written (e.g. under Program Files):
     %APPDATA%\AulumicNS\ (and its Cache sub folder).
   The settings themselves are Aulumic's TAppSettings (uSettingsManager),
-  extended with the AulumicNS fields; uAppConsts builds its paths from here. }
+  extended with the AulumicNS fields; uAppConsts builds its paths from here.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

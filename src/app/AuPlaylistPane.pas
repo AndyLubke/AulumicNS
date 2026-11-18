@@ -1,6 +1,11 @@
 unit AuPlaylistPane;
 
-{ The playlist pane on the right of the main window - Aulumic's playlist
+{ ==============================================================================
+  AulumicNS - AuPlaylistPane
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The playlist pane on the right of the main window - Aulumic's playlist
   frame (uFramePlaylist) on the AulumicNS group list: the playlist selector,
   "View" (grouping and formats) and "Edit" above the list.
 
@@ -23,7 +28,8 @@ unit AuPlaylistPane;
   The pane holds the entries (TPlEntry, in playlist order) and builds the
   rows from them (Rebuild); the main window stores them (uPlaylistStore)
   when OnChange says the content changed. Tracks of the library come from
-  its records (AddTracks; OnLookup for added files), never from the files. }
+  its records (AddTracks; OnLookup for added files), never from the files.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

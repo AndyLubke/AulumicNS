@@ -3,8 +3,9 @@ unit TestPlayback;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program (ported from Aulumic)
-  Unit Name: TestPlayback
+  AulumicNS tests - TestPlayback
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> AulumicNS: FLAC is decoded by the built-in decoder (AuDecFlac), so the
   FLAC tests always run; the libsoxr / libFLAC record layouts and the plugin

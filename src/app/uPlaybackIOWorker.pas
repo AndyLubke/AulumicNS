@@ -3,10 +3,9 @@ unit uPlaybackIOWorker;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uPlaybackIOWorker
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uPlaybackIOWorker
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Background disk access for TPlaybackManager, so a sleeping USB / network
   drive never freezes the user interface:

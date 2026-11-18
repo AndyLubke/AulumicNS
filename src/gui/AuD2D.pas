@@ -3,7 +3,12 @@ unit AuD2D;
 {$mode objfpc}{$H+}
 {$PACKRECORDS C}
 
-{ ---> AulumicNS: the parts of Direct2D, DirectWrite and the Windows Imaging
+{ ==============================================================================
+  AulumicNS - AuD2D
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  ---> AulumicNS: the parts of Direct2D, DirectWrite and the Windows Imaging
   Component (WIC) that AuGfx uses, declared by hand (FPC 3.2.2 has no units
   for them). The interfaces are declared in full up to the last method that
   is called: the ORDER of the methods is the binary contract (the vtable), so
@@ -11,7 +16,8 @@ unit AuD2D;
   a parameterless procedure (calling one of those would corrupt the stack).
   A C++ method that returns a structure takes a hidden pointer to the result
   as its first parameter (after Self): such methods are declared as a
-  procedure with an "out" parameter. }
+  procedure with an "out" parameter.
+  =============================================================================}
 
 interface
 

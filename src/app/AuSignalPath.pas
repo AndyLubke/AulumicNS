@@ -1,6 +1,11 @@
 unit AuSignalPath;
 
-{ The signal path (Aulos' TAuSignalPath of its Now Playing page): every stage
+{ ==============================================================================
+  AulumicNS - AuSignalPath
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The signal path (Aulos' TAuSignalPath of its Now Playing page): every stage
   between the file and the DAC - source, decoder or DSD transport,
   ReplayGain, tone control, resampler, volume, dither, output - green when it
   passes the signal on unchanged, amber when it changes it, with a summary
@@ -8,7 +13,8 @@ unit AuSignalPath;
   AulumicNS: a popup under the badge of the banner (a click on it) that
   follows the playback while it is open (refreshed twice a second). The
   stages come from the play thread's snapshot (TPlaybackManager.
-  GetSignalInfo), the playing file and the settings (BuildSignalPath). }
+  GetSignalInfo), the playing file and the settings (BuildSignalPath).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

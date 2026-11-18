@@ -3,8 +3,9 @@ unit TestDriveWake;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestDriveWake
+  AulumicNS tests - TestDriveWake
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for the drive wake of uDriveKeepAlive (WakeDrives, FindOfflineDrives,
   FinishSetAsideThreads): one access per drive or network share, the waiting

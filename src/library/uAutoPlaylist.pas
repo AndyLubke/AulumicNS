@@ -3,10 +3,9 @@ unit uAutoPlaylist;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uAutoPlaylist
-  Author:    André Lubke
-  Created:   2026 (split from uFramePlaylist / uFormPlaylistManager)
+  AulumicNS - uAutoPlaylist
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Auto-playlists without any UI:
     SortAutoPlaylistByDate   the order of a "last played" / "added"

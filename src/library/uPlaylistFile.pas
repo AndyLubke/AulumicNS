@@ -3,10 +3,9 @@ unit uPlaylistFile;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uPlaylistFile
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uPlaylistFile
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The entry of a stored playlist: the file and the tags kept with it, so a
   track outside the library is shown without reading its file.

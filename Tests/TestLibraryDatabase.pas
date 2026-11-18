@@ -4,8 +4,9 @@ unit TestLibraryDatabase;
 {$codepage UTF8}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestLibraryDatabase
+  AulumicNS tests - TestLibraryDatabase
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for the library database file (Library.db) of TLibraryManager:
   loading a hand-written file (all 21 track fields, library folders, virtual

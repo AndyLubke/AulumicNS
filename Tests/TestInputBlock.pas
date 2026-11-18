@@ -3,8 +3,9 @@ unit TestInputBlock;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestInputBlock
+  AulumicNS tests - TestInputBlock
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   uInputBlock: while the block is on, the input messages posted to the windows
   of this thread are dropped and everything else arrives; one allowed window

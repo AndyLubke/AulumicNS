@@ -1,6 +1,11 @@
 unit AuLibraryPane;
 
-{ The library pane on the left of the main window - Aulumic's library frame
+{ ==============================================================================
+  AulumicNS - AuLibraryPane
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The library pane on the left of the main window - Aulumic's library frame
   (uFrameLibrary) on the AulumicNS tree control: a search box and the rescan
   button above the library tree with the categories Folders, Artists,
   Albums and Genres (Artists / Albums / Genres as set in the preferences).
@@ -20,7 +25,8 @@ unit AuLibraryPane;
   name it stands for (artist, album, genre), Path = folder / file / link,
   Filter = the artist or genre of an album below it, Data = flag bits
   (LNF_VIRTUAL, LNF_OFFLINE). The code decides by these, never by the shown
-  caption. }
+  caption.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

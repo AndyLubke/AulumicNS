@@ -1,6 +1,11 @@
 unit AuLoudness;
 
-{ EBU R128 / ITU-R BS.1770-4 loudness measurement (from Aulos' AuLoudness;
+{ ==============================================================================
+  AulumicNS - AuLoudness
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  EBU R128 / ITU-R BS.1770-4 loudness measurement (from Aulos' AuLoudness;
   the meter only - the scan thread is Aulumic's uReplayGainThread). It
   replaces libebur128:
     K-weighting (high shelf + high pass, coefficients for any sample rate),
@@ -9,7 +14,8 @@ unit AuLoudness;
     the peak is the sample peak over all channels.
   IntegratedLoudness over the blocks of one track is its loudness, over the
   blocks of all tracks of an album the album loudness (the gates applied to
-  all blocks together, as ebur128_loudness_global_multiple). }
+  all blocks together, as ebur128_loudness_global_multiple).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

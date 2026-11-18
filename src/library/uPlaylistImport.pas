@@ -3,10 +3,9 @@ unit uPlaylistImport;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uPlaylistImport
-  Author:    André Lubke
-  Created:   2026 (split from uFramePlaylist)
+  AulumicNS - uPlaylistImport
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   What comes into a playlist from outside, without any UI:
     LoadM3UText / ParseM3UEntries  reading an M3U / M3U8 file (UTF-8 with or

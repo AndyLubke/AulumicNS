@@ -3,10 +3,9 @@ unit ALAudioEngine;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALAudioEngine
-  Author:       André Lubke
-  Date Created: 2025
+  AulumicNS - ALAudioEngine
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The core audio engine. Is programmed in FPC natively.
   Plays wav, flac and dsf files.

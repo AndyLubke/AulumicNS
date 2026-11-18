@@ -3,8 +3,9 @@ unit TestAudioRules;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestAudioRules
+  AulumicNS tests - TestAudioRules
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for ALSourceFactory (how a track's audio source is built, without a
   play thread or a sound device):

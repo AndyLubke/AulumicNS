@@ -3,10 +3,9 @@ unit uEngineStateManager;
 {$mode objfpc}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    uEngineStateManager
-  Author:       André Lubke
-  Date Created: 10-Jun-26
+  AulumicNS - uEngineStateManager
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Centralized 'Thread Police' to ensure threads don't interfere with each other,
   and application-wide event bus decoupling external units from uFormPlayMain.

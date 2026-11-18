@@ -1,13 +1,19 @@
 unit AuCoverViewer;
 
-{ The cover viewer (Aulumic's uPanelCoverArt in its popup; a click on the
+{ ==============================================================================
+  AulumicNS - AuCoverViewer
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The cover viewer (Aulumic's uPanelCoverArt in its popup; a click on the
   cover or the album in the banner): the playing album's cover as large as
   the window allows, and every other image of the album folder (back cover,
   scans) to step through - click / right click, the mouse wheel, the arrow
   keys, Page Up / Down, Home / End. The footer shows the format and which
   image it is. The embedded cover comes first unless the folder has its own
   front cover (Aulumic's rule). One window; it follows the next album when
-  it is opened again. }
+  it is opened again.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

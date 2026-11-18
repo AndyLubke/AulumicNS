@@ -1,6 +1,11 @@
 unit AuPdf;
 
-{ PDF rendering with the PDF engine built into Windows 10 / 11
+{ ==============================================================================
+  AulumicNS - AuPdf
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  PDF rendering with the PDF engine built into Windows 10 / 11
   (Windows.Data.Pdf, a WinRT component of the system - like Direct2D it ships
   with Windows, so the exe stays self-contained).
 
@@ -8,7 +13,8 @@ unit AuPdf;
   apartment): it loads the document, reads the page sizes and renders the
   requested pages at the requested pixel width into bitmaps (TGfxBitmap). Requests
   are served newest first; finished pages are taken by the main thread
-  with TakeResults. }
+  with TakeResults.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

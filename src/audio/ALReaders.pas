@@ -3,10 +3,9 @@ unit ALReaders;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALReaders
-  Author:       André Lubke
-  Date Created: 24-feb-26
+  AulumicNS - ALReaders
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by the AudioEngine to read FLAC, WAV and DSF files.
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic (file

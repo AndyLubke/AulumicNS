@@ -1,8 +1,9 @@
 unit uDbStore;
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: uDbStore
+  AulumicNS - uDbStore
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The storage of the library and the user statistics, in the format family
   of Aulos (library.adb + library.jnl):

@@ -1,6 +1,11 @@
 unit AuPropertiesForm;
 
-{ The Properties dialog (Aulumic's uFormTagEditor; Main menu > Tools > Edit
+{ ==============================================================================
+  AulumicNS - AuPropertiesForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Properties dialog (Aulumic's uFormTagEditor; Main menu > Tools > Edit
   Properties..., Alt+Enter, the library and playlist menus) in the Aulos
   layout:
     left        the files (a dot marks a changed one, ! one whose tag could
@@ -14,7 +19,8 @@ unit AuPropertiesForm;
   Title and Track stay unique per track. Only the fields the user changes
   are written. Save hands the changed files to the metadata custodian
   (background thread, as Aulumic) and closes.
-  ---> AulumicNS: sizable (Layout); it opens at the size it had. }
+  ---> AulumicNS: sizable (Layout); it opens at the size it had.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

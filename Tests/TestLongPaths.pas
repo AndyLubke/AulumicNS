@@ -3,8 +3,9 @@ unit TestLongPaths;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestLongPaths
+  AulumicNS tests - TestLongPaths
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Files whose path has 260 characters or more (Windows' MAX_PATH): the file
   calls take the \\?\ form (AuAudioTypes.LongPath). Before, such a file was

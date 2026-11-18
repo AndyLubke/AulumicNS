@@ -1,6 +1,11 @@
 unit AuLogForm;
 
-{ The Log window (Aulumic's frmAppLog, Main menu > Tools > Show Log...,
+{ ==============================================================================
+  AulumicNS - AuLogForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Log window (Aulumic's frmAppLog, Main menu > Tools > Show Log...,
   Ctrl+L): the lines of AuLog in a list with a fixed-width font; the time
   is dimmed, warnings and errors are shown in their colours. Not modal, one
   window; while it is open it follows the log (it stays at the end when it
@@ -10,7 +15,8 @@ unit AuLogForm;
     - Save to File... (Ctrl+S): the log and the error history, as Aulumic
     - Clear: the lines (the error history stays, as in Aulumic)
   AulumicNS: the lines are a list (Aulumic: a memo), so they keep the
-  colours and the window stays fast with the 5000 lines of a long session. }
+  colours and the window stays fast with the 5000 lines of a long session.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

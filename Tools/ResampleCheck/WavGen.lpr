@@ -1,7 +1,13 @@
 program WavGen;
 
-{ Worst-case test signals for inter-sample peaks: 24-bit stereo WAV, 10 s.
-  WavGen <folder> <rate> }
+{ ==============================================================================
+  AulumicNS tools - WavGen
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Worst-case test signals for inter-sample peaks: 24-bit stereo WAV, 10 s.
+  WavGen <folder> <rate>
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

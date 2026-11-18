@@ -1,6 +1,11 @@
 unit AuHelp;
 
-{ Help window of Aulos with a small native Markdown renderer (ported from the
+{ ==============================================================================
+  AulumicNS - AuHelp
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Help window of Aulos with a small native Markdown renderer (ported from the
   help window of the Chess Contraption Workshop).
 
   Supported Markdown:
@@ -22,7 +27,8 @@ unit AuHelp;
   150 % by Tools\MakeHelpShots.ps1); a file help\shots\<name>.png next to the
   exe overrides one. They are drawn at their size for the window's scaling,
   at most the width of the text. The controls are on Body (the own title
-  bar); F1 in a dialog opens the topic of its HelpKeyword (AuShowHelp). }
+  bar); F1 in a dialog opens the topic of its HelpKeyword (AuShowHelp).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

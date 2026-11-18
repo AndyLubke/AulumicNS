@@ -3,10 +3,9 @@ unit uSettingsLog;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uSettingsLog
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uSettingsLog
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Writes the audio / system settings to the log, with the names used in the
   Preferences window:

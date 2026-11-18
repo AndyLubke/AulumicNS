@@ -3,10 +3,9 @@ unit uTagParser;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uTagParser
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uTagParser
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Parses the metatag variables (%artist% etc.) for using in queries (in auto
   playlists) and for display purposes (in status bars etc.).

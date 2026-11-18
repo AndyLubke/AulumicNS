@@ -3,10 +3,9 @@ unit ALReaderDSF;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALReaderDSF
-  Author:       André Lubke
-  Date Created: 24-Jul-26
+  AulumicNS - ALReaderDSF
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read DSF files.
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic; the

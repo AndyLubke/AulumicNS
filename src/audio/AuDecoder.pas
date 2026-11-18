@@ -1,13 +1,19 @@
 unit AuDecoder;
 
-{ Base class of the decoders, a buffered file reader and the ReplayGain tag
+{ ==============================================================================
+  AulumicNS - AuDecoder
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Base class of the decoders, a buffered file reader and the ReplayGain tag
   parsers (Vorbis comments, ID3v2 TXXX) shared by them.
 
   Decoders deliver samples unchanged:
     skPcmInt   ReadPcm   interleaved Int32, value range of BitsPerSample
     skPcmFloat ReadFloat interleaved Double
     skDsd      ReadDsd   interleaved bytes (one per channel per frame),
-                         most significant bit = earliest DSD sample }
+                         most significant bit = earliest DSD sample
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

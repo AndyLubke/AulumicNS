@@ -1,6 +1,11 @@
 unit AuResample;
 
-{ Sample rate conversion of AulumicNS - replaces libsoxr, in Pascal, all in
+{ ==============================================================================
+  AulumicNS - AuResample
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Sample rate conversion of AulumicNS - replaces libsoxr, in Pascal, all in
   double precision. Built on the polyphase converter of Aulos (rational
   L / M, Kaiser windowed sinc, two stages for ratios of 3 and more) and
   extended with Aulumic's resampler settings:
@@ -27,7 +32,8 @@ unit AuResample;
 
   TAuStreamResampler has the streaming interface the engine used with
   libsoxr: Process takes input frames, returns how many it used and how many
-  output frames it wrote (interleaved doubles). }
+  output frames it wrote (interleaved doubles).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$R-}{$Q-}

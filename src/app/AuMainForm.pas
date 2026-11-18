@@ -1,6 +1,11 @@
 unit AuMainForm;
 
-{ The main window of AulumicNS - the layout of Aulumic, built with the
+{ ==============================================================================
+  AulumicNS - AuMainForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The main window of AulumicNS - the layout of Aulumic, built with the
   AulumicNS GUI library (no .lfm, no VirtualTreeView, vector icons, own
   title bar):
 
@@ -24,7 +29,8 @@ unit AuMainForm;
   Milestone 2: playback (Aulumic's engine with the built-in decoders and
   resampler, WASAPI and ASIO). Milestone 3: the library (Aulumic's library
   manager, stored in the Aulos format; AuMainForm_library.inc). The playlist
-  is one play list (real playlists: milestone 4). }
+  is one play list (real playlists: milestone 4).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

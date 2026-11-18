@@ -1,11 +1,17 @@
 unit AuMenus;
 
-{ Themed popup / context menus with icons, check marks, shortcuts and sub
+{ ==============================================================================
+  AulumicNS - AuMenus
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Themed popup / context menus with icons, check marks, shortcuts and sub
   menus. Fully keyboard operable (arrows, Enter, Escape, Left / Right).
   ---> AulumicNS (2026-11-12): a menu that is higher than the screen has room
   for is as high as fits and scrolls (scroll bar, mouse wheel, touch, the
   arrow keys, Home / End, Page Up / Down). It ran off the screen before: with
-  many playlists the lower ones could not be reached. }
+  many playlists the lower ones could not be reached.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

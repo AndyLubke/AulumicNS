@@ -1,9 +1,15 @@
 unit AuVolumePopup;
 
-{ The volume popup of the speaker button (Aulumic's volume popup in the
+{ ==============================================================================
+  AulumicNS - AuVolumePopup
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The volume popup of the speaker button (Aulumic's volume popup in the
   style of AulumicNS): a slider 0 .. 100 %, the percentage, mute, and a note
   when the volume is fixed (Lock Volume to 100 %, or DSD sent as DSD). The
-  value is 0 .. 1; the engine works with it in 64-bit floating point. }
+  value is 0 .. 1; the engine works with it in 64-bit floating point.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

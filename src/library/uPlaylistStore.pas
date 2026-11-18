@@ -1,8 +1,9 @@
 unit uPlaylistStore;
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: uPlaylistStore
+  AulumicNS - uPlaylistStore
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   All playlists and auto-playlists of AulumicNS in the Aulos format
   (uDbStore, as the library): Data\Playlists\playlists.adb (snapshot) and

@@ -4,6 +4,10 @@ program LibBench;
 {$APPTYPE CONSOLE}
 
 { ==============================================================================
+  AulumicNS tools - LibBench
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
   LibBench - times the library's operations on a real database.
 
     LibBench <folder with a COPY of library.adb / library.jnl> [--save=1] [--playlist=1]

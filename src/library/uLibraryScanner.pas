@@ -3,10 +3,9 @@ unit uLibraryScanner;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uLibraryScanner
-  Author:    André Lubke
-  Created:   2026 (split from uLibraryManager)
+  AulumicNS - uLibraryScanner
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   TLibraryScannerThread recursively scans the library folders in the
   background, reads the tags of new and changed files and builds the new

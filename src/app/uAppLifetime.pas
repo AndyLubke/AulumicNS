@@ -3,8 +3,9 @@ unit uAppLifetime;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS (from Aulumic)
-  Unit Name: uAppLifetime
+  AulumicNS - uAppLifetime
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The one place where the global objects are freed at the end of the program.
   Used by AulumicNS.lpr (normal exit and the early exits) and by the test

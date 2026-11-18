@@ -3,10 +3,9 @@ unit uToneControl;
 {$mode objfpc}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uToneControl
-// Author:       André Lubke
-// Date Created: 2026
+// AulumicNS - uToneControl
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // Implements a 3 shelve hybrid 'Baxandall/semi parametric EQ' tone control
 // with adjustable mid frequencies.

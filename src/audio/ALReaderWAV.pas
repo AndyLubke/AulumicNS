@@ -3,10 +3,9 @@ unit ALReaderWAV;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALReaderWAV
-  Author:       André Lubke
-  Date Created: 2025
+  AulumicNS - ALReaderWAV
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read WAV files.
   ---> CHANGED (ObjFPC switch, step 2): ObjFPC like the rest of Aulumic; the

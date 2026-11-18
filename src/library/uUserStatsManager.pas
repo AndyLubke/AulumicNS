@@ -3,10 +3,9 @@ unit uUserStatsManager;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uUserStatsManager
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uUserStatsManager
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Stores / Loads the UserStats database (date added, number of times played,
   ratings etc.).

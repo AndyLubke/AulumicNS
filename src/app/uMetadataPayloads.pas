@@ -3,10 +3,9 @@ unit uMetadataPayloads;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uMetadataPayloads
-// Author:       André Lubke
-// Date Created: 08-Jul-26
+// AulumicNS - uMetadataPayloads
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // Defines the strict data records, structures, and pointer types
 // (like TMetadataJob) used to safely pass information between the UI and

@@ -4,7 +4,9 @@ program AulumicNSTests;
 {$APPTYPE CONSOLE}
 
 { ==============================================================================
-  Project:   AulumicNS - test program (ported from Aulumic's AulumicTests)
+  AulumicNS tests - AulumicNSTests
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Console test runner (FPCUnit) for the logic of AulumicNS. Nothing is played
   on a sound device (the playback tests play into a memory output) and only

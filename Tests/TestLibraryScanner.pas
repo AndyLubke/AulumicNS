@@ -3,8 +3,9 @@ unit TestLibraryScanner;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestLibraryScanner
+  AulumicNS tests - TestLibraryScanner
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for the library scan (TLibraryManager.StartScan with the
   TLibraryScannerThread of uLibraryScanner) on a temporary folder with small

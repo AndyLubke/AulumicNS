@@ -4,8 +4,9 @@ unit TestPlaylistStore;
 {$codepage UTF8}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestPlaylistStore
+  AulumicNS tests - TestPlaylistStore
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The playlist store (uPlaylistStore: playlists.adb + playlists.jnl): every
   field survives save + reload; adding, renaming, changing and deleting

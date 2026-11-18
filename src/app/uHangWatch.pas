@@ -4,8 +4,9 @@ unit uHangWatch;
 {$PACKRECORDS C}
 
 { ==============================================================================
-  Project:      AulumicNS
-  Unit Name:    uHangWatch
+  AulumicNS - uHangWatch
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> AulumicNS: a watchdog for a frozen main window. A thread looks at the
   window every second: it is frozen when Windows calls it hung (IsHungAppWindow:

@@ -4,8 +4,9 @@ unit TestLibraryLogic;
 {$codepage UTF8}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestLibraryLogic
+  AulumicNS tests - TestLibraryLogic
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for the library's pure logic (no files, no threads):
     TTestTrackSorting : NaturalCompareText, SmartTrackCompare and the

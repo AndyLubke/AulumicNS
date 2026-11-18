@@ -1,6 +1,11 @@
 unit AuVirtualFolderForm;
 
-{ The Virtual Folder editor (Aulumic's uFormAliasEditor; the library menu:
+{ ==============================================================================
+  AulumicNS - AuVirtualFolderForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Virtual Folder editor (Aulumic's uFormAliasEditor; the library menu:
   Create / Edit Virtual Folder...): a virtual folder is a .aullink file in a
   library folder that shows other folders inside it (e.g. all recordings of
   one composer from everywhere in the library).
@@ -12,7 +17,8 @@ unit AuVirtualFolderForm;
     Folders       the folders inside it: Add Folder..., Remove (Del), folders
                   dropped from Explorer
   The paths are kept relative to the folder of the link (as Aulumic). The
-  search runs on a copy of the library (no disk access). }
+  search runs on a copy of the library (no disk access).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

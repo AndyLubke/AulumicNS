@@ -3,10 +3,9 @@ unit uVersionHelper;
 {$mode objfpc}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uVersionHelper
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uVersionHelper
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Loads the .exe's version info (Project Options > Version Info in Lazarus:
   the numbers and strings of AulumicNS.lpi).

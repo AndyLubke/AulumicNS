@@ -3,8 +3,9 @@ unit ALReaderFLAC;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      AulumicNS (from Aulumic)
-  Unit Name:    ALReaderFLAC
+  AulumicNS - ALReaderFLAC
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Used by ALReaders to read FLAC files.
   ---> AulumicNS: decodes with the built-in FLAC decoder of Aulos

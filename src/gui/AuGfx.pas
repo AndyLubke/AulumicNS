@@ -1,6 +1,11 @@
 unit AuGfx;
 
-{ The drawing layer of the GUI: TGfx (anti-aliased shapes, paths, gradients,
+{ ==============================================================================
+  AulumicNS - AuGfx
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The drawing layer of the GUI: TGfx (anti-aliased shapes, paths, gradients,
   clipping, bitmaps, text), fonts, bitmaps in memory and picture files.
   ---> AulumicNS: Direct2D draws, DirectWrite sets the text, the Windows
   Imaging Component (WIC) reads and writes picture files. All three are part
@@ -14,7 +19,8 @@ unit AuGfx;
   column, screenshots) get a target of their own with an alpha channel.
   Everything here is in pixels: the targets run at 96 dpi, the callers scale
   (AuTheme.S). Only the UI thread draws; picture files may be decoded on any
-  thread (ImageFromBytes / ImageFromFile). }
+  thread (ImageFromBytes / ImageFromFile).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

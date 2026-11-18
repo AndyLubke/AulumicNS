@@ -3,10 +3,9 @@ unit ALSourceFactory;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALSourceFactory
-  Author:       André Lubke
-  Date Created: 2026 (split from ALAudioThread)
+  AulumicNS - ALSourceFactory
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Building the audio source of a track from a snapshot of the play settings
   (TPlayThreadConfig), without a TPlayThread: the decoder (WAV, FLAC, DSF /

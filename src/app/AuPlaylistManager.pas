@@ -1,6 +1,11 @@
 unit AuPlaylistManager;
 
-{ The Playlist Manager (Aulumic's uFormPlaylistManager, Main menu >
+{ ==============================================================================
+  AulumicNS - AuPlaylistManager
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Playlist Manager (Aulumic's uFormPlaylistManager, Main menu >
   Playlist > Playlist Manager..., Alt+P, the Edit button above the
   playlist): all playlists - the Default playlist, your playlists, the
   auto-playlists (funnel) - with
@@ -9,7 +14,8 @@ unit AuPlaylistManager;
   Double click or Enter shows the playlist and closes the manager.
   AulumicNS: the changes go straight into the playlist store (Aulumic wrote
   the files); the main window learns about renames, the playlists whose
-  view or rules changed and the one to show (TPlaylistManagerResult). }
+  view or rules changed and the one to show (TPlaylistManagerResult).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

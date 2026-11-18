@@ -3,10 +3,9 @@ unit ALAudioOutput;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALAudioOutput
-  Author:       André Lubke
-  Date Created: 2026 (output split, step 2a)
+  AulumicNS - ALAudioOutput
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The output device as the play thread sees it (TPlayThread.RunOutput): an
   open stream that asks for whole buffers. The play thread fills them (read,

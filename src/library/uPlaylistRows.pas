@@ -3,10 +3,9 @@ unit uPlaylistRows;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uPlaylistRows
-  Author:    André Lubke
-  Created:   2026 (split from uFramePlaylist, phase 5c-1)
+  AulumicNS - uPlaylistRows
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The playlist's rows without any UI:
     TTrackNodeData            the data of one playlist row (track or group

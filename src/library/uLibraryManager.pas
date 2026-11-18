@@ -3,10 +3,9 @@ unit uLibraryManager;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uLibraryManager
-// Author:       André Lubke
-// Date Created: 08-Jul-26
+// AulumicNS - uLibraryManager
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // The backend data layer. Manages the in-memory track dictionary, coordinates
 // the background TLibraryScannerThread, and handles committing the physical

@@ -4,8 +4,9 @@ unit ALOutputRing;
 {$R-}{$Q-}
 
 { ==============================================================================
-  Project:      AulumicNS
-  Unit Name:    ALOutputRing
+  AulumicNS - ALOutputRing
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> AulumicNS: the ring between the play thread and a device that pulls
   whole periods on its own thread (the ASIO driver's bufferSwitch; the

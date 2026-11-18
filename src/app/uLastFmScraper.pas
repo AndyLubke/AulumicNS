@@ -1,10 +1,9 @@
 unit uLastFmScraper;
 
 { ==============================================================================
-  Project:     Aulumic
-  Unit Name:   uLastFmScraper
-  Author:      André Lubke
-  Created:     2026
+  AulumicNS - uLastFmScraper
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Scrapes Artist info from the LastFM site and
   album info from TheaudioDB, LastFM and Wikipedia (in that order)

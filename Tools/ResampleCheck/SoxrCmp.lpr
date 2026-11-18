@@ -1,6 +1,11 @@
 program SoxrCmp;
 
-{ AulumicNS' AuResample against libsoxr (Aulumic's DLL, Aulumic's settings).
+{ ==============================================================================
+  AulumicNS tools - SoxrCmp
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AulumicNS' AuResample against libsoxr (Aulumic's DLL, Aulumic's settings).
   A check tool (2026-11-11/12), not part of the program.
 
   Build (from the project folder; nothing is written into src):
@@ -30,7 +35,8 @@ program SoxrCmp;
                --floatpeak=1 --gain=-12 --dump=)> --scale=0.251188643150958
                --inr= --outr= --q= --ph= --bw= --aa=: the lag, the peaks and
                the difference below 19 kHz / to Nyquist / above it
-  WavGen.lpr writes the worst-case test signals (WavGen <folder> <rate>). }
+  WavGen.lpr writes the worst-case test signals (WavGen <folder> <rate>).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$R-}{$Q-}

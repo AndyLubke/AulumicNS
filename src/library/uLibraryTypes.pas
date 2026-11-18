@@ -3,10 +3,9 @@ unit uLibraryTypes;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uLibraryTypes
-  Author:    André Lubke
-  Created:   2026 (split from uLibraryManager)
+  AulumicNS - uLibraryTypes
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The library's track record and the functions that order tracks:
     TTrackInfo / PTrackInfo / TTrackInfoArray

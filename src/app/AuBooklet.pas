@@ -1,6 +1,11 @@
 unit AuBooklet;
 
-{ Booklet viewer: PDF booklets of an album in their own window.
+{ ==============================================================================
+  AulumicNS - AuBooklet
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Booklet viewer: PDF booklets of an album in their own window.
 
   Pages are shown one at a time or as a booklet spread (the cover alone,
   then facing pages side by side; landscape pages are spreads already and
@@ -13,7 +18,8 @@ unit AuBooklet;
   AulumicNS: copied from Aulos (replaces Aulumic's SumatraPDF); the bar and
   the view are on Body (below the own title bar); FindBooklets moved to
   uMetaUtils (the playback IO worker uses it for the banner's booklet button);
-  CloseBooklet frees the viewer at exit. }
+  CloseBooklet frees the viewer at exit.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

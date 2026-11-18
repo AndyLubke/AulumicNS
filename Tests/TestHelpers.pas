@@ -3,8 +3,9 @@ unit TestHelpers;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestHelpers
+  AulumicNS tests - TestHelpers
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Small helpers shared by the test units: a temporary folder per test (under
   %TEMP%\AulumicTests, never inside the project or the user's data) and

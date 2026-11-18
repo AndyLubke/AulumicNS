@@ -3,8 +3,9 @@ unit ALReaderDFF;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      AulumicNS
-  Unit Name:    ALReaderDFF
+  AulumicNS - ALReaderDFF
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> AulumicNS: reads DSDIFF (.dff) files for the DSD path of the engine.
   TDsfReader hands a DFF file to this reader, so the rest of the engine

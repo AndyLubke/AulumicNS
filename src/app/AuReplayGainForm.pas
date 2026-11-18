@@ -1,6 +1,11 @@
 unit AuReplayGainForm;
 
-{ The ReplayGain scanner window (Aulumic's uFormReplayGain): Main menu >
+{ ==============================================================================
+  AulumicNS - AuReplayGainForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The ReplayGain scanner window (Aulumic's uFormReplayGain): Main menu >
   Tools > Calculate ReplayGain (the whole library), the library menu (the
   selection - each album completed with its other tracks), the status line
   while a hidden scan runs.
@@ -9,7 +14,8 @@ unit AuReplayGainForm;
        it running (the status line shows it), Stop ends it after the track
     3. the results: every track with its gains and peaks or why it was not
        measured; Save All hands the measured ones to the metadata custodian
-  The loudness is measured by the built-in EBU R128 meter (no libebur128). }
+  The loudness is measured by the built-in EBU R128 meter (no libebur128).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

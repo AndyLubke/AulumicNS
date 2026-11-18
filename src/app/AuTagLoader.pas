@@ -1,13 +1,19 @@
 unit AuTagLoader;
 
-{ Reads the tags for the Properties dialog (Aulumic's uTagLoader): a small
+{ ==============================================================================
+  AulumicNS - AuTagLoader
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Reads the tags for the Properties dialog (Aulumic's uTagLoader): a small
   progress window with Cancel (Esc) while the files are read on the UI
   thread. The drives are woken first on a worker thread (WakeDrives), so a
   sleeping drive shows "Waiting for drive..." instead of a frozen window; a
   network drive that does not answer and a missing file stop the loading
   (a missing file offers a rescan of the library, as Aulumic).
   The records (TTagEditNodeData) are the editor's working copies: Original
-  as read, Current as edited. }
+  as read, Current as edited.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

@@ -1,13 +1,19 @@
 unit AuTransport;
 
-{ The bottom of the main window (Aulumic layout):
+{ ==============================================================================
+  AulumicNS - AuTransport
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The bottom of the main window (Aulumic layout):
   TTransportBar - position / seek bar with the times, the transport buttons
                   in the middle (shuffle, stop, previous, play / pause, next,
                   jump to now playing, repeat) and on the right the output
                   device, the tone control and the volume (with percent)
   TStatusStrip  - status line: background progress (a thin line on top),
                   the status text, the clickable ReplayGain scan notice and
-                  the engine details }
+                  the engine details
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

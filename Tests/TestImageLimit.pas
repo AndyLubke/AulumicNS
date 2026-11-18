@@ -3,8 +3,9 @@ unit TestImageLimit;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestImageLimit
+  AulumicNS tests - TestImageLimit
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The size limit of the picture loaders (AuGfx): a cover, an artist picture
   or a folder picture with more than MAX_IMAGE_PIXELS (8192 x 8192) is not

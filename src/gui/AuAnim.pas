@@ -1,6 +1,11 @@
 unit AuAnim;
 
-{ ---> AulumicNS: short animations of the GUI (hover fades, a sliding switch,
+{ ==============================================================================
+  AulumicNS - AuAnim
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  ---> AulumicNS: short animations of the GUI (hover fades, a sliding switch,
   gliding scroll positions, windows that fade in). An animated number is a
   TAuAnim record that lives in the control (a field); AnimTo starts its way to
   a new value, one timer for the whole program moves all running ones about
@@ -12,7 +17,8 @@ unit AuAnim;
   once - so the code that uses a TAuAnim needs no second path. The debug tool
   modes (--shots, --touch-probe, --ui-bench) leave AnimationsOn off.
 
-  A control must call AnimForget(Self) in its destructor (TAuControl does). }
+  A control must call AnimForget(Self) in its destructor (TAuControl does).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

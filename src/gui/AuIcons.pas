@@ -1,8 +1,14 @@
 unit AuIcons;
 
-{ Vector icon set. Every icon is drawn with strokes / fills (AuGfx) on a 16 x 16
+{ ==============================================================================
+  AulumicNS - AuIcons
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Vector icon set. Every icon is drawn with strokes / fills (AuGfx) on a 16 x 16
   design grid and scaled to any size, so it is crisp at every DPI and takes
-  the colour of the current theme. }
+  the colour of the current theme.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

@@ -1,6 +1,11 @@
 unit AuDecFlac;
 
-{ Native FLAC decoder (no libFLAC). Implements the complete format:
+{ ==============================================================================
+  AulumicNS - AuDecFlac
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Native FLAC decoder (no libFLAC). Implements the complete format:
   STREAMINFO, SEEKTABLE, VORBIS_COMMENT (ReplayGain); frames with fixed or
   variable block size; subframes CONSTANT, VERBATIM, FIXED (order 0 - 4) and
   LPC (order 1 - 32); Rice coding with 4 / 5 bit parameters and escaped
@@ -9,7 +14,8 @@ unit AuDecFlac;
   32-bit streams (33-bit side channel) are exact.
 
   The MD5 signature of the decoded audio from STREAMINFO is exposed so the
-  test program can prove the decoder is bit exact. }
+  test program can prove the decoder is bit exact.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$R-}{$Q-}

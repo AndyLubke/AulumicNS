@@ -3,10 +3,9 @@ unit uFileLockRegistry;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uFileLockRegistry
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uFileLockRegistry
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Central 'Registry' for locking and releasing files (used by file management
   routines).

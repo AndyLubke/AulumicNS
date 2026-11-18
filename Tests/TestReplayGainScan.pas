@@ -3,8 +3,9 @@ unit TestReplayGainScan;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program (---> AulumicNS: ported, milestone 5)
-  Unit Name: TestReplayGainScan
+  AulumicNS tests - TestReplayGainScan
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for uReplayGainScan (the rules of a ReplayGain scan, no UI, no thread):
     TTestReplayGainRules  : the gain of a loudness (reference -18 LUFS, limits,

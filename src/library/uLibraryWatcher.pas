@@ -1,8 +1,9 @@
 unit uLibraryWatcher;
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: uLibraryWatcher
+  AulumicNS - uLibraryWatcher
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Watches the library folders (from Aulos: TAuWatcher) and reports when
   something in them changed; the main window then starts a quiet library

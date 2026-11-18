@@ -3,9 +3,9 @@ unit uAppStrings;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uAppStrings
-// Author:       André Lubke
+// AulumicNS - uAppStrings
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // The central repository for all static user-facing application strings.
 // =============================================================================

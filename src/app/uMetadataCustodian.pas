@@ -3,10 +3,9 @@ unit uMetadataCustodian;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uMetadataCustodian
-// Author:       André Lubke
-// Date Created: 08-Jul-26
+// AulumicNS - uMetadataCustodian
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // A thread-safe daemon that processes background queues for writing ID3/FLAC
 // metadata and ReplayGain tags. Safely communicates with the audio engine to

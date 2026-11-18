@@ -3,8 +3,9 @@ unit TestVolumePopup;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestVolumePopup
+  AulumicNS tests - TestVolumePopup
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The volume popup frees itself when it closes (TAuPopup: caFree), after it
   has called OnClosed. The main window forgets its popup there

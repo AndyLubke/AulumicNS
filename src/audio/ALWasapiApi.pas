@@ -3,10 +3,9 @@ unit ALWasapiApi;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALWasapiApi
-  Author:       André Lubke
-  Date Created: 2026 (split from ALAudioThread)
+  AulumicNS - ALWasapiApi
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The Windows Core Audio (WASAPI / MMDevice) declarations Aulumic uses: COM
   interfaces with their GUIDs, error codes, the wave format records and the

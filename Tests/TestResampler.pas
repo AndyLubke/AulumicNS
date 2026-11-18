@@ -3,8 +3,9 @@ unit TestResampler;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestResampler
+  AulumicNS tests - TestResampler
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests of the built-in resampler (AuResample, replaces libsoxr). Everything
   is computed, nothing is played:

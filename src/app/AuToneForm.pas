@@ -1,6 +1,11 @@
 unit AuToneForm;
 
-{ The tone control window: five bands (bass, low mid, mid, high mid, treble;
+{ ==============================================================================
+  AulumicNS - AuToneForm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The tone control window: five bands (bass, low mid, mid, high mid, treble;
   three - bass, mid, treble - until 2026-11-14), each with a selectable
   frequency and a vertical slider (-10 .. +10 dB in 0.1 dB steps); Aulumic's
   "semi Baxandall" tone control with two bands more. Changes apply at
@@ -12,7 +17,8 @@ unit AuToneForm;
 
   Slider keys: Up / Down 0.5 dB (Ctrl 0.1 dB), Page Up / Down 2 dB,
   Home or a double click = 0 dB; the mouse wheel moves 0.5 dB. The steps
-  and a mouse drag land on the 0.5 dB grid (Ctrl: 0.1 dB), as in Aulumic. }
+  and a mouse drag land on the 0.5 dB grid (Ctrl: 0.1 dB), as in Aulumic.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

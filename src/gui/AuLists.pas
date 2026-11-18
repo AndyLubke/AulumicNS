@@ -1,12 +1,18 @@
 unit AuLists;
 
-{ Virtual, owner-drawn collection controls:
+{ ==============================================================================
+  AulumicNS - AuLists
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Virtual, owner-drawn collection controls:
   TAuListView  - multi-column track list: resizable / sortable columns,
                  multi-selection, horizontal + vertical themed scroll bars
   TAuTileView  - grid of cover tiles (albums, artists)
   TAuNavRail   - vertical navigation (collapsible to icons)
   All of them hold no data: they ask the owner through events, so they scale
-  to libraries with hundreds of thousands of tracks. }
+  to libraries with hundreds of thousands of tracks.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

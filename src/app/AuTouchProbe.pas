@@ -1,6 +1,11 @@
 unit AuTouchProbe;
 
-{ ---> AulumicNS (debug build): the touch probe (--touch-probe=<report>,
+{ ==============================================================================
+  AulumicNS - AuTouchProbe
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  ---> AulumicNS (debug build): the touch probe (--touch-probe=<report>,
   run by Tools\ProbeTouch.ps1). It checks touch scrolling without a touch
   screen: Windows' touch injection (InjectTouchInput, Windows 8 and later,
   no touch hardware needed) puts a simulated finger on the screen, and
@@ -19,7 +24,8 @@ unit AuTouchProbe;
   windows it times out.
 
   This is real input on the desktop for about half a minute: the windows are
-  put on top and the mouse pointer is moved (and put back at the end). }
+  put on top and the mouse pointer is moved (and put back at the end).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

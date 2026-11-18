@@ -3,10 +3,9 @@ unit ALMetadata;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALMetadata
-  Author:       André Lubke
-  Date Created: 24-feb-26
+  AulumicNS - ALMetadata
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Reads metadata (using AulumicTags package) from tracks.
 ==============================================================================}

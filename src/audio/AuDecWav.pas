@@ -1,8 +1,14 @@
 unit AuDecWav;
 
-{ WAV / RF64 decoder: integer PCM 8 - 32 bit (also valid bits < container),
+{ ==============================================================================
+  AulumicNS - AuDecWav
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  WAV / RF64 decoder: integer PCM 8 - 32 bit (also valid bits < container),
   IEEE float 32 / 64 bit, WAVE_FORMAT_EXTENSIBLE. ReplayGain from an ID3
-  chunk. }
+  chunk.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

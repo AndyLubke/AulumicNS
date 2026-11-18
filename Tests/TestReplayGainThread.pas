@@ -3,8 +3,9 @@ unit TestReplayGainThread;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program (---> AulumicNS: ported, milestone 5)
-  Unit Name: TestReplayGainThread
+  AulumicNS tests - TestReplayGainThread
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Runs the real ReplayGain scan thread (TReplayGainThread) on
   generated WAV files and checks what it reports through its events:

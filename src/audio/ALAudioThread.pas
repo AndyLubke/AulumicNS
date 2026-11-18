@@ -3,10 +3,9 @@ unit ALAudioThread;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALAudioThread
-  Author:       André Lubke
-  Date Created: 2026
+  AulumicNS - ALAudioThread
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Manages time-critical WASAPI Exclusive mode playback. Handles bit-perfect
   audio delivery, libSoxR PCM resampling, native DSD/DoP packaging, and

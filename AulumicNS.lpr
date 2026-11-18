@@ -1,9 +1,15 @@
 program AulumicNS;
 
-{ AulumicNS - bit-perfect music player (WASAPI exclusive / ASIO).
+{ ==============================================================================
+  AulumicNS
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AulumicNS - bit-perfect music player (WASAPI exclusive / ASIO).
   The layout and functions of Aulumic with the self-contained GUI library of
   Aulos: one executable, no external DLLs besides Windows itself, no .lfm
-  files, vector icons, live dark / light theme. }
+  files, vector icons, live dark / light theme.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

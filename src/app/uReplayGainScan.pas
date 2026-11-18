@@ -3,10 +3,9 @@ unit uReplayGainScan;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uReplayGainScan
-  Author:    André Lubke
-  Created:   2026 (split from uFormReplayGain / uReplayGainThread)
+  AulumicNS - uReplayGainScan
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The rules of a ReplayGain scan, without UI and without the scan thread:
     TRGScanResult / TRGResultStatus  one scanned track and what became of it

@@ -3,10 +3,9 @@ unit uOSUtils;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uOSUtils
-// Author:       André Lubke
-// Date Created: 2026
+// AulumicNS - uOSUtils
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // Helper routines for OS related stuff.
 // =============================================================================

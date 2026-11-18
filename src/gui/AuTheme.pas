@@ -1,8 +1,14 @@
 unit AuTheme;
 
-{ Colour palette (dark / light, six accents), DPI scaling, fonts and the
+{ ==============================================================================
+  AulumicNS - AuTheme
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Colour palette (dark / light, six accents), DPI scaling, fonts and the
   theme-change broadcast. Controls never cache colours: they read the
-  palette variables while painting, so a theme switch only needs a repaint. }
+  palette variables while painting, so a theme switch only needs a repaint.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

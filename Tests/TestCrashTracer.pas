@@ -3,8 +3,9 @@ unit TestCrashTracer;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestCrashTracer
+  AulumicNS tests - TestCrashTracer
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for uCrashTracer's DescribeCodeAddress / DescribeExceptionPlace: the
   place of an exception as 'module+$offset' with its callers, as the log

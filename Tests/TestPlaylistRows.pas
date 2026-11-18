@@ -4,8 +4,9 @@ unit TestPlaylistRows;
 {$codepage UTF8}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestPlaylistRows
+  AulumicNS tests - TestPlaylistRows
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for uPlaylistRows (the playlist's rows without UI):
     TTestRowCopies  : track <-> stored playlist entry

@@ -3,10 +3,9 @@ unit uReplayGainThread;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uReplayGainThread
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uReplayGainThread
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Thread used for background ReplayGain scanning: measures the loudness of
   the albums it is given and reports through events, on the

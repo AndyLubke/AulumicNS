@@ -1,6 +1,11 @@
 unit AuDemoLibrary;
 
-{ The demo library of the help screenshots (debug build:
+{ ==============================================================================
+  AulumicNS - AuDemoLibrary
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The demo library of the help screenshots (debug build:
   AulumicNS.exe --make-demo-library=<folder>). Made-up artists and albums -
   nothing of a real person - as FLAC files of digital silence: CONSTANT
   subframes keep a five minute track at a few KB, so the albums have real
@@ -10,7 +15,8 @@ unit AuDemoLibrary;
   for two albums), one album two disc folders and a Scans folder, and two
   albums a small PDF booklet (cover page and text pages).
   The writers (WriteSilentFlac, WriteDemoBookletPdf) are tested by
-  TTestDemoLibrary. }
+  TTestDemoLibrary.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

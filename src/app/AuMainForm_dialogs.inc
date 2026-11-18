@@ -1,8 +1,14 @@
 {%MainUnit AuMainForm.pas}
-{ AuMainForm_dialogs.inc - TMainForm: the tools of milestone 5 that work on
+{ ==============================================================================
+  AulumicNS - AuMainForm_dialogs.inc
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AuMainForm_dialogs.inc - TMainForm: the tools of milestone 5 that work on
   files: the metadata custodian (tag writing on a background thread, as
   Aulumic) and Properties (the tag editor) from the library, the playlist or
-  the main menu. }
+  the main menu.
+  =============================================================================}
 
 { ---- the metadata custodian ---- }
 

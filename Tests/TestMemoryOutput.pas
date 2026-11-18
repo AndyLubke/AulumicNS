@@ -3,8 +3,9 @@ unit TestMemoryOutput;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestMemoryOutput
+  AulumicNS tests - TestMemoryOutput
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> ADDED (output split, step 3a): An output device for the playback tests
   (TestPlayback). TMemoryOutput is a TAudioOutput (ALAudioOutput) that keeps

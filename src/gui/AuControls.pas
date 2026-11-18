@@ -1,9 +1,15 @@
 unit AuControls;
 
-{ Owner-drawn control library. Every control paints itself with Direct2D (AuGfx)
+{ ==============================================================================
+  AulumicNS - AuControls
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Owner-drawn control library. Every control paints itself with Direct2D (AuGfx)
   in the colours of the current theme (AuTheme) - no native Windows widget is
   used, so scroll bars, combo drop-downs, hints and popups are all themed.
-  Every interactive control is a tab stop and fully keyboard operable. }
+  Every interactive control is a tab stop and fully keyboard operable.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

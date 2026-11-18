@@ -3,10 +3,9 @@ unit uDriveKeepAlive;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uDriveKeepAlive
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uDriveKeepAlive
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Keeps the drives of the current and the next track awake during playback
   (Preferences > System > Keep Music Drives Awake During Playback), so a

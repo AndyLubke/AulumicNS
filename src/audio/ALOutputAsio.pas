@@ -5,8 +5,9 @@ unit ALOutputAsio;
 {$R-}{$Q-}
 
 { ==============================================================================
-  Project:      AulumicNS
-  Unit Name:    ALOutputAsio
+  AulumicNS - ALOutputAsio
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   ---> AulumicNS: TAsioOutput, the ASIO output of the engine - a TAudioOutput
   like TWasapiOutput, so the play thread (TPlayThread.RunOutput: reading,

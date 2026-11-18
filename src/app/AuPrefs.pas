@@ -1,6 +1,11 @@
 unit AuPrefs;
 
-{ The Preferences dialog (Main menu > Preferences..., Ctrl+P, the gear in the
+{ ==============================================================================
+  AulumicNS - AuPrefs
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Preferences dialog (Main menu > Preferences..., Ctrl+P, the gear in the
   title bar): the content of Aulumic's Preferences (uFormPrefs) in the
   Aulos layout - the pages on the left, every setting with a description
   line under its name (no hint bar).
@@ -41,7 +46,8 @@ unit AuPrefs;
   The dialog edits a copy of the settings and of the folder list; the main
   window applies them after OK (as Aulumic's TfrmMain.ShowPrefsDialog). Scan
   and Repair hand the folder list to the main window at once and start the
-  scan (as Aulumic); the progress shows in the dialog. }
+  scan (as Aulumic); the progress shows in the dialog.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

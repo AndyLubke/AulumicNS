@@ -3,7 +3,9 @@ unit TestOutputRing;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - tests (audio chain fixes)
+  AulumicNS tests - TestOutputRing
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The ring between the play thread and the ASIO driver (ALOutputRing): the
   periods come out in the order they went in, also across the end of the

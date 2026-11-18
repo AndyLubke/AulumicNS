@@ -3,8 +3,9 @@ unit TestHeadroom;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestHeadroom
+  AulumicNS tests - TestHeadroom
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The automatic headroom (ALHeadroom, TPlayThread.RunGain).
 

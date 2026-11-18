@@ -1,6 +1,11 @@
 unit AuBanner;
 
-{ The "Now Playing" banner at the top of the main window (Aulumic layout):
+{ ==============================================================================
+  AulumicNS - AuBanner
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The "Now Playing" banner at the top of the main window (Aulumic layout):
     cover  Title                               FLAC        |peak |
            Album (link)                        24 bit/96   |meter|
            Genre                               Stereo      |     |
@@ -13,7 +18,8 @@ unit AuBanner;
   child control (it repaints up to 25 times a second).
   When the banner is made lower (the splitter below it) the fonts shrink
   and the rows disappear one by one, like in Aulumic. The background is a
-  vertical gradient tinted with the main colour of the cover. }
+  vertical gradient tinted with the main colour of the cover.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

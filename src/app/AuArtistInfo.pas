@@ -1,12 +1,18 @@
 unit AuArtistInfo;
 
-{ Artist Info (Aulumic's uPanelArtistInfo in its popup; a click on an artist
+{ ==============================================================================
+  AulumicNS - AuArtistInfo
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Artist Info (Aulumic's uPanelArtistInfo in its popup; a click on an artist
   in the banner): the biography and picture from Last.fm / Wikipedia /
   TheAudioDB (uLastFmScraper, one worker thread), saved in Data\MusicInfo,
   and how much of the artist the library holds. The biography can be edited
   (F2) and the picture replaced (Ctrl+O, a dropped file, Ctrl+V) or removed
   (Del); the user's own biography and picture are kept by Refresh (F5).
-  One window; it follows the next artist when it is opened again. }
+  One window; it follows the next artist when it is opened again.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

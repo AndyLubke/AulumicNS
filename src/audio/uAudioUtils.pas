@@ -3,10 +3,9 @@ unit uAudioUtils;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    uAudioUtils
-  Author:       André Lubke
-  Date Created: 24-Jun-26
+  AulumicNS - uAudioUtils
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Various helper routines for audio files.
 ==============================================================================}

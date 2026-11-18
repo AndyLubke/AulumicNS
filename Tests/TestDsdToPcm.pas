@@ -3,7 +3,9 @@ unit TestDsdToPcm;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - tests (audio chain: DSD to PCM)
+  AulumicNS tests - TestDsdToPcm
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   TDsdToPcmSource.SetOutputRate decimates straight to a lower rate (the DSD
   rate / 64 .. / 256) only when its DSD filter alone keeps the output free

@@ -3,10 +3,9 @@ unit uSettingsManager;
 {$mode objfpc}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uSettingsManager
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uSettingsManager
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Loads and saves all application settings to and from the .ini file.
   =============================================================================}

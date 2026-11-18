@@ -3,7 +3,9 @@ unit TestMetadataCustodian;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - tests (milestone 5)
+  AulumicNS tests - TestMetadataCustodian
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The metadata custodian writes the tags of the Properties dialog (the ported
   uMetadataCustodian on its own thread): WAV (ID3 in an 'id3 ' chunk), FLAC

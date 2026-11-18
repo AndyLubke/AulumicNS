@@ -3,8 +3,9 @@ unit TestImageFormats;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestImageFormats
+  AulumicNS tests - TestImageFormats
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The picture loader (AuGfx.ImageFromBytes, since 2026-11-13 on the Windows
   Imaging Component) with the kinds of picture a cover or an artist picture

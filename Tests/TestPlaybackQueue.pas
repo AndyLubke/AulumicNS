@@ -3,8 +3,9 @@ unit TestPlaybackQueue;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic - test program
-  Unit Name: TestPlaybackQueue
+  AulumicNS tests - TestPlaybackQueue
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Tests for the play queue of TPlaybackManager (shuffle modes). Nothing is
   played: the queue is only filled and reordered while the manager is

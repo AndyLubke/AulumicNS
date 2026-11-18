@@ -1,11 +1,17 @@
 unit AuDebugQueue;
 
-{ The Debug Queue window (Aulumic's uDebugQueue, Main menu > Tools > Show
+{ ==============================================================================
+  AulumicNS - AuDebugQueue
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The Debug Queue window (Aulumic's uDebugQueue, Main menu > Tools > Show
   Debug Queue, Ctrl+D): the play queue of the playback manager in play
   order (shuffled when shuffle is on), the playing track highlighted and
   kept in view. The title shows the state, the index and the count. Stays
   on top, not modal; Esc or Ctrl+D closes it. Refreshes every 500 ms, the
-  list only when the queue changed (QueueRevision). }
+  list only when the queue changed (QueueRevision).
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

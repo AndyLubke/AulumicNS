@@ -3,6 +3,10 @@ unit SimOutputs;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
+  AulumicNS tools - SimOutputs
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
   AudioSim: simulated output devices for the real play thread (TPlayThread
   with OutputFactory), in real time.
 

@@ -1,6 +1,11 @@
 unit AuExtra;
 
-{ Controls added for AulumicNS:
+{ ==============================================================================
+  AulumicNS - AuExtra
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Controls added for AulumicNS:
   TAuDropButton - a button that looks like a combo box (or a flat text
                   button with a chevron) and opens a menu or popup of the
                   owner (playlist selector, output device, view options)
@@ -10,7 +15,8 @@ unit AuExtra;
                   (uPeakMeterController, 2026-11-11): a thin frame, fine
                   blocks, a colour per block from green over amber to red,
                   60 dB scale, Aulumic's rise / fall, a red top block after
-                  clipping }
+                  clipping
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

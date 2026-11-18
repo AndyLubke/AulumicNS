@@ -1,6 +1,12 @@
 unit AuAudioTypes;
 
-{ Types shared by the decoders, the DSP stages, the outputs and the engine. }
+{ ==============================================================================
+  AulumicNS - AuAudioTypes
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Types shared by the decoders, the DSP stages, the outputs and the engine.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 {$modeswitch advancedrecords}

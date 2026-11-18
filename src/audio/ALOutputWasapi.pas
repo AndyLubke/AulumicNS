@@ -3,10 +3,9 @@ unit ALOutputWasapi;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALOutputWasapi
-  Author:       André Lubke
-  Date Created: 2026 (output split, step 2a)
+  AulumicNS - ALOutputWasapi
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   TWasapiOutput: the TAudioOutput (ALAudioOutput) of a WASAPI exclusive-mode
   stream in event-driven mode.

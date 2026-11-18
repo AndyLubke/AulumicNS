@@ -3,8 +3,9 @@ unit AuAbout;
 {$mode objfpc}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: AuAbout
+  AulumicNS - AuAbout
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The About window (Main menu > About...): the logo, the name, the version and
   build of this program file (uVersionHelper: read from the file itself), the

@@ -3,8 +3,9 @@ unit TestTextTags;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestTextTags
+  AulumicNS tests - TestTextTags
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Reading the text fields of a tag without loading its pictures
   (basetag.TagReadTextOnly, audiotag.GetFileTagsObject(FileName, True),

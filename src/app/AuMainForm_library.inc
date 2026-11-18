@@ -1,10 +1,16 @@
 {%MainUnit AuMainForm.pas}
-{ AuMainForm_library.inc - TMainForm: the library (milestone 3):
+{ ==============================================================================
+  AulumicNS - AuMainForm_library.inc
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AuMainForm_library.inc - TMainForm: the library (milestone 3):
     InitLibrary, FreeLibrary, LibLookup, RequestLibraryScan,
     LibraryScanProgress, LibraryScanDone, StateStatus, StateClearThumbs,
     RestartWatcher, CheckWatcher, LibPlay, LibAdd, TreeActivate,
     TreeContext and its menu items, MnLibraryFolders, MnRefresh, MnRescan,
-    CountPlay, CommitPlay, TrackStats, BannerHeart }
+    CountPlay, CommitPlay, TrackStats, BannerHeart
+  =============================================================================}
 
 const
   { ---> AulumicNS: after the tag writer's batch the folder changes are its own

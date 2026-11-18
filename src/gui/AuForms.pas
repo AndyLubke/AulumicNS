@@ -1,8 +1,14 @@
 unit AuForms;
 
-{ Base window class (TAuForm: themed title bar and background, Enter /
+{ ==============================================================================
+  AulumicNS - AuForms
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  Base window class (TAuForm: themed title bar and background, Enter /
   Escape handling, follows theme switches), message and input dialogs, and
-  toast notifications. All windows are built in code - no .lfm files. }
+  toast notifications. All windows are built in code - no .lfm files.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

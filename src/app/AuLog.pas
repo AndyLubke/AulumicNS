@@ -1,11 +1,17 @@
 unit AuLog;
 
-{ The application log of AulumicNS - Aulumic's log (uFormAppLog) without its
+{ ==============================================================================
+  AulumicNS - AuLog
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The application log of AulumicNS - Aulumic's log (uFormAppLog) without its
   window: the same lines ("hh:nn:ss - [INFO]  ..."), the separate error
   history, the purge of old lines (the startup block stays), the engine's
   log events (WM_AUDIO_ENGINE_LOG) and AulumicNSLog.txt, written at exit only
   when errors were logged. The log window (milestone 5) shows Lines and
-  listens to OnChanged. All calls on the UI thread. }
+  listens to OnChanged. All calls on the UI thread.
+  =============================================================================}
 
 {$mode ObjFPC}{$H+}
 

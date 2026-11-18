@@ -1,5 +1,10 @@
 {%MainUnit AuMainForm.pas}
-{ AuMainForm_files.inc - TMainForm: files into the play list and the play
+{ ==============================================================================
+  AulumicNS - AuMainForm_files.inc
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AuMainForm_files.inc - TMainForm: files into the play list and the play
   list into the play queue:
     CollectMusicFiles, AddPaths, PlayEntry, SyncQueueWithList,
     RemoveSelected, FormDropFiles, CheckIncoming, JumpToNowPlaying,
@@ -8,7 +13,8 @@
   Milestone 4: files go into the playlist on screen (an auto-playlist on
   screen: the Default playlist, as Aulumic); an Explorer drop over the
   playlist is inserted there; the play queue is made from the shown
-  playlist and stays with it (FPlayingPl). }
+  playlist and stays with it (FPlayingPl).
+  =============================================================================}
 
 { the music files of a folder and its sub folders, sorted per folder }
 procedure TMainForm.CollectMusicFiles(const APath: string; AList: TStrings);

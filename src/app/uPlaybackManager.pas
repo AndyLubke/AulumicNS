@@ -3,10 +3,9 @@ unit uPlaybackManager;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:     Aulumic
-// Unit Name:   uPlaybackManager
-// Author:      André Lubke
-// Date Created: 08-Jul-26
+// AulumicNS - uPlaybackManager
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // Acts as the bridge between the raw audio thread and the user interface.
 // Manages high-level engine states, gapless track handoffs, seeking, and

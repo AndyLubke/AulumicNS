@@ -3,8 +3,9 @@ unit TestToneControl;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestToneControl
+  AulumicNS tests - TestToneControl
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The tone control (uToneControl): three biquad filters in series per channel
   (low shelf, peaking, high shelf; RBJ's formulas, Q = 1 / sqrt 2, Direct Form

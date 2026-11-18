@@ -3,7 +3,9 @@ unit TestDemoLibrary;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - tests (milestone 6)
+  AulumicNS tests - TestDemoLibrary
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The demo library of the help screenshots (AuDemoLibrary): the silent FLAC
   files are read back by the built-in decoder (every sample 0, the right

@@ -4,6 +4,10 @@ program AudioSim;
 {$APPTYPE CONSOLE}
 
 { ==============================================================================
+  AulumicNS tools - AudioSim
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
   AudioSim - the audio chain of AulumicNS under the microscope.
 
   bench <file> [options]   decode + resample as the play thread does

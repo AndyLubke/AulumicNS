@@ -1,5 +1,10 @@
 {%MainUnit AuMainForm.pas}
-{ AuMainForm_playlist.inc - TMainForm: the playlists (milestone 4):
+{ ==============================================================================
+  AulumicNS - AuMainForm_playlist.inc
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  AuMainForm_playlist.inc - TMainForm: the playlists (milestone 4):
     InitPlaylists, FreePlaylists, ShownPlaylist, ShowPlaylist, ApplyView,
     SaveShownPlaylist, PlChanged, PlCollapseChanged, CheckPlaylistSave,
     the playlist selector (PlaylistDrop, PlaylistPick, New / Rename /
@@ -8,7 +13,8 @@
     PlDragDrop, PlEndDrag), M3U import / export, Remove dead items.
   The playlists are in uPlaylistStore (playlists.adb + journal); the pane
   shows one of them (FShownPl). The play queue belongs to the playlist that
-  was played from (FPlayingPl), as in Aulumic. }
+  was played from (FPlayingPl), as in Aulumic.
+  =============================================================================}
 
 const
   PL_SAVE_DELAY_MS = 1500;     // a change is stored this long after the last one

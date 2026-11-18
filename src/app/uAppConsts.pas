@@ -3,10 +3,9 @@ unit uAppConsts;
 {$mode ObjFPC}{$H+}
 
 // =============================================================================
-// Project:      Aulumic
-// Unit Name:    uAppConsts
-// Author:       André Lubke
-// Date Created: 08-Jul-26
+// AulumicNS - uAppConsts
+// Copyright (C) 2026 André Lubke
+// Licensed under the GNU General Public License, version 3 (see LICENSE).
 //
 // Central unit for global constants, global enums, global variables, and
 // global directory paths.

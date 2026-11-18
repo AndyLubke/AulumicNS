@@ -1,6 +1,11 @@
 unit AuSingle;
 
-{ One AulumicNS at a time: the audio device is used exclusively, so a second
+{ ==============================================================================
+  AulumicNS - AuSingle
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  One AulumicNS at a time: the audio device is used exclusively, so a second
   copy could not play anyway.
 
   The first copy owns a named mutex and publishes two window handles in a
@@ -10,7 +15,8 @@ unit AuSingle;
   mutex, activates the first copy and hands over the files of its command
   line (Explorer "Open with", double click on a music file) with
   WM_COPYDATA; then it ends. The main window takes the files with
-  TakeIncoming. }
+  TakeIncoming.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

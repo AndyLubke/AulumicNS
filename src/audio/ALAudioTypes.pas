@@ -3,10 +3,9 @@ unit ALAudioTypes;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:      Aulumic
-  Unit Name:    ALAudioTypes
-  Author:       André Lubke
-  Date Created: 2026
+  AulumicNS - ALAudioTypes
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Shared constants and types used for Audio Engine settings.
   =============================================================================}

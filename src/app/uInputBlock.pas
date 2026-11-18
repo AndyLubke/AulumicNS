@@ -3,8 +3,9 @@ unit uInputBlock;
 {$mode objfpc}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS
-  Unit Name: uInputBlock
+  AulumicNS - uInputBlock
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The program does not take input for a moment, but stays alive: while a worker
   thread wakes a drive (AuTagLoader.TDriveWaiter) the UI thread keeps handling

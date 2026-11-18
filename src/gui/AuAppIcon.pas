@@ -1,11 +1,17 @@
 unit AuAppIcon;
 
-{ The application icon: the Aulumic logo (a golden "A" whose crossbar
+{ ==============================================================================
+  AulumicNS - AuAppIcon
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
+
+  The application icon: the Aulumic logo (a golden "A" whose crossbar
   flows out as sound waves, on a dark tile), drawn as vector graphics so it
   is sharp at every size. Used for the window (HICON at the system sizes)
   and written as an .ico file for the executable (AulumicNS.ico, made with
   "AulumicNS.exe --make-icon=<file>" of the debug build; the project embeds
-  it). "--icon-preview=<file.png>" writes a 256 px PNG to check the design. }
+  it). "--icon-preview=<file.png>" writes a 256 px PNG to check the design.
+  =============================================================================}
 
 {$mode objfpc}{$H+}
 

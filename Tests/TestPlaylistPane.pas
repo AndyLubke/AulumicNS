@@ -3,8 +3,9 @@ unit TestPlaylistPane;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   AulumicNS - test program
-  Unit Name: TestPlaylistPane
+  AulumicNS tests - TestPlaylistPane
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   The playlist pane's texts (TPlaylistPane.BuildTexts): the library's date
   added and the play statistics are looked up only when a format shows them,

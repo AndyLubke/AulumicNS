@@ -3,10 +3,9 @@ unit uCrashTracer;
 {$mode ObjFPC}{$H+}
 
 { ==============================================================================
-  Project:   Aulumic
-  Unit Name: uCrashTracer
-  Author:    André Lubke
-  Created:   2026
+  AulumicNS - uCrashTracer
+  Copyright (C) 2026 André Lubke
+  Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Helper unit for tracing crashes at closing down.
 
