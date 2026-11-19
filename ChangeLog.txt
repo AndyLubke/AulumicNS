@@ -8,6 +8,18 @@ Coming in the next version
 (Nothing yet.)
 
 
+Version 1.0.0.11 (19 November 2026)
+-------------------------------------------------------------------------------
+
+NEW & IMPROVED
+
+- A Last.fm API key can come from a file: put a text file LastFmKey.txt with
+  the key in it next to AulumicNS.exe. While no key is entered in
+  Preferences > System > Artist information, Aulumic takes it from that file
+  when it starts and keeps it in its settings, so the file is only needed
+  once. Handy when you pass Aulumic on to someone together with a key.
+
+
 Version 1.0.0.10 (18 November 2026)
 -------------------------------------------------------------------------------
 

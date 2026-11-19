@@ -177,6 +177,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestInputBlock"/>
       </Unit>
+      <Unit>
+        <Filename Value="TestSettings.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestSettings"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

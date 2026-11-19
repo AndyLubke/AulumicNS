@@ -75,6 +75,9 @@ const
   // Empty marker files: the bio / picture was set by the user (kept by Refresh)
   FILE_ARTIST_BIO_USER        = 'artist_bio.user';
   FILE_ARTIST_IMAGE_USER      = 'artist_image.user';
+  // Next to the program file: a Last.fm API key for a program that has none
+  // in its settings yet (uSettingsManager.ReadLastFmKeyFile)
+  FILE_LASTFM_KEY             = 'LastFmKey.txt';
 
   // The icons are the vector icons of AuIcons
 

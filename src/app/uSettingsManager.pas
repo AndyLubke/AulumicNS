@@ -24,6 +24,10 @@ procedure ToolWindowSize(ARememberedW, ARememberedH, ADefW, ADefH: Integer; out 
 // setting goes to the band that has its frequency among the five (below
 // 800 Hz: low mid, from 3 kHz: high mid), and the Mid band is flat at 1 kHz
 procedure MoveThreeBandMid(var AMidHz, AMidDB, ALowMidHz, ALowMidDB, AHighMidHz, AHighMidDB: Integer);
+// The Last.fm API key in a key file: its first line that is not empty and
+// not a comment (# or ;), when that is 16 to 64 letters and digits; else ''.
+// A missing, unreadable or oversized file gives '' as well.
+function ReadLastFmKeyFile(const AFile: string): string;
 
 type
 
@@ -271,6 +275,55 @@ begin
     Exit;
   AMidHz := VAL_DEF_MIDHZ;
   AMidDB := 0;
+end;
+
+function ReadLastFmKeyFile(const AFile: string): string;
+const
+  MAX_KEY_FILE_BYTES = 4096;
+var
+  FS: TFileStream;
+  Raw, Line: string;
+  SL: TStringList;
+  I, K: Integer;
+  Good: Boolean;
+begin
+  Result := '';
+  if not FileExists(AFile) then Exit;
+  try
+    FS := TFileStream.Create(AFile, fmOpenRead or fmShareDenyNone);
+    try
+      if (FS.Size <= 0) or (FS.Size > MAX_KEY_FILE_BYTES) then Exit;
+      SetLength(Raw, FS.Size);
+      FS.ReadBuffer(Raw[1], FS.Size);
+    finally
+      FS.Free;
+    end;
+    // a UTF-8 byte order mark, as Notepad may write one
+    if Copy(Raw, 1, 3) = #$EF#$BB#$BF then Delete(Raw, 1, 3);
+    SL := TStringList.Create;
+    try
+      SL.Text := Raw;
+      for I := 0 to SL.Count - 1 do
+      begin
+        Line := Trim(SL[I]);
+        if (Line = '') or (Line[1] = '#') or (Line[1] = ';') then Continue;
+        Good := (Length(Line) >= 16) and (Length(Line) <= 64);
+        if Good then
+          for K := 1 to Length(Line) do
+            if not (Line[K] in ['0'..'9', 'A'..'Z', 'a'..'z']) then
+            begin
+              Good := False;
+              Break;
+            end;
+        if Good then Result := Line;
+        Break;
+      end;
+    finally
+      SL.Free;
+    end;
+  except
+    Result := '';
+  end;
 end;
 
 procedure ToolWindowSize(ARememberedW, ARememberedH, ADefW, ADefH: Integer; out W, H: Integer);
@@ -597,8 +650,12 @@ begin
 
   Data.ShowPeakMeter := FIniFile.ReadBool(SEC_UI, KEY_SHOWPEAKMETER, True);
   // No key is built in (the source is public): the user's own
-  // key, entered in Preferences > System > Artist information.
+  // key, entered in Preferences > System > Artist information. While none is
+  // set, a key file next to the program file is taken over; Save then keeps
+  // it in the settings, so the file is only needed once.
   Data.LastFmApiKey  := Trim(FIniFile.ReadString(SEC_ADVANCED, KEY_LASTFM_API_KEY, ''));
+  if Data.LastFmApiKey = '' then
+    Data.LastFmApiKey := ReadLastFmKeyFile(ExtractFilePath(ParamStr(0)) + FILE_LASTFM_KEY);
 
   Data.Audio.UseHighResTimer  := FIniFile.ReadBool(SEC_AUDIO, KEY_USE_HIGHRES_TIMER, True);
   Data.Audio.OptimizeAffinity := FIniFile.ReadBool(SEC_AUDIO, KEY_OPTIMIZE_AFFINITY, True);

@@ -325,7 +325,7 @@ These settings help Windows give audio playback priority over other tasks. Leave
 
 ### Card: Artist information
 
-- **Last.fm API key:** Artist Info gets its biographies from Last.fm, and Last.fm asks every program for a key. Aulumic has none built in, so you need one of your own. It's free: create an API account at last.fm/api and paste the "API key" you get into this field. Biographies you already have are still shown without a key.
+- **Last.fm API key:** Artist Info gets its biographies from Last.fm, and Last.fm asks every program for a key. Aulumic has none built in, so you need one of your own. It's free: create an API account at last.fm/api and paste the "API key" you get into this field. Biographies you already have are still shown without a key. If someone gives you a file `LastFmKey.txt` with a key in it, put it next to `AulumicNS.exe`: while no key is entered here, Aulumic takes the key from that file at start and keeps it, so the file is only needed once.
 
 ## 9. Shortcuts page
 
