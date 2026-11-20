@@ -92,6 +92,8 @@ begin
     P^.HeaderFmt := '%album% (%year%)';
     P^.TrackFmt := '%title%';
     P^.LastFile := 'E:\Klassik\b.flac';
+    P^.SortMode := 3;
+    P^.TopFile := 'E:\Klassik\a.flac';
     SetLength(P^.Collapsed, 1);
     P^.Collapsed[0] := 'Symphonie Nr. 9';
     E := nil;
@@ -117,7 +119,9 @@ begin
     AssertEquals('Header format', '%album% (%year%)', P^.HeaderFmt);
     AssertEquals('Track format', '%title%', P^.TrackFmt);
     AssertEquals('Last file', 'E:\Klassik\b.flac', P^.LastFile);
-    AssertEquals('Collapsed', 1, Length(P^.Collapsed));
+    AssertEquals('Sort mode', 3, P^.SortMode);
+    AssertEquals('Top file', 'E:\Klassik\a.flac', P^.TopFile);
+    AssertEquals('The view values are no collapsed names', 1, Length(P^.Collapsed));
     AssertEquals('Collapsed group', 'Symphonie Nr. 9', P^.Collapsed[0]);
     AssertEquals('Entries', 2, Length(P^.Entries));
     AssertEquals('Path', 'E:\Klassik\b.flac', P^.Entries[1].FilePath);
@@ -136,6 +140,8 @@ begin
     P := S.Find('Recently Added');
     AssertNotNull('Auto-playlist', P);
     AssertTrue('Kind', P^.Kind = pkAuto);
+    AssertEquals('No sort mode set', 0, P^.SortMode);
+    AssertEquals('No top file set', '', P^.TopFile);
     AssertEquals('Query', '%added% IN LAST 30d', P^.Query);
   finally
     S.Free;

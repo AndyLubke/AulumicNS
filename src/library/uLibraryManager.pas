@@ -60,6 +60,16 @@ type
     // Only folders with music (somewhere below them) are in it.
     FFolderIndex            : TStringList;
     FFolderIndexValid       : Boolean;
+
+    // Which tracks belong to a folder, an artist, a genre and an album:
+    // per name (lower case) the indices into FTracks. The tree asks these
+    // questions once per node; without the lists every answer is a pass over
+    // the whole library. Built at the first question after a change (it
+    // goes with the other caches) and only a short list of candidates: each
+    // one is tested again with the condition of the question itself.
+    FTrackIndexValid        : Boolean;
+    FTrackIndexCount        : Integer;
+    FIdxFolder, FIdxArtist, FIdxGenre, FIdxAlbum: TStringList;
     // Library folders that could not be reached during the last scan
     FUnavailableRoots       : TStringList;
 
@@ -112,6 +122,9 @@ type
     procedure ClearCaches;
     procedure ValidateCaches;
     procedure ClearFolderIndex;
+    procedure ClearTrackIndex;
+    procedure ValidateTrackIndex;
+    function  TrackCandidates(AIndex: TStringList; const AName: string): TFPList;
     procedure ValidateFolderIndex;
     function  MergeScannedLinks(AScanner: TLibraryScannerThread): Boolean;
     procedure HandleScannerFinished(Sender: TObject);
@@ -378,6 +391,8 @@ begin
 end;
 { TLibraryManager }
 
+function NewTrackIndexList: TStringList; forward;
+
 constructor TLibraryManager.Create(const ADbFile: string);
 begin
   inherited Create;
@@ -444,6 +459,11 @@ begin
   FFolderIndex.UseLocale               := False;
   FFolderIndex.OwnsObjects             := True;
   FFolderIndexValid                    := False;
+  FIdxFolder                           := NewTrackIndexList;
+  FIdxArtist                           := NewTrackIndexList;
+  FIdxGenre                            := NewTrackIndexList;
+  FIdxAlbum                            := NewTrackIndexList;
+  FTrackIndexValid                     := False;
 
   FUnavailableRoots                    := TStringList.Create;
   FUnavailableRoots.Sorted             := True;
@@ -468,6 +488,10 @@ begin
     SaveDatabase;
 
   ClearCaches;
+  FreeAndNil(FIdxFolder);
+  FreeAndNil(FIdxArtist);
+  FreeAndNil(FIdxGenre);
+  FreeAndNil(FIdxAlbum);
   FTrackDict.Free;
   FArtistSummaryCache.Free;
   FGenreSummaryCache.Free;
@@ -2203,15 +2227,24 @@ procedure TLibraryManager.GetTracksInFolder(const FolderDir: string; ATracks: TT
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   TargetDir: string;
 begin
   ATracks.Clear;
   TargetDir := ExcludeTrailingPathDelimiter(FolderDir);
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxFolder, TargetDir);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
       if SameText(ExcludeTrailingPathDelimiter(Track^.FolderDir), TargetDir) then
         ATracks.Add(Track^);
     end;
@@ -2248,13 +2281,22 @@ procedure TLibraryManager.GetTracksByArtist(const ArtistName: string; ATracks: T
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
 begin
   ATracks.Clear;
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxArtist, ArtistName);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
       if ContainsDelimitedItem(Track^.AlbumArtist, ArtistName) or
          ContainsDelimitedItem(Track^.Artist, ArtistName) then
         ATracks.Add(Track^);
@@ -2270,6 +2312,8 @@ procedure TLibraryManager.GetTracksByAlbum(const AlbumName: string; ATracks: TTr
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   TargetAlb, TrackArt, CompositeStr: string;
 begin
   ATracks.Clear;
@@ -2279,9 +2323,16 @@ begin
 
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxAlbum, TargetAlb);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
 
       TrackArt := Trim(Track^.AlbumArtist);
       if TrackArt = '' then
@@ -2316,13 +2367,22 @@ procedure TLibraryManager.GetTracksByGenre(const GenreName: string; ATracks: TTr
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
 begin
   ATracks.Clear;
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxGenre, GenreName);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
       if ContainsDelimitedItem(Track^.Genre, GenreName) then
         ATracks.Add(Track^);
     end;
@@ -2338,6 +2398,8 @@ procedure TLibraryManager.GetAlbumsByArtist(const ArtistName: string;
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   TempList: TStringList;
   AAlbum: string;
 begin
@@ -2348,9 +2410,16 @@ begin
   try
     FCriticalSection.Enter;
     try
-      for I := 0 to FTracks.Count - 1 do
+      Hits := TrackCandidates(FIdxArtist, ArtistName);
+      if Hits <> nil then
+      for K := 0 to Hits.Count - 1 do
       begin
+        I := PtrInt(Hits[K]);
+        if I >= FTracks.Count then
+          Continue;
         Track := PTrackInfo(FTracks[I]);
+        if Track = nil then
+          Continue;
         if ContainsDelimitedItem(Track^.AlbumArtist, ArtistName) or
            ContainsDelimitedItem(Track^.Artist, ArtistName) then
         begin
@@ -2374,6 +2443,8 @@ procedure TLibraryManager.GetAlbumsByGenre(const GenreName: string;
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   TempList: TStringList;
   AAlbum: string;
 begin
@@ -2384,9 +2455,16 @@ begin
   try
     FCriticalSection.Enter;
     try
-      for I := 0 to FTracks.Count - 1 do
+      Hits := TrackCandidates(FIdxGenre, GenreName);
+      if Hits <> nil then
+      for K := 0 to Hits.Count - 1 do
       begin
+        I := PtrInt(Hits[K]);
+        if I >= FTracks.Count then
+          Continue;
         Track := PTrackInfo(FTracks[I]);
+        if Track = nil then
+          Continue;
         if ContainsDelimitedItem(Track^.Genre, GenreName) then
         begin
           AAlbum := Trim(Track^.Album);
@@ -2409,14 +2487,23 @@ procedure TLibraryManager.GetTracksByArtistAndAlbum(const ArtistName, AlbumName:
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   Alb: string;
 begin
   ATracks.Clear;
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxArtist, ArtistName);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
       Alb   := Trim(Track^.Album);
       if Alb = '' then
         Alb := LBL_UNKNOWN_ALBUM;
@@ -2437,14 +2524,23 @@ procedure TLibraryManager.GetTracksByGenreAndAlbum(const GenreName, AlbumName: s
 var
   I: integer;
   Track: PTrackInfo;
+  Hits: TFPList;
+  K: Integer;
   Alb: string;
 begin
   ATracks.Clear;
   FCriticalSection.Enter;
   try
-    for I := 0 to FTracks.Count - 1 do
+    Hits := TrackCandidates(FIdxGenre, GenreName);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
     begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
       Track := PTrackInfo(FTracks[I]);
+      if Track = nil then
+        Continue;
       Alb   := Trim(Track^.Album);
       if Alb = '' then
         Alb := LBL_UNKNOWN_ALBUM;
@@ -2471,8 +2567,128 @@ begin
   FAlbumSummaryCache.Capacity := 0;
 
   ClearFolderIndex;
+  ClearTrackIndex;
 
   FCachesValid := False;
+end;
+
+function NewTrackIndexList: TStringList;
+begin
+  Result := TStringList.Create;
+  Result.CaseSensitive := True;      // the names are stored in lower case
+  Result.UseLocale := False;
+  Result.Sorted := True;
+  Result.OwnsObjects := True;        // the TFPList of each name
+end;
+
+procedure TLibraryManager.ClearTrackIndex;
+begin
+  FIdxFolder.Clear;
+  FIdxArtist.Clear;
+  FIdxGenre.Clear;
+  FIdxAlbum.Clear;
+  FTrackIndexValid := False;
+end;
+
+// The album of a track as the Albums category names it
+function AlbumCompositeOf(Track: PTrackInfo): string;
+var
+  TrackArt: string;
+begin
+  TrackArt := Trim(Track^.AlbumArtist);
+  if TrackArt = '' then
+    TrackArt := Trim(Track^.Artist);
+  if TrackArt = '' then
+    TrackArt := LBL_UNKNOWN_ARTIST;
+  Result := Format('%s - %s', [TrackArt, Trim(Track^.Album)]);
+end;
+
+// Called under FCriticalSection.
+procedure TLibraryManager.ValidateTrackIndex;
+var
+  I: Integer;
+  Track: PTrackInfo;
+
+  procedure Put(AIndex: TStringList; const AName: string);
+  var
+    Idx: Integer;
+    L: TFPList;
+    Key: string;
+  begin
+    Key := LowerCase(AName);
+    if AIndex.Find(Key, Idx) then
+      L := TFPList(AIndex.Objects[Idx])
+    else
+    begin
+      L := TFPList.Create;
+      AIndex.AddObject(Key, L);
+    end;
+    // (a track named twice in one tag is listed once)
+    if (L.Count = 0) or (PtrUInt(L.Last) <> PtrUInt(I)) then
+      L.Add(Pointer(PtrInt(I)));
+  end;
+
+  // The items of a tag as ContainsDelimitedItem sees them: separated by
+  // ';', trimmed; an empty tag stands for both "unknown" names
+  procedure PutItems(AIndex: TStringList; const ARaw: string);
+  var
+    Rem, S: string;
+    P: Integer;
+  begin
+    Rem := Trim(ARaw);
+    if Rem = '' then
+    begin
+      Put(AIndex, LBL_UNKNOWN_ARTIST);
+      Put(AIndex, LBL_UNKNOWN_GENRE);
+      Exit;
+    end;
+    repeat
+      P := Pos(';', Rem);
+      if P > 0 then
+      begin
+        S := Trim(Copy(Rem, 1, P - 1));
+        Rem := Trim(Copy(Rem, P + 1, Length(Rem)));
+      end
+      else
+      begin
+        S := Trim(Rem);
+        Rem := '';
+      end;
+      if S <> '' then
+        Put(AIndex, S);
+    until P = 0;
+  end;
+
+begin
+  if FTrackIndexValid and (FTrackIndexCount = FTracks.Count) then
+    Exit;
+  ClearTrackIndex;
+  for I := 0 to FTracks.Count - 1 do
+  begin
+    Track := PTrackInfo(FTracks[I]);
+    if Track = nil then
+      Continue;
+    Put(FIdxFolder, ExcludeTrailingPathDelimiter(Track^.FolderDir));
+    PutItems(FIdxArtist, Track^.AlbumArtist);
+    PutItems(FIdxArtist, Track^.Artist);
+    PutItems(FIdxGenre, Track^.Genre);
+    Put(FIdxAlbum, AlbumCompositeOf(Track));
+  end;
+  FTrackIndexCount := FTracks.Count;
+  FTrackIndexValid := True;
+end;
+
+// The indices into FTracks of the tracks that may belong to AName (nil:
+// none). Called under FCriticalSection; the caller tests each one.
+function TLibraryManager.TrackCandidates(AIndex: TStringList; const AName: string): TFPList;
+var
+  Idx: Integer;
+begin
+  ValidateTrackIndex;
+  if AIndex.Find(LowerCase(Trim(AName)), Idx) then
+    Result := TFPList(AIndex.Objects[Idx])
+  else
+    Result := nil;
 end;
 
 procedure TLibraryManager.ClearFolderIndex;

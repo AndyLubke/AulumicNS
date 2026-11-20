@@ -161,6 +161,7 @@ begin
     Application.HasOption('ui-bench') or Application.HasOption('touch-probe')) {$ENDIF};
   if not AppSettings.Data.GpuPaint then GpuPaintAllowed := False;
   FontScale := AppSettings.Data.UIFontSize / 100;
+  if AppSettings.Data.CompactRows then RowDensity := ROW_DENSITY_COMPACT;
   SetTheme(TAuThemeMode(AppSettings.Data.ThemeMode mod 3), AppSettings.Data.Accent);
   Application.Title := APP_TITLE;
   {$PUSH}{$WARN 5044 OFF}   // MainFormOnTaskBar is Windows only (as is the whole program)
@@ -168,9 +169,31 @@ begin
   {$POP}
   Application.HintPause := 450;
   Application.HintHidePause := 6000;
-  Application.Initialize;
-  Application.CreateForm(TMainForm, MainForm);
-  Application.Run;
+  { an error that nothing catches is shown in the themed message window, from
+    the first moment (the main window puts its own handler in front, which
+    writes the log too). The tool modes of the debug build show none: they
+    write the trace and end with exit code 1. }
+  {$IFDEF DEBUG}
+  ErrorBoxesOff := Application.HasOption('shots') or Application.HasOption('ui-bench') or
+    Application.HasOption('touch-probe') or Application.HasOption('help-probe') or Application.HasOption('test-repair') or
+    Application.HasOption('test-hang') or Application.HasOption('test-drive-wait') or
+    Application.HasOption('make-demo-library') or Application.HasOption('make-icon') or
+    Application.HasOption('icon-preview');
+  {$ENDIF}
+  InstallErrorBox;
+  try
+    Application.Initialize;
+    Application.CreateForm(TMainForm, MainForm);
+    Application.Run;
+  except
+    on E: Exception do
+    begin
+      { the main window could not be built, or an error left the message loop }
+      LogShutdownStepError('LPR: start or run');
+      ShowErrorBox(E);
+      ExitCode := 1;
+    end;
+  end;
   { all windows and the play thread are gone: the global objects (settings,
     log, ...) are freed; a thread still blocked by a sleeping
     drive ends with the process. Traced as the rest of the close

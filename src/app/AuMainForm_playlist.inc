@@ -20,6 +20,39 @@
 const
   PL_SAVE_DELAY_MS = 1500;     // a change is stored this long after the last one
 
+{ TStoredPlaylist.SortMode: the order in the low four bits (the numbers are
+  stored: never change them), SORT_STORED_REVERSE added when reversed.
+  4 was "newest first" as an order of its own: the year, reversed. }
+const
+  SORT_STORED: array[TPlSortMode] of Integer = (0, 1, 2, 3, 5);
+  SORT_STORED_YEAR_DOWN = 4;
+  SORT_STORED_REVERSE = 16;
+
+procedure DecodeSort(ACode: Integer; out AMode: TPlSortMode; out AReverse: Boolean);
+var
+  M: TPlSortMode;
+begin
+  AMode := psAdded;
+  AReverse := False;
+  if (ACode < 0) or (ACode >= 2 * SORT_STORED_REVERSE) then Exit;
+  AReverse := ACode >= SORT_STORED_REVERSE;
+  ACode := ACode mod SORT_STORED_REVERSE;
+  if ACode = SORT_STORED_YEAR_DOWN then
+  begin
+    AMode := psYear;
+    AReverse := True;
+    Exit;
+  end;
+  for M := Low(TPlSortMode) to High(TPlSortMode) do
+    if SORT_STORED[M] = ACode then AMode := M;
+end;
+
+function EncodeSort(AMode: TPlSortMode; AReverse: Boolean): Integer;
+begin
+  Result := SORT_STORED[AMode];
+  if AReverse then Inc(Result, SORT_STORED_REVERSE);
+end;
+
 procedure TMainForm.InitPlaylists;
 var
   Old: string;
@@ -75,6 +108,8 @@ procedure TMainForm.ApplyView(P: PStoredPlaylist; const ADateSuffix: string);
 var
   G: TGroupingMode;
   HF, TF: string;
+  SM: TPlSortMode;
+  Rev: Boolean;
 begin
   if (P <> nil) and (P^.GroupMode >= 0) and (P^.GroupMode <= Ord(High(TGroupingMode))) then
     G := TGroupingMode(P^.GroupMode)
@@ -82,7 +117,12 @@ begin
     G := TGroupingMode(EnsureRange(AppSettings.Data.DefaultGroupingMode, 0, Ord(High(TGroupingMode))));
   if (P <> nil) and (P^.HeaderFmt <> '') then HF := P^.HeaderFmt else HF := AppSettings.Data.DefaultHeaderFormat;
   if (P <> nil) and (P^.TrackFmt <> '') then TF := P^.TrackFmt else TF := AppSettings.Data.DefaultTrackFormat;
-  FPl.SetView(G, HF, TF, ADateSuffix, (P <> nil) and (P^.Kind = pkAuto));
+  SM := psAdded;
+  Rev := False;
+  if P <> nil then DecodeSort(P^.SortMode, SM, Rev);
+  { the columns and the sort of its flat list }
+  if P <> nil then FPl.SetFlatLayout(P^.FlatCols, P^.FlatSort) else FPl.SetFlatLayout('', '');
+  FPl.SetView(G, HF, TF, ADateSuffix, (P <> nil) and (P^.Kind = pkAuto), SM, Rev);
 end;
 
 procedure TMainForm.ShowPlaylist(const AName: string; AForce: Boolean);
@@ -161,6 +201,8 @@ begin
       E := Min(OldSel, FPl.EntryCount - 1);
     if E >= 0 then FPl.SelectEntry(E, False, True);
   end;
+  { and the list where it was scrolled to }
+  FPl.ScrollToFile(P^.TopFile);
   AppSettings.Data.ActivePlayList := FShownPl;
 end;
 
@@ -177,21 +219,24 @@ end;
 procedure TMainForm.SaveShownPlaylist(ANow: Boolean);
 var
   P: PStoredPlaylist;
-  Sel: string;
+  Sel, TopF: string;
 begin
   P := ShownPlaylist;
   if (P = nil) or FPl.IsDemo then Exit;
   Sel := FPl.SelectedFilePath;
+  TopF := FPl.TopFile;
   if (FPlSaveDue <> 0) and (P^.Kind = pkNormal) then
   begin
     P^.Entries := FPl.ToEntries;
     P^.Collapsed := FPl.CollapsedNames;
     P^.LastFile := Sel;
+    P^.TopFile := TopF;
     FPlaylists.Changed(P);
   end
-  else if ANow and (Sel <> P^.LastFile) then
+  else if ANow and ((Sel <> P^.LastFile) or (TopF <> P^.TopFile)) then
   begin
     P^.LastFile := Sel;
+    P^.TopFile := TopF;
     P^.Collapsed := FPl.CollapsedNames;
     FPlaylists.Changed(P);
   end;
@@ -382,6 +427,8 @@ begin
     It.Checked := (P^.HeaderFmt <> '') and (P^.HeaderFmt = HEADER_FORMAT_OPTIONS[I].DataStr);
   end;
   Sub := FViewMenu.AddSub('Track format', icNote);
+  { a flat list has columns, no track format }
+  FViewMenu.Item(FViewMenu.Count - 1).Enabled := PlGroupMode(P) <> gmFlat;
   It := Sub.Add('Use global preferences', @MnViewTrack);
   It.Tag := -1;
   It.Checked := P^.TrackFmt = '';
@@ -393,6 +440,65 @@ begin
     It.Checked := (P^.TrackFmt <> '') and (P^.TrackFmt = TRACK_FORMAT_OPTIONS[I].DataStr);
   end;
   FViewMenu.PopupBelow(FPl.BtnView, True);
+end;
+
+{ the sort button: the order of the groups of the shown playlist (its
+  direction is the arrow button beside it: MnSortReverse) }
+procedure TMainForm.SortClick(Sender: TObject);
+var
+  P: PStoredPlaylist;
+  M: TPlSortMode;
+  It: TAuMenuItem;
+begin
+  P := ShownPlaylist;
+  if P = nil then Exit;
+  FViewMenu.Free;
+  FViewMenu := TAuMenu.Create;
+  for M := Low(TPlSortMode) to High(TPlSortMode) do
+  begin
+    It := FViewMenu.Add(FPl.SortName(M), @MnSort);
+    It.Tag := Ord(M);
+    It.Checked := FPl.SortMode = M;
+    if M = psAdded then FViewMenu.AddSeparator;
+  end;
+  FViewMenu.PopupBelow(FPl.BtnSort, True);
+end;
+
+procedure TMainForm.MnSort(Sender: TObject);
+var
+  P: PStoredPlaylist;
+begin
+  P := ShownPlaylist;
+  if P = nil then Exit;
+  SaveShownPlaylist(True);
+  P^.SortMode := EncodeSort(TPlSortMode(EnsureRange(TAuMenuItem(Sender).Tag, 0, Ord(High(TPlSortMode)))),
+    FPl.SortReverse);
+  ViewChanged;
+end;
+
+{ the flat list's columns, their widths or its sort changed: kept with the
+  playlist }
+procedure TMainForm.PlViewChanged(Sender: TObject);
+var
+  P: PStoredPlaylist;
+begin
+  P := ShownPlaylist;
+  if (P = nil) or FPl.IsDemo or FLoadingPl then Exit;
+  if (P^.FlatCols = FPl.FlatColsText) and (P^.FlatSort = FPl.FlatSortText) then Exit;
+  P^.FlatCols := FPl.FlatColsText;
+  P^.FlatSort := FPl.FlatSortText;
+  FPlaylists.Changed(P);
+end;
+
+procedure TMainForm.MnSortReverse(Sender: TObject);
+var
+  P: PStoredPlaylist;
+begin
+  P := ShownPlaylist;
+  if P = nil then Exit;
+  SaveShownPlaylist(True);
+  P^.SortMode := EncodeSort(FPl.SortMode, not FPl.SortReverse);
+  ViewChanged;
 end;
 
 procedure TMainForm.ViewChanged;
@@ -605,6 +711,8 @@ begin
   RO := FPl.ReadOnly;
   FCtxMenu.Free;
   FCtxMenu := TAuMenu.Create;
+  { what it acts on, from the selected tracks to the whole playlist; the
+    windows last, Properties at the very end }
   It := FCtxMenu.Add('Play', @MnPlaySelected, icPlay, 'Enter');
   It.Enabled := HasSel;
   Sub := FCtxMenu.AddSub('Rating', icStar);
@@ -615,31 +723,77 @@ begin
   end;
   It := Sub.Add('No rating', @MnPlRate, icStar);
   It.Tag := 0;
+  { a favourite is a track with five stars: ticked when all selected are }
+  It := FCtxMenu.Add('Favourite', @MnPlFavourite, icHeart);
+  It.Enabled := HasSel;
+  It.Checked := SelectionIsFavourite;
   Sub := FCtxMenu.AddSub('Add to', icPlaylist);
   AddToPlaylistMenu(Sub, @MnPlAddTo);
   FCtxMenu.AddSeparator;
+  It := FCtxMenu.Add('Open folder...', @MnShowInExplorer, icFolder);
+  It.Enabled := HasSel;
+  It := FCtxMenu.Add('Calculate ReplayGain...', @MnPlReplayGain, icWave);
+  It.Enabled := HasSel;
+  FCtxMenu.AddSeparator;
   It := FCtxMenu.Add('Remove from playlist', @MnRemoveSelected, icTrash, 'Del');
   It.Enabled := HasSel and not RO;
+  FCtxMenu.AddSeparator;
+  FCtxMenu.Add('Expand all', @MnPlExpandAll, icTriDown);
+  FCtxMenu.Add('Collapse all', @MnPlCollapseAll, icTriRight);
+  It := FCtxMenu.Add('Jump to Now Playing', @JumpClick, icLocate, 'Ctrl+J');
+  It.Enabled := FPlayingPath <> '';
+  FCtxMenu.Add('Refresh', @MnRefresh, icRefresh, 'F5');
   It := FCtxMenu.Add('Remove dead items', @MnRemoveDead, icTrash);
   It.Enabled := (FPl.EntryCount > 0) and not RO;
   It := FCtxMenu.Add('Clear the playlist', @MnClearList, icTrash);
   It.Enabled := (FPl.EntryCount > 0) and not RO;
   FCtxMenu.AddSeparator;
-  FCtxMenu.Add('Expand all', @MnPlExpandAll, icTriDown);
-  FCtxMenu.Add('Collapse all', @MnPlCollapseAll, icTriRight);
-  It := FCtxMenu.Add('Show Now Playing', @JumpClick, icLocate, 'Ctrl+J');
-  It.Enabled := FPlayingPath <> '';
-  FCtxMenu.AddSeparator;
-  FCtxMenu.Add('Refresh', @MnRefresh, icRefresh, 'F5');
-  It := FCtxMenu.Add('Open folder...', @MnShowInExplorer, icFolder);
-  It.Enabled := HasSel;
-  It := FCtxMenu.Add('Calculate ReplayGain...', @MnPlReplayGain, icWave);
-  It.Enabled := HasSel;
+  FCtxMenu.Add('Playlist Manager...', @MnPlaylistManager, icEdit, 'Alt+P');
   It := FCtxMenu.Add('Properties...', @MnPlProperties, icTag, 'Alt+Enter');
   It.Enabled := HasSel;
-  FCtxMenu.AddSeparator;
-  FCtxMenu.Add('Playlist Manager...', @MnPlaylistManager, icEdit, 'Alt+P');
   FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
+{ the selected tracks all have five stars (none selected: no) }
+function TMainForm.SelectionIsFavourite: Boolean;
+var
+  Sel: TIntArray;
+  I: Integer;
+begin
+  Sel := FPl.SelectedEntries;
+  Result := Length(Sel) > 0;
+  for I := 0 to High(Sel) do
+    if FPl.Entry(Sel[I]).Rating < 5 then Exit(False);
+end;
+
+{ makes the selected tracks favourites (five stars), or takes the stars
+  away when they all are }
+procedure TMainForm.MnPlFavourite(Sender: TObject);
+begin
+  if SelectionIsFavourite then RateSelection(0) else RateSelection(5);
+end;
+
+procedure TMainForm.MnNewPlaylist(Sender: TObject);
+var
+  N: string;
+begin
+  if FPlaylists = nil then Exit;
+  N := FPlaylists.UniqueName('New playlist');
+  if not AskPlaylistName('New playlist', N) then Exit;
+  if FPlaylists.Add(N, pkNormal) = nil then Exit;
+  BeginBusy;
+  try
+    ShowPlaylist(N);
+  finally
+    EndBusy;
+  end;
+end;
+
+procedure TMainForm.MnPlSticky(Sender: TObject);
+begin
+  AppSettings.Data.StickyHeaders := not AppSettings.Data.StickyHeaders;
+  FPl.List.StickyHeaders := AppSettings.Data.StickyHeaders;
+  FPl.List.Invalidate;
 end;
 
 procedure TMainForm.MnPlRate(Sender: TObject);
@@ -695,7 +849,9 @@ end;
   of the playlist are checked on a worker thread (FindOfflineDrives; the
   "Waiting for drive..." window with Cancel when it takes a moment: a USB disk
   that spins up, a NAS that does not answer). Files on a drive that cannot be
-  reached are not touched and stay in the playlist (RowFileState). Checking
+  reached are not touched and stay in the playlist (RowFileState). When
+  something is missing, a question with the numbers comes before anything is
+  removed. Checking
   every file from the window's own thread would make the window wait for
   each file of a playlist on a NAS that is down. }
 procedure TMainForm.MnRemoveDead(Sender: TObject);
@@ -703,7 +859,7 @@ var
   Dead: TIntArray;
   I, N, Kept: Integer;
   Paths, Offline: TStringList;
-  KeptText: string;
+  KeptText, Ask: string;
 begin
   if FPl.ReadOnly or (FPl.EntryCount = 0) then Exit;
   Paths := TStringList.Create;
@@ -720,6 +876,8 @@ begin
     Screen.Cursor := crHourGlass;
     try
       for I := 0 to Paths.Count - 1 do
+      begin
+        KeepWindowAlive;        // (every file is looked for on its drive)
         case RowFileState(Paths[I], Offline, @DeadItemFileExists) of
           rfsMissing:
             begin
@@ -730,6 +888,7 @@ begin
         else
           ;
         end;
+      end;
     finally
       Screen.Cursor := crDefault;
     end;
@@ -743,6 +902,13 @@ begin
       else FToast.ShowToast('No dead items', 'Every track of this playlist is there.', icInfo, 2200);
       Exit;
     end;
+    { Nothing leaves the playlist without a yes; the question names what was
+      found, and what stays because its drive cannot be reached }
+    if N = 1 then Ask := SafeFormat('Remove 1 track whose file no longer exists from "%s"?', [FShownPl])
+    else Ask := SafeFormat('Remove %d tracks whose files no longer exist from "%s"?', [N, FShownPl]);
+    if Kept > 0 then Ask := Ask + sLineBreak + sLineBreak + KeptText;
+    if ALMessageDlg('Remove dead items', Ask, 'Remove', 'Cancel', False, mbNo, mkWarning) <> mrYes then Exit;
+    if FShuttingDown or (FPl.EntryCount <> Paths.Count) then Exit;
     FPl.RemoveEntries(Dead);
     if Kept > 0 then FToast.ShowToast(SafeFormat('%d dead items removed', [N]), KeptText, icTrash, 4500)
     else FToast.ShowToast(SafeFormat('%d dead items removed', [N]), FShownPl, icTrash, 2200);
@@ -761,6 +927,14 @@ var
   MarkAbove: Boolean;
 begin
   Accept := ((Source = FLib.Tree) or (Source = FPl.List)) and not FPl.ReadOnly;
+  { a sorted list: nothing is moved in it, and what is dropped finds its
+    place by itself - no marker }
+  if FPl.SortActive then
+  begin
+    if Source = FPl.List then Accept := False;
+    FPl.List.SetDropMarker(-1, False);
+    Exit;
+  end;
   if (State = dsDragLeave) or not Accept then
   begin
     FPl.List.SetDropMarker(-1, False);
@@ -784,16 +958,22 @@ begin
   BeginBusy;
   try
     if Source = FPl.List then
-      FPl.MoveEntries(FPl.SelectedEntries, At)
+    begin
+      if FPl.SortActive then
+        FToast.ShowToast('This playlist is sorted', 'Choose "' + FPl.SortName(psAdded) +
+          '" in the sort menu to arrange it by hand.', icInfo, 3200)
+      else
+        FPl.MoveEntries(FPl.SelectedEntries, At);
+    end
     else if Source = FLib.Tree then
     begin
       L := TTrackList.Create;
       try
         FLib.CollectTracks(FLib.ActionNodes, L);
         if L.Count = 0 then Exit;
-        First := At;
         FPl.AddTracks(L, At);
-        FPl.SelectEntry(First, True, False);
+        First := FPl.LastAddedIndex;
+        if First >= 0 then FPl.SelectEntry(First, True, False);
       finally
         L.Free;
       end;

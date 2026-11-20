@@ -43,8 +43,24 @@ uses
   uAppConsts, uLibraryTypes, uPlaylistFile;
 
 type
+  { the order of the groups shown: as the tracks were added (the order that
+    is stored), or sorted - a view, the stored order stays }
+  TPlSortMode = (psAdded, psArtist, psAlbum, psYear, psDateAdded);
+
+  { the columns of a flat list, in the order they are shown. The number and
+    the title are always there; the title takes the room that is left. }
+  TPlColumn = (pcNumber, pcTitle, pcArtist, pcAlbum, pcAlbumArtist, pcYear, pcGenre, pcFormat,
+    pcPlays, pcLastPlayed, pcAdded, pcRating, pcTime);
+  TPlColumnSet = set of TPlColumn;
+  TPlColRect = record
+    Col: TPlColumn;
+    X, W: Integer;          // pixels from the left of the row content
+  end;
+  TPlColRects = array of TPlColRect;
+
   TPlEntry = record
     Id: Integer;            // stable row id (the play queue's TrackId)
+    Seq: Integer;           // its place in the order added (the stored order)
     FilePath: string;
     Title, Artist, AlbumArtist, Album, Genre: string;
     Year: Integer;
@@ -57,6 +73,9 @@ type
     GroupKey: string;       // the album of the play queue item
     FolderDir: string;
     TitleText: string;      // the track format, made by Rebuild / RefreshTexts
+    ArtistText: string;     // the track's artist behind the title ('' = not shown)
+    Plays: Integer;         // flat list columns, from the library and the user stats (FillStats)
+    LastPlayed, Added: Int64;
   end;
   TIntArray = array of Integer;
 
@@ -64,7 +83,12 @@ type
     First, Count, TotalSec: Integer;   // the entries of the group
     Rating: Integer;                   // the average of its tracks
     Text: string;                      // the header format
+    Info: string;                      // "11 tracks • 49:30" under the stars ('' = none)
     Album, AlbumArtist, FolderDir: string;
+    FirstDisc: Integer;                // the first disc number of the group (0: none yet)
+    MultiDisc: Boolean;                // its tracks have more than one disc number
+    FirstArtist: string;
+    MixedArtists: Boolean;             // its tracks have more than one artist
   end;
 
   { a library record for a file (False: not in the library) }
@@ -88,6 +112,21 @@ type
     FOnLookup: TPlLookupEvent;
     FThumbs: TStringList;              // album hash -> TGfxBitmap (nil: none)
     FGroupMode: TGroupingMode;
+    FSortMode: TPlSortMode;
+    FSortReverse: Boolean;
+    FQuietCollapse: Boolean;           // ListCollapse leaves the names alone
+    { the flat list: its columns (unscaled widths) and what it is sorted by -
+      the column clicked last, then the one clicked before it }
+    FColHead: TAuControl;
+    FColMenu: TAuMenu;
+    FColVisible: TPlColumnSet;
+    FColWidth: array[TPlColumn] of Integer;
+    FSortCol, FSortCol2: TPlColumn;
+    FSortRev, FSortRev2: Boolean;
+    FFlatStarsX: Single;               // where the rating column begins in a row (< 0: not shown)
+    FOnViewChange: TNotifyEvent;
+    FLastAdded: Integer;               // the first of the entries added last
+    FWantTop: string;                  // ScrollToFile waiting for the list to have its size
     FHeaderFmt, FTrackFmt, FDateSuffix: string;
     FReadOnly: Boolean;
     FCollapsed: TStringList;           // header texts / albums to keep collapsed
@@ -95,11 +134,23 @@ type
     FOnChange, FOnRatingChange, FOnCollapseChange: TNotifyEvent;
     FOnCoverClick: TPlCoverEvent;
     procedure TopResize(Sender: TObject);
+    procedure ListResize(Sender: TObject);
+    function SeqOrder: TIntArray;
+    procedure RenumberSeq;
+    procedure ApplySort;
+    procedure FillStats;
+    function NeedsStats: Boolean;
+    function SuffixShows(const ATag: string): Boolean;
+    procedure DrawFlatRow(G: TGfx; E: Integer; X, Y, W, H: Single);
+    procedure ColMenuClick(Sender: TObject);
+    procedure NotifyView;
     procedure DrawRow(Sender: TObject; G: TGfx; Row: Integer; X, Y, W, H: Single; State: TAuRowState);
+    procedure DrawLead(Sender: TObject; G: TGfx; Row: Integer; X, Y, W, H: Single; State: TAuRowState);
     function RowText(Sender: TObject; Row: Integer): string;
     procedure DrawStars(G: TGfx; X, CY, Sz: Single; Rating: Integer; C: TARGB);
     procedure RowClick(Sender: TObject; Row: Integer; X, Y: Integer);
     procedure ListCollapse(Sender: TObject);
+    procedure SetAllCollapsed(AValue: Boolean);
     procedure SetPlaying(V: Integer);
     function ReadEntry(const APath: string): TPlEntry;
     function ThumbOf(const H: TPlHeader): TGfxBitmap;
@@ -114,8 +165,8 @@ type
     procedure BuildTexts;
   public
     BtnPlaylist: TAuDropButton;
-    BtnView: TAuButton;
-    BtnEdit: TAuIconButton;
+    BtnView, BtnSort: TAuButton;
+    BtnEdit, BtnSortDir: TAuIconButton;
     List: TAuGroupList;
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -123,7 +174,41 @@ type
     { the grouping, formats ('' = the defaults, see the main window), the date
       suffix of an auto-playlist and whether the list may be changed }
     procedure SetView(AGroupMode: TGroupingMode; const AHeaderFmt, ATrackFmt, ADateSuffix: string;
-      AReadOnly: Boolean);
+      AReadOnly: Boolean; ASortMode: TPlSortMode = psAdded; ASortReverse: Boolean = False);
+    { the groups are shown in another order than the tracks were added:
+      new tracks find their place by themselves, and nothing can be moved }
+    function SortActive: Boolean;
+    function SortName(AMode: TPlSortMode): string;
+    { ---- the flat list's columns ---- }
+    function ColumnTitle(C: TPlColumn): string;
+    function ColumnText(E: Integer; C: TPlColumn): string;
+    { the columns shown: those chosen, and the date an auto-playlist is
+      sorted by }
+    function ShownColumns: TPlColumnSet;
+    { their places in a row AWidth pixels wide; columns that leave the title
+      too little room are left out, the least important first }
+    function ColumnRects(AWidth: Integer): TPlColRects;
+    { the layout and the sort as texts for the playlist store ('' = default) }
+    function FlatColsText: string;
+    function FlatSortText: string;
+    procedure SetFlatLayout(const ACols, ASort: string);
+    { a click on a heading: sorts by that column, a second click reverses;
+      the number column is the playlist's own order }
+    procedure SortByColumn(C: TPlColumn);
+    procedure ToggleColumn(C: TPlColumn);
+    procedure SetColumnWidth(C: TPlColumn; AWidth: Integer);
+    procedure PopupColumnMenu;
+    procedure Resort;
+    property SortColumn: TPlColumn read FSortCol;
+    property SortColumnReverse: Boolean read FSortRev;
+    { the columns, their widths or the sort of the flat list changed }
+    property OnViewChange: TNotifyEvent read FOnViewChange write FOnViewChange;
+    { where the entries added last begin (the insert position, or their
+      place in a sorted list); -1 before anything was added }
+    property LastAddedIndex: Integer read FLastAdded;
+    { the track at the top of the list, and the list scrolled back to it }
+    function TopFile: string;
+    procedure ScrollToFile(const APath: string);
     { reads the tags of the files and adds them (at InsertAt, -1 = the end) }
     procedure AddFiles(Paths: TStrings; InsertAt: Integer = -1);
     { copies of library records (no disk access) }
@@ -172,6 +257,8 @@ type
     function StarsWidth: Single;
     property PlayingEntry: Integer read FPlaying write SetPlaying;
     property GroupMode: TGroupingMode read FGroupMode;
+    property SortMode: TPlSortMode read FSortMode;
+    property SortReverse: Boolean read FSortReverse;
     property ReadOnly: Boolean read FReadOnly;
     property IsDemo: Boolean read FDemo;
     property OnLookup: TPlLookupEvent read FOnLookup write FOnLookup;
@@ -187,12 +274,31 @@ function FormatDuration(Sec: Integer): string;
 implementation
 
 uses
-  AuAudioTypes, ALMetadata, uAudioUtils, uMetaUtils, uUserStatsManager, uTagParser, uPlaylistRows, uAppStrings;
+  LazUTF8, DateUtils, uInputBlock, AuAudioTypes, ALMetadata, uAudioUtils, uMetaUtils, uUserStatsManager, uTagParser, uPlaylistRows, uAppStrings;
 
 const
   PL_EMPTY_TEXT = 'This playlist is empty.' + LineEnding +
     'Drag music from the library or from Windows Explorer here,' + LineEnding +
     'or use Main menu > File > Add files... (Ctrl+O).';
+  COL_HEAD_H = 28;                // the heading row of a flat list
+  COL_TITLE_MIN_W = 150;          // the title keeps this much; other columns give way
+  COL_MIN_W = 40;                 // a column can be dragged this narrow ...
+  COL_MAX_W = 600;                // ... and this wide
+  COL_GRIP_W = 5;                 // the drag zone at each side of a column's left edge
+  COL_IDS: array[TPlColumn] of string = ('num', 'title', 'artist', 'album', 'albumartist', 'year',
+    'genre', 'format', 'plays', 'lastplayed', 'added', 'rating', 'time');
+  COL_TITLES: array[TPlColumn] of string = ('#', 'Title', 'Artist', 'Album', 'Album artist', 'Year',
+    'Genre', 'Format', 'Plays', 'Last played', 'Added', 'Rating', 'Time');
+  COL_DEFAULT_W: array[TPlColumn] of Integer = (46, 0, 190, 210, 170, 56, 130, 84, 56, 112, 112, 0, 64);
+  COL_DEFAULT_VISIBLE = [pcNumber, pcTitle, pcArtist, pcAlbum, pcRating, pcTime];
+  COL_RESIZABLE = [pcArtist, pcAlbum, pcAlbumArtist, pcYear, pcGenre, pcFormat, pcPlays, pcLastPlayed, pcAdded];
+  { what gives way first when the pane is narrow }
+  COL_DROP_ORDER: array[0..9] of TPlColumn = (pcAdded, pcLastPlayed, pcPlays, pcFormat, pcGenre, pcYear,
+    pcAlbumArtist, pcAlbum, pcArtist, pcRating);
+  LIST_READY_MIN_H = 120;         // a list lower than this has not been laid out yet
+  SORT_BUTTON_MIN_PANE_W = 520;   // a narrower pane has no room for the sort button
+  HEADER_TEXT_MIN_W = 220;   // a header keeps this much for its text before the track count and time appear
+  ARTIST_TEXT_MIN_W = 70;    // a track's artist is shown from this much room behind the title
   PL_AUTO_EMPTY_TEXT = 'This auto-playlist is empty: no track of the library matches its rules.' + LineEnding +
     'Change its rules in the Playlist Manager (Alt+P).';
 
@@ -205,11 +311,605 @@ begin
     Result := Format('%d:%.2d', [Sec div 60, Sec mod 60]);
 end;
 
+function IfIcon(AReverse: Boolean): TAuIcon;
+begin
+  if AReverse then Result := icSortDesc else Result := icSortAsc;
+end;
+
+{ ---- the heading row of a flat list ---- }
+
+type
+  { One heading per column, at the places ColumnRects gives the rows. A click
+    sorts by the column, a right click opens the list of columns. The line
+    between two headings is dragged as a splitter: it follows the pointer,
+    the column on one side grows by what the other gives up. Left of the
+    first such column is the title, which takes or gives the difference. }
+  TPlColumnHeader = class(TAuControl)
+  private
+    FHotCol, FDownCol: Integer;       // Ord(TPlColumn), -1 = none
+    FGrip: Integer;                   // the column whose edge is dragged, -1 = none
+    FGripX, FGripW, FGripMax: Integer;
+    FGripLeft, FGripLeftW: Integer;   // the column left of the dragged line, when it has a width of its own
+    function Rects(out AX0: Integer): TPlColRects;
+    function ColAt(X: Integer; out AGrip: Integer): Integer;
+  protected
+    procedure DoPaint(G: TGfx); override;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseLeave; override;
+  public
+    FPane: TPlaylistPane;
+    constructor Create(AOwner: TComponent); override;
+  end;
+
+constructor TPlColumnHeader.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FocusOnClick := False;
+  FHotCol := -1;
+  FDownCol := -1;
+  FGrip := -1;
+  FGripLeft := -1;
+end;
+
+function TPlColumnHeader.Rects(out AX0: Integer): TPlColRects;
+begin
+  AX0 := FPane.List.Left + FPane.List.ContentLeft;
+  Result := FPane.ColumnRects(FPane.List.ContentWidth);
+end;
+
+{ the column at X (-1: none) and, in AGrip, the column whose left edge is
+  near enough to drag (-1: none) }
+function TPlColumnHeader.ColAt(X: Integer; out AGrip: Integer): Integer;
+var
+  R: TPlColRects;
+  I, X0: Integer;
+begin
+  Result := -1;
+  AGrip := -1;
+  R := Rects(X0);
+  for I := 0 to High(R) do
+  begin
+    if (R[I].Col in COL_RESIZABLE) and (Abs(X - (X0 + R[I].X)) <= S(COL_GRIP_W)) then AGrip := Ord(R[I].Col);
+    if (X >= X0 + R[I].X) and (X < X0 + R[I].X + R[I].W) then Result := Ord(R[I].Col);
+  end;
+end;
+
+procedure TPlColumnHeader.DoPaint(G: TGfx);
+var
+  R: TPlColRects;
+  I, X0, TW: Integer;
+  F: TGfxFont;
+  T: string;
+  C: TPlColumn;
+  Fg: TARGB;
+begin
+  G.FillRect(0, 0, Width, Height, EffBack);
+  if FPane = nil then Exit;
+  R := Rects(X0);
+  F := UIFont(FPane.List.TextSize - 1.5);
+  for I := 0 to High(R) do
+  begin
+    C := R[I].Col;
+    T := FPane.ColumnTitle(C);
+    if Ord(C) = FHotCol then
+      G.FillRound(X0 + R[I].X - S(4), S(3), R[I].W, Height - S(7), S(5), Blend(EffBack, clHover, 0.9));
+    if C = FPane.SortColumn then Fg := clAccentText else Fg := clTextDim;
+    TW := Ceil(TextWidth(T, F));
+    if C = pcTime then
+    begin
+      { right aligned, as the times are }
+      G.Text(T, X0 + R[I].X, 0, R[I].W, Height - S(1), F, Fg, 2, 1);
+      if (C = FPane.SortColumn) and FPane.SortActive then
+        DrawIcon(G, IfIcon(FPane.SortColumnReverse), X0 + R[I].X + R[I].W - TW - S(10), Height / 2, S(11), Fg);
+    end
+    else
+    begin
+      G.Text(T, X0 + R[I].X, 0, R[I].W - S(8), Height - S(1), F, Fg, 0, 1);
+      if (C = FPane.SortColumn) and FPane.SortActive and (TW + S(18) < R[I].W) then
+        DrawIcon(G, IfIcon(FPane.SortColumnReverse), X0 + R[I].X + TW + S(10), Height / 2, S(11), Fg);
+    end;
+  end;
+  G.FillRect(S(8), Height - 1, Width - S(16), 1, WithAlpha(clText, 30));
+end;
+
+procedure TPlColumnHeader.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  Col, Grip, D: Integer;
+begin
+  inherited MouseMove(Shift, X, Y);
+  if FGrip >= 0 then
+  begin
+    { the left edge follows the pointer: to the left is wider }
+    D := Round((X - FGripX) / UIScale);          // to the right: the left side grows
+    if FGripLeft >= 0 then
+    begin
+      if COL_MIN_W - FGripLeftW > FGripW - COL_MIN_W then Exit;
+      D := EnsureRange(D, COL_MIN_W - FGripLeftW, FGripW - COL_MIN_W);
+      FPane.SetColumnWidth(TPlColumn(FGripLeft), FGripLeftW + D);
+      FPane.SetColumnWidth(TPlColumn(FGrip), FGripW - D);
+    end
+    else
+      FPane.SetColumnWidth(TPlColumn(FGrip), Math.Min(FGripMax, FGripW - D));
+    Exit;
+  end;
+  Col := ColAt(X, Grip);
+  if Grip >= 0 then Cursor := crHSplit else Cursor := crDefault;
+  if Grip >= 0 then Col := -1;
+  if Col <> FHotCol then
+  begin
+    FHotCol := Col;
+    Invalidate;
+  end;
+end;
+
+procedure TPlColumnHeader.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Col, Grip, I, X0, Spare: Integer;
+  R: TPlColRects;
+begin
+  Spare := 0;
+  inherited MouseDown(Button, Shift, X, Y);
+  FDownCol := -1;
+  if Button = mbRight then
+  begin
+    FPane.PopupColumnMenu;
+    Exit;
+  end;
+  if Button <> mbLeft then Exit;
+  Col := ColAt(X, Grip);
+  if Grip >= 0 then
+  begin
+    { from the width as it is shown (it may be squeezed), and at most as
+      much wider as the title can give }
+    FGrip := Grip;
+    FGripX := X;
+    FGripW := FPane.FColWidth[TPlColumn(Grip)];
+    FGripMax := FGripW;
+    R := Rects(X0);
+    FGripLeft := -1;
+    for I := 0 to High(R) do
+    begin
+      if Ord(R[I].Col) = Grip then
+      begin
+        FGripW := Round(R[I].W / UIScale);
+        if (I > 0) and (R[I - 1].Col in COL_RESIZABLE) then
+        begin
+          FGripLeft := Ord(R[I - 1].Col);
+          FGripLeftW := Round(R[I - 1].W / UIScale);
+        end;
+      end;
+      if R[I].Col = pcTitle then Spare := Math.Max(0, R[I].W - S(COL_TITLE_MIN_W));
+    end;
+    FGripMax := FGripW + Round(Spare / UIScale);
+  end
+  else
+    FDownCol := Col;
+end;
+
+procedure TPlColumnHeader.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Col, Grip: Integer;
+begin
+  inherited MouseUp(Button, Shift, X, Y);
+  if Button <> mbLeft then Exit;
+  if FGrip >= 0 then
+  begin
+    FGrip := -1;
+    FPane.NotifyView;
+    Exit;
+  end;
+  Col := ColAt(X, Grip);
+  if (Col >= 0) and (Col = FDownCol) then FPane.SortByColumn(TPlColumn(Col));
+  FDownCol := -1;
+end;
+
+procedure TPlColumnHeader.MouseLeave;
+begin
+  inherited MouseLeave;
+  if FGrip < 0 then Cursor := crDefault;
+  if FHotCol >= 0 then
+  begin
+    FHotCol := -1;
+    Invalidate;
+  end;
+end;
+
+{ ---- the columns ---- }
+
+function TPlaylistPane.ColumnTitle(C: TPlColumn): string;
+begin
+  Result := COL_TITLES[C];
+end;
+
+function TPlaylistPane.SuffixShows(const ATag: string): Boolean;
+begin
+  Result := Pos('%' + LowerCase(ATag) + '%', LowerCase(FDateSuffix)) > 0;
+end;
+
+function TPlaylistPane.ShownColumns: TPlColumnSet;
+begin
+  Result := FColVisible + [pcNumber, pcTitle];
+  if FDateSuffix <> '' then
+  begin
+    if SuffixShows(MASTER_TAG_REGISTRY[tiAdded].TagStr) then Include(Result, pcAdded);
+    if SuffixShows(MASTER_TAG_REGISTRY[tiLastPlayed].TagStr) then Include(Result, pcLastPlayed);
+  end;
+end;
+
+{ a column that is shown or sorted by needs the library's date added or the
+  play statistics }
+function TPlaylistPane.NeedsStats: Boolean;
+const
+  STAT_COLS = [pcPlays, pcLastPlayed, pcAdded];
+begin
+  Result := (ShownColumns * STAT_COLS <> []) or (FSortCol in STAT_COLS) or (FSortCol2 in STAT_COLS);
+end;
+
+procedure TPlaylistPane.FillStats;
+var
+  I: Integer;
+  T: TTrackInfo;
+  St: PUserTrackStats;
+begin
+  T := Default(TTrackInfo);
+  for I := 0 to FCount - 1 do
+  begin
+    KeepWindowAlive;
+    FEntries[I].Plays := 0;
+    FEntries[I].LastPlayed := 0;
+    FEntries[I].Added := 0;
+    if not (Assigned(FOnLookup) and FOnLookup(FEntries[I].FilePath, T)) then Continue;
+    FEntries[I].Added := T.DateAdded;
+    if UserStatsManager = nil then Continue;
+    St := UserStatsManager.PeekStats(T.PrimaryFingerprint);
+    if (St = nil) and (T.FallbackFingerprint <> '') then St := UserStatsManager.PeekStats(T.FallbackFingerprint);
+    if St = nil then Continue;
+    FEntries[I].Plays := St^.PlayCount;
+    FEntries[I].LastPlayed := St^.LastPlayed;
+  end;
+end;
+
+function TPlaylistPane.ColumnText(E: Integer; C: TPlColumn): string;
+var
+  D: TPlEntry;
+
+  function DateText(AUnix: Int64): string;
+  begin
+    if AUnix > 0 then Result := FormatDateTime('dd mmm yyyy', UnixToDateTime(AUnix, False)) else Result := '';
+  end;
+
+begin
+  Result := '';
+  if (E < 0) or (E >= FCount) then Exit;
+  D := FEntries[E];
+  case C of
+    pcNumber: Result := DisplayNumber(E);
+    pcTitle: Result := D.TitleText;
+    pcArtist: Result := FormatTagString(D.Artist, 0, ', ');
+    pcAlbum: Result := D.Album;
+    pcAlbumArtist: Result := FormatTagString(D.AlbumArtist, 0, ', ');
+    pcYear: if D.Year > 0 then Result := IntToStr(D.Year);
+    pcGenre: Result := FormatTagString(D.Genre, 0, ', ');
+    pcFormat:
+      if D.SampleRate > 0 then
+      begin
+        if IsDSDFile(D.FilePath) then Result := 'DSD' + IntToStr(D.SampleRate div 44100)
+        else if D.BitDepth > 0 then Result := Format('%d/%s', [D.BitDepth, FormatFloat('0.#', D.SampleRate / 1000)])
+        else Result := FormatFloat('0.#', D.SampleRate / 1000) + ' kHz';
+      end;
+    pcPlays: if D.Plays > 0 then Result := IntToStr(D.Plays);
+    pcLastPlayed: Result := DateText(D.LastPlayed);
+    pcAdded: Result := DateText(D.Added);
+    pcTime: Result := D.DurationStr;
+  else
+    ;
+  end;
+end;
+
+function TPlaylistPane.ColumnRects(AWidth: Integer): TPlColRects;
+var
+  Cols: TPlColumnSet;
+  C: TPlColumn;
+  I, N, X, Fixed, Flex, FlexMin, Room, TitleW: Integer;
+  Scale: Double;
+
+  function WidthOf(ACol: TPlColumn): Integer;
+  begin
+    if ACol = pcRating then Result := Round(StarsWidth) + S(20)
+    else if ACol in COL_RESIZABLE then Result := Math.Max(S(COL_MIN_W), Round(S(FColWidth[ACol]) * Scale))
+    else Result := S(FColWidth[ACol]);
+  end;
+
+begin
+  Result := nil;
+  Cols := ShownColumns;
+  I := 0;
+  { When the columns do not fit beside the title's least width, those with a
+    width of their own are all made narrower by the same part (for the
+    picture only: the widths chosen stay). Columns are left out only when
+    even their least widths do not fit. So a column switched on is always
+    seen, and nothing disappears while a width is dragged. }
+  repeat
+    Scale := 1;
+    Fixed := 0;
+    Flex := 0;
+    FlexMin := 0;
+    for C := Low(TPlColumn) to High(TPlColumn) do
+      if (C in Cols) and (C <> pcTitle) then
+      begin
+        if C in COL_RESIZABLE then
+        begin
+          Inc(Flex, S(FColWidth[C]));
+          Inc(FlexMin, S(COL_MIN_W));
+        end
+        else
+          Inc(Fixed, WidthOf(C));
+      end;
+    Room := AWidth - Fixed - S(COL_TITLE_MIN_W);
+    if Flex <= Room then Break;
+    if FlexMin <= Room then
+    begin
+      Scale := Room / Flex;
+      Break;
+    end;
+    { too narrow for all of them: the next column of the drop order goes }
+    while (I <= High(COL_DROP_ORDER)) and not (COL_DROP_ORDER[I] in Cols) do Inc(I);
+    if I > High(COL_DROP_ORDER) then Break;
+    Exclude(Cols, COL_DROP_ORDER[I]);
+  until False;
+  TitleW := AWidth - Fixed;
+  for C := Low(TPlColumn) to High(TPlColumn) do
+    if (C in Cols) and (C in COL_RESIZABLE) then Dec(TitleW, WidthOf(C));
+  if TitleW < S(COL_MIN_W) then TitleW := S(COL_MIN_W);
+  SetLength(Result, Ord(High(TPlColumn)) + 1);
+  N := 0;
+  X := 0;
+  for C := Low(TPlColumn) to High(TPlColumn) do
+    if C in Cols then
+    begin
+      Result[N].Col := C;
+      Result[N].X := X;
+      if C = pcTitle then Result[N].W := TitleW else Result[N].W := WidthOf(C);
+      Inc(X, Result[N].W);
+      Inc(N);
+    end;
+  SetLength(Result, N);
+end;
+
+{ "artist:190:1;album:210:0;..." - every column but the number and the
+  title: its width and whether it is shown }
+function TPlaylistPane.FlatColsText: string;
+var
+  C: TPlColumn;
+  IsDefault: Boolean;
+begin
+  Result := '';
+  IsDefault := FColVisible = COL_DEFAULT_VISIBLE;
+  for C := pcArtist to High(TPlColumn) do
+  begin
+    if FColWidth[C] <> COL_DEFAULT_W[C] then IsDefault := False;
+    if Result <> '' then Result := Result + ';';
+    Result := Result + COL_IDS[C] + ':' + IntToStr(FColWidth[C]) + ':' + IntToStr(Ord(C in FColVisible));
+  end;
+  if IsDefault then Result := '';
+end;
+
+{ "artist,0;album,1" - the column sorted by and the one before it, each with
+  1 when reversed }
+function TPlaylistPane.FlatSortText: string;
+begin
+  if (FSortCol = pcNumber) and not FSortRev then Exit('');
+  Result := COL_IDS[FSortCol] + ',' + IntToStr(Ord(FSortRev)) + ';' +
+    COL_IDS[FSortCol2] + ',' + IntToStr(Ord(FSortRev2));
+end;
+
+procedure TPlaylistPane.SetFlatLayout(const ACols, ASort: string);
+var
+  Parts, F: TStringArray;
+  C: TPlColumn;
+  I: Integer;
+
+  function ColOf(const AId: string; out ACol: TPlColumn): Boolean;
+  var
+    K: TPlColumn;
+  begin
+    for K := Low(TPlColumn) to High(TPlColumn) do
+      if COL_IDS[K] = AId then
+      begin
+        ACol := K;
+        Exit(True);
+      end;
+    Result := False;
+  end;
+
+begin
+  FColVisible := COL_DEFAULT_VISIBLE;
+  for C := Low(TPlColumn) to High(TPlColumn) do FColWidth[C] := COL_DEFAULT_W[C];
+  FSortCol := pcNumber;
+  FSortCol2 := pcNumber;
+  FSortRev := False;
+  FSortRev2 := False;
+  if ACols <> '' then
+  begin
+    Parts := ACols.Split([';']);
+    for I := 0 to High(Parts) do
+    begin
+      F := Parts[I].Split([':']);
+      if (Length(F) <> 3) or not ColOf(F[0], C) or (C in [pcNumber, pcTitle]) then Continue;
+      if C in COL_RESIZABLE then FColWidth[C] := EnsureRange(StrToIntDef(F[1], COL_DEFAULT_W[C]), COL_MIN_W, COL_MAX_W);
+      if F[2] = '1' then Include(FColVisible, C) else Exclude(FColVisible, C);
+    end;
+  end;
+  if ASort <> '' then
+  begin
+    Parts := ASort.Split([';']);
+    for I := 0 to Math.Min(1, High(Parts)) do
+    begin
+      F := Parts[I].Split([',']);
+      if (Length(F) <> 2) or not ColOf(F[0], C) then Continue;
+      if I = 0 then
+      begin
+        FSortCol := C;
+        FSortRev := F[1] = '1';
+      end
+      else
+      begin
+        FSortCol2 := C;
+        FSortRev2 := F[1] = '1';
+      end;
+    end;
+  end;
+  if FColHead <> nil then FColHead.Invalidate;
+end;
+
+procedure TPlaylistPane.NotifyView;
+begin
+  if Assigned(FOnViewChange) and not FDemo then FOnViewChange(Self);
+end;
+
+procedure TPlaylistPane.SetColumnWidth(C: TPlColumn; AWidth: Integer);
+begin
+  AWidth := EnsureRange(AWidth, COL_MIN_W, COL_MAX_W);
+  if not (C in COL_RESIZABLE) or (FColWidth[C] = AWidth) then Exit;
+  FColWidth[C] := AWidth;
+  FColHead.Invalidate;
+  List.Invalidate;
+end;
+
+procedure TPlaylistPane.ToggleColumn(C: TPlColumn);
+begin
+  if C in [pcNumber, pcTitle] then Exit;
+  if C in FColVisible then Exclude(FColVisible, C) else Include(FColVisible, C);
+  if NeedsStats then FillStats;
+  FColHead.Invalidate;
+  List.Invalidate;
+  NotifyView;
+end;
+
+procedure TPlaylistPane.ColMenuClick(Sender: TObject);
+begin
+  ToggleColumn(TPlColumn(EnsureRange(TAuMenuItem(Sender).Tag, 0, Ord(High(TPlColumn)))));
+end;
+
+procedure TPlaylistPane.PopupColumnMenu;
+var
+  C: TPlColumn;
+  It: TAuMenuItem;
+begin
+  FColMenu.Free;
+  FColMenu := TAuMenu.Create;
+  for C := pcArtist to High(TPlColumn) do
+  begin
+    It := FColMenu.Add(ColumnTitle(C), @ColMenuClick);
+    It.Tag := Ord(C);
+    It.Checked := C in FColVisible;
+  end;
+  FColMenu.PopupAtCursor;
+end;
+
+procedure TPlaylistPane.SortByColumn(C: TPlColumn);
+begin
+  if C = FSortCol then FSortRev := not FSortRev
+  else
+  begin
+    { the column sorted by until now decides among equal values }
+    FSortCol2 := FSortCol;
+    FSortRev2 := FSortRev;
+    FSortCol := C;
+    FSortRev := False;
+  end;
+  Resort;
+end;
+
+{ the entries in the order of the sort as it is now; the selected tracks
+  stay selected, the playing track stays the playing track }
+procedure TPlaylistPane.Resort;
+const
+  MAX_RESELECT = 500;
+var
+  Sel: TIntArray;
+  Ids: array of Integer;
+  I, E, R: Integer;
+begin
+  Screen.Cursor := crHourGlass;
+  try
+    Sel := SelectedEntries;
+    Ids := nil;
+    SetLength(Ids, Math.Min(Length(Sel), MAX_RESELECT));
+    for I := 0 to High(Ids) do Ids[I] := FEntries[Sel[I]].Id;
+    ApplySort;
+    Rebuild;
+    for I := 0 to High(Ids) do
+    begin
+      E := IndexOfId(Ids[I]);
+      if I = 0 then SelectEntry(E, True, False)
+      else
+      begin
+        R := RowOfEntry(E);
+        if R >= 0 then List.Selected[R] := True;
+      end;
+    end;
+    FColHead.Invalidate;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+  Changed;
+  NotifyView;
+end;
+
+{ a track of a flat list: one text per column }
+procedure TPlaylistPane.DrawFlatRow(G: TGfx; E: Integer; X, Y, W, H: Single);
+var
+  R: TPlColRects;
+  I: Integer;
+  F, BF: TGfxFont;
+  Fg, Dim: TARGB;
+  Playing: Boolean;
+  CX, CW: Single;
+begin
+  Playing := E = FPlaying;
+  if Playing then Fg := clAccentText else Fg := clText;
+  if Playing then Dim := clAccentText else Dim := clTextDim;
+  F := UIFont(List.TextSize);
+  BF := UIFont(List.TextSize, True);
+  FFlatStarsX := -100000;
+  R := ColumnRects(Round(W));
+  for I := 0 to High(R) do
+  begin
+    CX := X + R[I].X;
+    CW := R[I].W;
+    case R[I].Col of
+      pcTitle:
+        begin
+          if Playing then
+          begin
+            DrawIcon(G, icPlay, CX + S(5), Y + H / 2, H * 0.42, clAccentText);
+            CX := CX + S(16);
+            CW := CW - S(16);
+          end;
+          if Playing then G.Text(FEntries[E].TitleText, CX, Y, CW - S(12), H, BF, Fg, 0, 1)
+          else G.Text(FEntries[E].TitleText, CX, Y, CW - S(12), H, F, Fg, 0, 1);
+        end;
+      pcRating:
+        begin
+          FFlatStarsX := R[I].X;
+          DrawStars(G, CX, Y + H / 2, Round(List.ItemHeight * 0.52), FEntries[E].Rating,
+            IfC(Playing, clAccentText, clTextDim));
+        end;
+      pcTime: G.Text(FEntries[E].DurationStr, CX, Y, CW, H, F, Dim, 2, 1);
+    else
+      G.Text(ColumnText(E, R[I].Col), CX, Y, CW - S(12), H, F, Dim, 0, 1);
+    end;
+  end;
+end;
 constructor TPlaylistPane.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   BackRole := crBg;
   FPlaying := -1;
+  FLastAdded := -1;
   FGroupMode := gmAlbum;
   FCollapsed := TStringList.Create;
   FCollapsed.Sorted := True;
@@ -223,6 +923,15 @@ begin
   FTop.Align := alTop;
   FTop.Height := S(50);
   FTop.OnResize := @TopResize;
+  { the heading row of a flat list, between the buttons and the list }
+  FColHead := TPlColumnHeader.Create(Self);
+  FColHead.Parent := Self;
+  FColHead.Top := FTop.Height;
+  FColHead.Align := alTop;
+  FColHead.Height := S(COL_HEAD_H);
+  FColHead.Visible := False;
+  TPlColumnHeader(FColHead).FPane := Self;
+  SetFlatLayout('', '');
   BtnPlaylist := TAuDropButton.Create(Self);
   BtnPlaylist.Parent := FTop;
   BtnPlaylist.Caption := 'Default Playlist';
@@ -232,10 +941,23 @@ begin
   BtnView := TAuButton.Create(Self);
   BtnView.Parent := FTop;
   BtnView.Kind := bkFlat;
-  BtnView.Icon := icEye;
+  BtnView.Icon := icAlbum;
   BtnView.Caption := 'By album';
   BtnView.Hint := 'View: grouping and layout of this playlist';
   BtnView.ShowHint := True;
+  BtnSort := TAuButton.Create(Self);
+  BtnSort.Parent := FTop;
+  BtnSort.Kind := bkFlat;
+  BtnSort.Caption := SortName(psAdded);
+  BtnSort.Hint := 'Sort: the order of the albums in this playlist';
+  BtnSort.ShowHint := True;
+  { the direction of that order, a button of its own }
+  BtnSortDir := TAuIconButton.Create(Self);
+  BtnSortDir.Parent := FTop;
+  BtnSortDir.Icon := icSortAsc;
+  BtnSortDir.IconSize := 16;
+  BtnSortDir.Hint := 'Reverse the order';
+  BtnSortDir.ShowHint := True;
   BtnEdit := TAuIconButton.Create(Self);
   BtnEdit.Parent := FTop;
   BtnEdit.Icon := icEdit;
@@ -249,19 +971,24 @@ begin
   List.BorderSpacing.Bottom := S(4);
   List.DragEnabled := True;
   List.OnDrawRow := @DrawRow;
+  List.OnDrawLead := @DrawLead;
   List.OnRowText := @RowText;   // type-ahead as in the library tree
   List.OnRowClick := @RowClick;
   List.OnCollapseChange := @ListCollapse;
+  List.OnResize := @ListResize;
   List.EmptyText := PL_EMPTY_TEXT;
   BtnPlaylist.TabOrder := 0;
-  BtnView.TabOrder := 1;
-  BtnEdit.TabOrder := 2;
+  BtnSortDir.TabOrder := 1;
+  BtnSort.TabOrder := 2;
+  BtnView.TabOrder := 3;
+  BtnEdit.TabOrder := 4;
   TopResize(nil);
 end;
 
 destructor TPlaylistPane.Destroy;
 begin
   ClearThumbCache;
+  FColMenu.Free;
   FThumbs.Free;
   FCollapsed.Free;
   inherited Destroy;
@@ -269,13 +996,25 @@ end;
 
 procedure TPlaylistPane.TopResize(Sender: TObject);
 var
-  VW: Integer;
+  VW, Right: Integer;
 begin
-  if (BtnPlaylist = nil) or (BtnView = nil) or (BtnEdit = nil) then Exit;
+  if (BtnPlaylist = nil) or (BtnView = nil) or (BtnSort = nil) or (BtnSortDir = nil) or (BtnEdit = nil) then Exit;
   BtnEdit.SetBounds(FTop.Width - S(10) - S(34), S(9), S(34), S(34));
   VW := BtnView.PreferredWidth;
   BtnView.SetBounds(BtnEdit.Left - S(4) - VW, S(10), VW, S(32));
-  BtnPlaylist.SetBounds(S(10), S(10), Math.Max(S(60), BtnView.Left - S(18)), S(32));
+  Right := BtnView.Left;
+  { the sort buttons (direction, order): for grouped lists, where the pane
+    is wide enough for them }
+  BtnSort.Visible := (FGroupMode <> gmFlat) and (FTop.Width >= S(SORT_BUTTON_MIN_PANE_W));
+  BtnSortDir.Visible := BtnSort.Visible;
+  if BtnSort.Visible then
+  begin
+    VW := BtnSort.PreferredWidth;
+    BtnSort.SetBounds(Right - S(4) - VW, S(10), VW, S(32));
+    BtnSortDir.SetBounds(BtnSort.Left - S(34), S(9), S(34), S(34));
+    Right := BtnSortDir.Left;
+  end;
+  BtnPlaylist.SetBounds(S(10), S(10), Math.Max(S(60), Right - S(18)), S(32));
 end;
 
 procedure TPlaylistPane.Changed;
@@ -377,10 +1116,14 @@ end;
 
 procedure TPlaylistPane.InsertEntries(const New_: array of TPlEntry; N, InsertAt: Integer);
 var
-  I: Integer;
+  I, MaxSeq, FirstId: Integer;
 begin
   if N = 0 then Exit;
-  if (InsertAt < 0) or (InsertAt > FCount) then InsertAt := FCount;
+  { a sorted list finds the place itself: added last in the stored order }
+  if (InsertAt < 0) or (InsertAt > FCount) or SortActive then InsertAt := FCount;
+  MaxSeq := -1;
+  for I := 0 to FCount - 1 do
+    if FEntries[I].Seq > MaxSeq then MaxSeq := FEntries[I].Seq;
   SetLength(FEntries, FCount + N);
   for I := FCount - 1 downto InsertAt do FEntries[I + N] := FEntries[I];
   for I := 0 to N - 1 do
@@ -388,9 +1131,13 @@ begin
     Inc(FNextId);
     FEntries[InsertAt + I] := New_[I];
     FEntries[InsertAt + I].Id := FNextId;
+    FEntries[InsertAt + I].Seq := MaxSeq + 1 + I;
   end;
+  FirstId := FNextId - N + 1;
   if (FPlaying >= InsertAt) then Inc(FPlaying, N);
   Inc(FCount, N);
+  if SortActive then ApplySort else RenumberSeq;
+  FLastAdded := IndexOfId(FirstId);
   Rebuild;
   Changed;
 end;
@@ -400,6 +1147,8 @@ begin
   FCount := 0;
   SetLength(FEntries, 0);
   FPlaying := -1;
+  FLastAdded := -1;
+  FWantTop := '';
   FDemo := False;
   Rebuild;
   Changed;
@@ -417,6 +1166,7 @@ begin
   for I := 0 to Paths.Count - 1 do
     if IsValidMusicFile(Paths[I]) then
     begin
+      KeepWindowAlive;            // (each file is read from its drive)
       New_[N] := ReadEntry(Paths[I]);
       Inc(N);
     end;
@@ -431,7 +1181,11 @@ begin
   if FDemo then Clear;
   if (Tracks = nil) or (Tracks.Count = 0) then Exit;
   SetLength(New_, Tracks.Count);
-  for I := 0 to Tracks.Count - 1 do New_[I] := EntryFromTrack(Tracks[I]^);
+  for I := 0 to Tracks.Count - 1 do
+  begin
+    KeepWindowAlive;
+    New_[I] := EntryFromTrack(Tracks[I]^);
+  end;
   InsertEntries(New_, Tracks.Count, InsertAt);
 end;
 
@@ -445,20 +1199,33 @@ begin
   SetLength(FEntries, FCount);
   for I := 0 to FCount - 1 do
   begin
+    KeepWindowAlive;
     FEntries[I] := EntryFromTrack(TrackFromEntry(AEntries[I]));
     Inc(FNextId);
     FEntries[I].Id := FNextId;
+    FEntries[I].Seq := I;
   end;
+  FLastAdded := -1;
+  FWantTop := '';
+  if SortActive then ApplySort;
   Rebuild;
 end;
 
 function TPlaylistPane.ToEntries: TPlaylistEntries;
 var
   I: Integer;
+  Order: TIntArray;
 begin
+  { always in the order added, however the list is sorted }
   Result := nil;
   SetLength(Result, FCount);
-  for I := 0 to FCount - 1 do Result[I] := uPlaylistRows.EntryFromTrack(TrackOf(FEntries[I]));
+  if SortActive then
+  begin
+    Order := SeqOrder;
+    for I := 0 to FCount - 1 do Result[I] := uPlaylistRows.EntryFromTrack(TrackOf(FEntries[Order[I]]));
+  end
+  else
+    for I := 0 to FCount - 1 do Result[I] := uPlaylistRows.EntryFromTrack(TrackOf(FEntries[I]));
 end;
 
 procedure TPlaylistPane.RemoveEntries(const Idx: TIntArray);
@@ -482,6 +1249,7 @@ begin
   FCount := N;
   SetLength(FEntries, N);
   FPlaying := NewPlaying;
+  if not SortActive then RenumberSeq;
   Rebuild;
   Changed;
 end;
@@ -492,7 +1260,7 @@ var
   Moved, Rest: array of TPlEntry;
   I, NM, NR, At, PlayingId: Integer;
 begin
-  if (Length(Idx) = 0) or FReadOnly then Exit;
+  if (Length(Idx) = 0) or FReadOnly or SortActive then Exit;
   if (InsertAt < 0) or (InsertAt > FCount) then InsertAt := FCount;
   SetLength(Sel, FCount);
   for I := 0 to High(Idx) do
@@ -523,6 +1291,7 @@ begin
   for I := 0 to NM - 1 do FEntries[At + I] := Moved[I];
   for I := At to NR - 1 do FEntries[NM + I] := Rest[I];
   if PlayingId <> 0 then FPlaying := IndexOfId(PlayingId);
+  RenumberSeq;
   Rebuild;
   for I := 0 to NM - 1 do List.Selected[RowOfEntry(At + I)] := True;
   Changed;
@@ -530,7 +1299,7 @@ end;
 
 procedure TPlaylistPane.SyncWithLibrary;
 var
-  I, Id: Integer;
+  I, Id, Sq: Integer;
   T: TTrackInfo;
   Changes: Boolean;
 begin
@@ -539,11 +1308,16 @@ begin
   for I := 0 to FCount - 1 do
     if FOnLookup(FEntries[I].FilePath, T) then
     begin
+      KeepWindowAlive;
       Id := FEntries[I].Id;
+      Sq := FEntries[I].Seq;
       FEntries[I] := EntryFromTrack(T);
       FEntries[I].Id := Id;
+      FEntries[I].Seq := Sq;
       Changes := True;
     end;
+  { the tags a sort goes by may have changed }
+  if SortActive then ApplySort;
   Rebuild;
   if Changes then Changed;
 end;
@@ -582,23 +1356,364 @@ end;
 { ---- view ---- }
 
 procedure TPlaylistPane.SetView(AGroupMode: TGroupingMode; const AHeaderFmt, ATrackFmt,
-  ADateSuffix: string; AReadOnly: Boolean);
+  ADateSuffix: string; AReadOnly: Boolean; ASortMode: TPlSortMode; ASortReverse: Boolean);
 begin
   FGroupMode := AGroupMode;
+  FSortMode := ASortMode;
+  FSortReverse := ASortReverse;
+  { the arrow points down while the order is reversed }
+  if ASortReverse then BtnSortDir.Icon := icSortDesc else BtnSortDir.Icon := icSortAsc;
+  BtnSortDir.Invalidate;
   FHeaderFmt := AHeaderFmt;
   FTrackFmt := ATrackFmt;
   FDateSuffix := ADateSuffix;
   FReadOnly := AReadOnly;
+  BtnSort.Caption := SortName(FSortMode);
   { an auto-playlist cannot take dropped music: its own text }
   if AReadOnly then List.EmptyText := PL_AUTO_EMPTY_TEXT else List.EmptyText := PL_EMPTY_TEXT;
   List.DragEnabled := True;
+  FColHead.Visible := FGroupMode = gmFlat;
+  FColHead.Invalidate;
+  { the view button shows the grouping in its icon and its text (the icons
+    of the grouping menu) }
   case FGroupMode of
-    gmFolder: BtnView.Caption := 'By folder';
-    gmFlat: BtnView.Caption := 'Flat list';
+    gmFolder:
+      begin
+        BtnView.Caption := 'By folder';
+        BtnView.Icon := icFolder;
+      end;
+    gmFlat:
+      begin
+        BtnView.Caption := 'Flat list';
+        BtnView.Icon := icList;
+      end;
   else
     BtnView.Caption := 'By album';
+    BtnView.Icon := icAlbum;
   end;
   TopResize(nil);
+end;
+
+{ ---- the order of the groups ---- }
+
+function TPlaylistPane.SortActive: Boolean;
+begin
+  if FGroupMode = gmFlat then Result := (FSortCol <> pcNumber) or FSortRev
+  else Result := (FSortMode <> psAdded) or FSortReverse;
+end;
+
+function TPlaylistPane.SortName(AMode: TPlSortMode): string;
+const
+  NAMES: array[TPlSortMode] of string = ('Playlist order', 'Artist', 'Album', 'Year', 'Added to library');
+begin
+  Result := NAMES[AMode];
+end;
+
+{ the indices of the entries in the order added (ascending Seq) }
+function TPlaylistPane.SeqOrder: TIntArray;
+var
+  I, MaxSeq, N: Integer;
+  Slot: array of Integer;
+begin
+  Result := nil;
+  SetLength(Result, FCount);
+  MaxSeq := -1;
+  for I := 0 to FCount - 1 do
+    if FEntries[I].Seq > MaxSeq then MaxSeq := FEntries[I].Seq;
+  Slot := nil;
+  SetLength(Slot, MaxSeq + 1);          // 0 = no entry has this number
+  for I := 0 to FCount - 1 do
+    if FEntries[I].Seq >= 0 then Slot[FEntries[I].Seq] := I + 1;
+  N := 0;
+  for I := 0 to MaxSeq do
+    if Slot[I] > 0 then
+    begin
+      Result[N] := Slot[I] - 1;
+      Inc(N);
+    end;
+  { (numbers used twice would lose entries: then the order as it is) }
+  if N <> FCount then
+    for I := 0 to FCount - 1 do Result[I] := I;
+end;
+
+{ the order shown is the order added }
+procedure TPlaylistPane.RenumberSeq;
+var
+  I: Integer;
+begin
+  for I := 0 to FCount - 1 do FEntries[I].Seq := I;
+end;
+
+{ Puts the entries in the order of the sort mode: the groups as they follow
+  from the order added (tracks that follow each other with the same group
+  key), sorted by the tags of their first track; the tracks of a group keep
+  their order. The numbers of the order added are made gapless on the way. }
+procedure TPlaylistPane.ApplySort;
+type
+  TSortGroup = record
+    First, Count, Year: Integer;
+    Artist, Album: string;
+    Added: Int64;
+  end;
+  TFlatKey = record
+    S: string;
+    N: Int64;
+  end;
+  TFlatKeys = array of TFlatKey;
+const
+  FLAT_TEXT_COLS = [pcTitle, pcArtist, pcAlbum, pcAlbumArtist, pcGenre];
+var
+  K1, K2: TFlatKeys;
+  Order, GI: TIntArray;
+  Src: array of TPlEntry;
+  G: array of TSortGroup;
+  I, J, N, K, PlayingId: Integer;
+  Key, Cur: string;
+  T: TTrackInfo;
+
+  function Cmp(const A, B: Int64): Integer;
+  begin
+    if A < B then Result := -1 else if A > B then Result := 1 else Result := 0;
+  end;
+
+  { what a track is sorted by in a column: a text without accents and
+    capitals, or a number }
+  function KeyOf(const AEntry: TPlEntry; ACol: TPlColumn): TFlatKey;
+
+    function TextKey(const AText: string): string;
+    begin
+      Result := UTF8LowerCase(StripAccents(AText));
+    end;
+
+  begin
+    Result.S := '';
+    Result.N := 0;
+    case ACol of
+      pcNumber: Result.N := AEntry.Seq;
+      pcTitle: Result.S := TextKey(AEntry.Title);
+      pcArtist: Result.S := TextKey(AEntry.Artist);
+      pcAlbum: Result.S := TextKey(AEntry.Album);
+      pcAlbumArtist: Result.S := TextKey(AEntry.AlbumArtist);
+      pcGenre: Result.S := TextKey(AEntry.Genre);
+      pcYear: Result.N := AEntry.Year;
+      pcFormat: Result.N := Int64(AEntry.SampleRate) * 64 + AEntry.BitDepth;
+      pcPlays: Result.N := AEntry.Plays;
+      pcLastPlayed: Result.N := AEntry.LastPlayed;
+      pcAdded: Result.N := AEntry.Added;
+      pcRating: Result.N := AEntry.Rating;
+      pcTime: Result.N := AEntry.Seconds;
+    end;
+  end;
+
+  { a year that is not known comes last, whichever way the years run }
+  function YearOf(AYear: Integer; ADescending: Boolean): Int64;
+  begin
+    if AYear > 0 then Result := AYear
+    else if ADescending then Result := -1
+    else Result := High(Integer);
+  end;
+
+  { a flat list: by the column sorted by, then by the one before it }
+  function FlatCompare(A, B: Integer; ACol: TPlColumn; ARev: Boolean; const AKeys: TFlatKeys): Integer;
+  begin
+    if ACol in FLAT_TEXT_COLS then Result := CompareStr(AKeys[A].S, AKeys[B].S)
+    else Result := Cmp(AKeys[A].N, AKeys[B].N);
+    if ARev then Result := -Result;
+  end;
+
+  function Before(A, B: Integer): Boolean;
+  var
+    C, Dir: Integer;
+  begin
+    if FGroupMode = gmFlat then
+    begin
+      C := FlatCompare(A, B, FSortCol, FSortRev, K1);
+      if C = 0 then C := FlatCompare(A, B, FSortCol2, FSortRev2, K2);
+      if C = 0 then C := A - B;
+      Exit(C < 0);
+    end;
+    { the order of the menu, or its reverse: artists and albums from A, the
+      oldest year first, the album added to the library last first }
+    if FSortReverse then Dir := -1 else Dir := 1;
+    C := 0;
+    case FSortMode of
+      psAdded: ;
+      psArtist:
+        begin
+          C := Dir * AnsiCompareText(G[A].Artist, G[B].Artist);
+          if C = 0 then C := Cmp(YearOf(G[A].Year, False), YearOf(G[B].Year, False));
+          if C = 0 then C := AnsiCompareText(G[A].Album, G[B].Album);
+        end;
+      psAlbum:
+        begin
+          C := Dir * AnsiCompareText(G[A].Album, G[B].Album);
+          if C = 0 then C := AnsiCompareText(G[A].Artist, G[B].Artist);
+        end;
+      psYear:
+        begin
+          if not FSortReverse then C := Cmp(YearOf(G[A].Year, False), YearOf(G[B].Year, False))
+          else C := Cmp(YearOf(G[B].Year, True), YearOf(G[A].Year, True));
+          if C = 0 then C := AnsiCompareText(G[A].Artist, G[B].Artist);
+          if C = 0 then C := AnsiCompareText(G[A].Album, G[B].Album);
+        end;
+      psDateAdded:
+        begin
+          C := Dir * Cmp(G[B].Added, G[A].Added);
+          if C = 0 then C := AnsiCompareText(G[A].Artist, G[B].Artist);
+          if C = 0 then C := AnsiCompareText(G[A].Album, G[B].Album);
+        end;
+    end;
+    { equal groups stay in the order added ("As added" reversed: the last
+      added first) }
+    if C = 0 then
+    begin
+      C := A - B;
+      if (FSortMode = psAdded) and FSortReverse then C := -C;
+    end;
+    Result := C < 0;
+  end;
+
+  procedure QuickSort(L, R: Integer);
+  var
+    A, B, P, Tmp: Integer;
+  begin
+    while L < R do
+    begin
+      A := L;
+      B := R;
+      P := GI[(L + R) div 2];
+      repeat
+        while Before(GI[A], P) do Inc(A);
+        while Before(P, GI[B]) do Dec(B);
+        if A <= B then
+        begin
+          Tmp := GI[A];
+          GI[A] := GI[B];
+          GI[B] := Tmp;
+          Inc(A);
+          Dec(B);
+        end;
+      until A > B;
+      if B - L < R - A then
+      begin
+        QuickSort(L, B);
+        L := A;
+      end
+      else
+      begin
+        QuickSort(A, R);
+        R := B;
+      end;
+    end;
+  end;
+
+begin
+  if FCount = 0 then Exit;
+  if (FGroupMode = gmFlat) and NeedsStats then FillStats;
+  T := Default(TTrackInfo);
+  if FPlaying >= 0 then PlayingId := FEntries[FPlaying].Id else PlayingId := 0;
+  Order := SeqOrder;
+  Src := nil;
+  SetLength(Src, FCount);
+  for I := 0 to FCount - 1 do
+  begin
+    Src[I] := FEntries[Order[I]];
+    Src[I].Seq := I;
+  end;
+  if not SortActive then
+    for I := 0 to FCount - 1 do FEntries[I] := Src[I]
+  else if FGroupMode = gmFlat then
+  begin
+    { the tracks themselves, by the keys of the two columns }
+    K1 := nil;
+    K2 := nil;
+    SetLength(K1, FCount);
+    SetLength(K2, FCount);
+    for I := 0 to FCount - 1 do
+    begin
+      KeepWindowAlive;
+      K1[I] := KeyOf(Src[I], FSortCol);
+      K2[I] := KeyOf(Src[I], FSortCol2);
+    end;
+    GI := nil;
+    SetLength(GI, FCount);
+    for I := 0 to FCount - 1 do GI[I] := I;
+    QuickSort(0, FCount - 1);
+    for I := 0 to FCount - 1 do FEntries[I] := Src[GI[I]];
+  end
+  else
+  begin
+    G := nil;
+    SetLength(G, FCount);
+    N := 0;
+    Cur := '';
+    for I := 0 to FCount - 1 do
+    begin
+      KeepWindowAlive;
+      Key := PlaylistGroupKey(TrackOf(Src[I]), FGroupMode);
+      if (N = 0) or (Key <> Cur) then
+      begin
+        Cur := Key;
+        G[N] := Default(TSortGroup);
+        G[N].First := I;
+        G[N].Artist := Src[I].AlbumArtist;
+        if G[N].Artist = '' then G[N].Artist := Src[I].Artist;
+        G[N].Album := Src[I].Album;
+        G[N].Year := Src[I].Year;
+        Inc(N);
+      end;
+      Inc(G[N - 1].Count);
+      { the library's date added: the latest of the group's tracks }
+      if (FSortMode = psDateAdded) and Assigned(FOnLookup) and FOnLookup(Src[I].FilePath, T) and
+         (T.DateAdded > G[N - 1].Added) then
+        G[N - 1].Added := T.DateAdded;
+    end;
+    GI := nil;
+    SetLength(GI, N);
+    for I := 0 to N - 1 do GI[I] := I;
+    QuickSort(0, N - 1);
+    K := 0;
+    for I := 0 to N - 1 do
+      for J := G[GI[I]].First to G[GI[I]].First + G[GI[I]].Count - 1 do
+      begin
+        FEntries[K] := Src[J];
+        Inc(K);
+      end;
+  end;
+  if PlayingId <> 0 then FPlaying := IndexOfId(PlayingId);
+end;
+
+function TPlaylistPane.TopFile: string;
+var
+  E: Integer;
+begin
+  Result := '';
+  E := EntryOfRow(List.TopRow);
+  if (E >= 0) and (E < FCount) then Result := FEntries[E].FilePath;
+end;
+
+procedure TPlaylistPane.ScrollToFile(const APath: string);
+var
+  E, R: Integer;
+begin
+  FWantTop := '';
+  if APath = '' then Exit;
+  { before the pane is laid out the list cannot scroll: again in ListResize }
+  if List.ClientHeight < S(LIST_READY_MIN_H) then
+  begin
+    FWantTop := APath;
+    Exit;
+  end;
+  E := IndexOfFile(APath);
+  if E < 0 then Exit;
+  R := RowOfEntry(E);
+  if (R >= 0) and not List.IsVisibleRow(R) then R := List.Group[R];
+  if R >= 0 then List.ScrollRowToTop(R);
+end;
+
+procedure TPlaylistPane.ListResize(Sender: TObject);
+begin
+  if (FWantTop <> '') and (List.ClientHeight >= S(LIST_READY_MIN_H)) then ScrollToFile(FWantTop);
 end;
 
 function TPlaylistPane.HeaderTextWidth(const S: string): Integer;
@@ -670,6 +1785,7 @@ var
     SetLength(EntStats, FCount);
     for K := 0 to FCount - 1 do
     begin
+      KeepWindowAlive;
       EntKnown[K] := Assigned(FOnLookup) and FOnLookup(FEntries[K].FilePath, T);
       EntAdded[K] := 0;
       EntStats[K] := nil;
@@ -693,24 +1809,70 @@ var
       Ctx.UserStats := St;
   end;
 
+  { the artist of track K behind its title: in a group whose tracks are not
+    all by the same artist, where it is not the album artist of the header
+    and the track format does not show it }
+  procedure SetArtistText(K: Integer; AFormatShowsIt: Boolean);
+  var
+    Hd: Integer;
+  begin
+    FEntries[K].ArtistText := '';
+    Hd := FHeaderOf[K];
+    if (Hd < 0) or (not FHeaders[Hd].MixedArtists) or AFormatShowsIt or (FEntries[K].Artist = '') or
+       (FEntries[K].AlbumArtist = '') or
+       (UTF8LowerCase(FEntries[K].Artist) = UTF8LowerCase(FEntries[K].AlbumArtist)) then Exit;
+    FEntries[K].ArtistText := FormatTagString(FEntries[K].Artist, 0, ', ');
+  end;
+
+  function UsesTag(const AFmt: string; AId: TTagID): Boolean;
+  begin
+    Result := Pos('%' + MASTER_TAG_REGISTRY[AId].TagStr + '%', LowerCase(AFmt)) > 0;
+  end;
+
+  { "11 tracks • 49:30": the parts the header format does not show itself }
+  function GroupInfoText(const AHeader: TPlHeader; ACount, ATime: Boolean): string;
+  begin
+    Result := '';
+    if ACount then
+      if AHeader.Count = 1 then Result := '1 track' else Result := Format('%d tracks', [AHeader.Count]);
+    if ATime and (AHeader.TotalSec > 0) then
+    begin
+      if Result <> '' then Result := Result + '  •  ';
+      Result := Result + FormatGroupDuration(AHeader.TotalSec);
+    end;
+  end;
+
 var
   TrackFmt, HeaderFmt: string;
-  TrackStats, HeaderStats: Boolean;
+  TrackStats, HeaderStats, TrackHasArtist, InfoCount, InfoTime: Boolean;
 begin
   Ctx := Default(TTrackFormatContext);
   if FDemo then
   begin
-    for I := 0 to FCount - 1 do FEntries[I].TitleText := FEntries[I].Title;
+    for I := 0 to FCount - 1 do
+    begin
+      FEntries[I].TitleText := FEntries[I].Title;
+      SetArtistText(I, False);
+    end;
     for I := 0 to FHeaderCount - 1 do
+    begin
       FHeaders[I].Text := FHeaders[I].Album + '  •  ' + IntToStr(FEntries[FHeaders[I].First].Year) +
         '  •  ' + FHeaders[I].AlbumArtist;
+      FHeaders[I].Info := GroupInfoText(FHeaders[I], True, True);
+    end;
     Exit;
   end;
   { the formats, and whether they show the date added or the statistics }
-  TrackFmt := FTrackFmt;
-  if (FGroupMode = gmFlat) and (FDateSuffix <> '') then TrackFmt := TrackFmt + FDateSuffix;
+  { a flat list has columns: its title column is the plain title, and the
+    date of an auto-playlist is a column too }
+  if FGroupMode = gmFlat then TrackFmt := '' else TrackFmt := FTrackFmt;
+  if (FGroupMode = gmFlat) and NeedsStats and not SortActive then FillStats;
   if (FGroupMode = gmFolder) or (FHeaderFmt = '') then HeaderFmt := '%folder%' else HeaderFmt := FHeaderFmt;
   if FDateSuffix <> '' then HeaderFmt := HeaderFmt + FDateSuffix;
+  { what the formats show themselves is not shown a second time }
+  TrackHasArtist := UsesTag(TrackFmt, tiArtist);
+  InfoCount := not UsesTag(HeaderFmt, tiTrackCount);
+  InfoTime := not UsesTag(HeaderFmt, tiTotalTime);
   TrackStats := UsesStats(TrackFmt);
   HeaderStats := (FHeaderCount > 0) and UsesStats(HeaderFmt);
   if TrackStats or HeaderStats then LookUpAll;
@@ -718,11 +1880,13 @@ begin
   Fmt := TrackFmt;
   for I := 0 to FCount - 1 do
   begin
+    KeepWindowAlive;
     MetaOf(FEntries[I]);
     if TrackStats then StatsOf(I, False);
     if Fmt = '' then FEntries[I].TitleText := FEntries[I].Title
     else FEntries[I].TitleText := CleanTag(FormatTrackInfo(Fmt, Ctx));
     if FEntries[I].TitleText = '' then FEntries[I].TitleText := FEntries[I].Title;
+    SetArtistText(I, TrackHasArtist);
   end;
   { headers }
   Fmt := HeaderFmt;
@@ -737,6 +1901,7 @@ begin
     FHeaders[I].Text := CleanTag(FormatTrackInfo(Fmt, Ctx));
     if Trim(FHeaders[I].Text) = '' then
       FHeaders[I].Text := ExtractFileName(FHeaders[I].FolderDir);
+    FHeaders[I].Info := GroupInfoText(FHeaders[I], InfoCount, InfoTime);
     Total := 0;
     N := 0;
     for J := FHeaders[I].First to FHeaders[I].First + FHeaders[I].Count - 1 do
@@ -752,7 +1917,7 @@ end;
   (the callers select what they changed) }
 procedure TPlaylistPane.Rebuild;
 var
-  I, H: Integer;
+  I, H, R: Integer;
   Key, CurKey: string;
   Paths: TStringList;
   T: TTrackInfo;
@@ -775,6 +1940,7 @@ begin
         FHeaderOf[I] := -1;
         Continue;
       end;
+      KeepWindowAlive;
       T := TrackOf(FEntries[I]);
       Key := PlaylistGroupKey(T, FGroupMode);
       if (H < 0) or (Key <> CurKey) or (Paths.IndexOf(FEntries[I].FilePath) >= 0) then
@@ -789,7 +1955,14 @@ begin
         FHeaders[H].Album := FEntries[I].Album;
         FHeaders[H].AlbumArtist := FEntries[I].AlbumArtist;
         FHeaders[H].FolderDir := FEntries[I].FolderDir;
+        FHeaders[H].FirstArtist := FEntries[I].Artist;
       end;
+      if FEntries[I].DiscNum > 0 then
+      begin
+        if FHeaders[H].FirstDisc = 0 then FHeaders[H].FirstDisc := FEntries[I].DiscNum
+        else if FEntries[I].DiscNum <> FHeaders[H].FirstDisc then FHeaders[H].MultiDisc := True;
+      end;
+      if FEntries[I].Artist <> FHeaders[H].FirstArtist then FHeaders[H].MixedArtists := True;
       Paths.Add(FEntries[I].FilePath);
       Inc(FHeaders[H].Count);
       Inc(FHeaders[H].TotalSec, FEntries[I].Seconds);
@@ -808,27 +1981,46 @@ begin
       H := FHeaderOf[I];
       if (H >= 0) and (FHeaders[H].First = I) then
         List.AddHeader(-(H + 1), 2);
-      List.AddItem(I);
+      KeepWindowAlive;
+      R := List.AddItem(I);
+      { a "Disc n" heading above the first track of each disc of a group
+        with several discs }
+      if (H >= 0) and FHeaders[H].MultiDisc and (FEntries[I].DiscNum > 0) and
+         ((FHeaders[H].First = I) or (FEntries[I - 1].DiscNum <> FEntries[I].DiscNum)) then
+        List.SetLead(R, True);
     end;
   finally
     List.EndUpdate;
   end;
   { collapsed groups, by header text or album }
   if FCollapsed.Count > 0 then
-    for I := 0 to List.RowCount - 1 do
-      if List.Kind[I] = rkHeader then
-      begin
-        H := -List.Data[I] - 1;
-        if (FCollapsed.IndexOf(FHeaders[H].Text) >= 0) or
-           ((FHeaders[H].Album <> '') and (FCollapsed.IndexOf(FHeaders[H].Album) >= 0)) then
-          List.Collapsed[I] := True;
-      end;
+  begin
+    FQuietCollapse := True;
+    List.BeginUpdate;
+    try
+      for I := 0 to List.RowCount - 1 do
+        if List.Kind[I] = rkHeader then
+        begin
+          H := -List.Data[I] - 1;
+          if (FCollapsed.IndexOf(FHeaders[H].Text) >= 0) or
+             ((FHeaders[H].Album <> '') and (FCollapsed.IndexOf(FHeaders[H].Album) >= 0)) then
+            List.Collapsed[I] := True;
+        end;
+    finally
+      List.EndUpdate;
+      FQuietCollapse := False;
+    end;
+  end;
 end;
 
 procedure TPlaylistPane.ListCollapse(Sender: TObject);
 var
   I, H: Integer;
 begin
+  { while the pane itself opens or closes several groups the names stay as
+    they are: taking them from the list after the first group would lose
+    the names of all the others }
+  if FQuietCollapse then Exit;
   FCollapsed.Clear;
   for I := 0 to List.RowCount - 1 do
     if (List.Kind[I] = rkHeader) and List.Collapsed[I] then
@@ -857,22 +2049,31 @@ begin
     if ANames[I] <> '' then FCollapsed.Add(ANames[I]);
 end;
 
-procedure TPlaylistPane.ExpandAll;
+{ every group open or closed, in one step; then the names once }
+procedure TPlaylistPane.SetAllCollapsed(AValue: Boolean);
 var
   I: Integer;
 begin
-  for I := 0 to List.RowCount - 1 do
-    if List.Kind[I] = rkHeader then List.Collapsed[I] := False;
+  FQuietCollapse := True;
+  List.BeginUpdate;
+  try
+    for I := 0 to List.RowCount - 1 do
+      if List.Kind[I] = rkHeader then List.Collapsed[I] := AValue;
+  finally
+    List.EndUpdate;
+    FQuietCollapse := False;
+  end;
   ListCollapse(nil);
 end;
 
-procedure TPlaylistPane.CollapseAll;
-var
-  I: Integer;
+procedure TPlaylistPane.ExpandAll;
 begin
-  for I := 0 to List.RowCount - 1 do
-    if List.Kind[I] = rkHeader then List.Collapsed[I] := True;
-  ListCollapse(nil);
+  SetAllCollapsed(False);
+end;
+
+procedure TPlaylistPane.CollapseAll;
+begin
+  SetAllCollapsed(True);
 end;
 
 { ---- painting ---- }
@@ -898,6 +2099,7 @@ end;
 function TPlaylistPane.StarsLeft(IsHeader: Boolean): Single;
 begin
   if IsHeader then Result := FRowW - StarsWidth - S(4)
+  else if FGroupMode = gmFlat then Result := FFlatStarsX
   else Result := FRowW - S(64) - StarsWidth - S(8);
 end;
 
@@ -964,8 +2166,8 @@ procedure TPlaylistPane.DrawRow(Sender: TObject; G: TGfx; Row: Integer; X, Y, W,
 var
   E, Hd: Integer;
   D: TPlEntry;
-  F, BF, HF: TGfxFont;
-  Th, TX, NumW, DurW, StW, StSz, TW: Single;
+  F, BF, HF, IFnt: TGfxFont;
+  Th, TX, NumW, DurW, StW, StSz, TW, RightW, InfoW, Avail, TitleW: Single;
   Fg, Dim: TARGB;
   L1, L2: string;
   Playing: Boolean;
@@ -995,8 +2197,22 @@ begin
       DrawIcon(G, icFolder, X + S(14), Y + H / 2, S(20), clAccentText);
       TX := X + S(34);
     end;
-    DrawStars(G, X + W - StW - S(4), Y + H / 2, StSz, Hdr.Rating, clAccentText);
-    TW := X + W - StW - S(16) - TX;
+    { at the right: the stars and, where there is room for it, the group's
+      track count and time under them; the header text keeps the rest }
+    RightW := StW;
+    IFnt := UIFont(List.TextSize - 1.5);
+    InfoW := 0;
+    if Hdr.Info <> '' then InfoW := Ceil(TextWidth(Hdr.Info, IFnt));
+    if (InfoW > 0) and (X + W - Math.Max(StW, InfoW) - S(16) - TX >= S(HEADER_TEXT_MIN_W)) then
+    begin
+      RightW := Math.Max(StW, InfoW);
+      DrawStars(G, X + W - StW - S(4), Y + H / 2 - IFnt.LineHeight * 0.55, StSz, Hdr.Rating, clAccentText);
+      G.Text(Hdr.Info, X + W - S(4) - InfoW - S(2), Y + H / 2 + StSz * 0.25, InfoW + S(4), IFnt.LineHeight + S(2),
+        IFnt, clTextDim, 2, 0);
+    end
+    else
+      DrawStars(G, X + W - StW - S(4), Y + H / 2, StSz, Hdr.Rating, clAccentText);
+    TW := X + W - RightW - S(16) - TX;
     { the header text: one line in the larger font when it fits,
       else two lines (split at a ' • ') in the smaller one }
     HF := UIFont(List.TextSize + 2, True);
@@ -1030,6 +2246,11 @@ begin
     Fg := clText;
     Dim := clTextDim;
   end;
+  if FGroupMode = gmFlat then
+  begin
+    DrawFlatRow(G, E, X, Y, W, H);
+    Exit;
+  end;
   NumW := S(46);
   DurW := S(64);
   G.Text(DisplayNumber(E), X, Y, NumW, H, F, Dim, 0, 1);
@@ -1039,10 +2260,36 @@ begin
     DrawIcon(G, icPlay, TX + S(5), Y + H / 2, H * 0.42, clAccentText);
     TX := TX + S(16);
   end;
-  if Playing then G.Text(D.TitleText, TX, Y, X + W - DurW - StW - S(20) - TX, H, BF, Fg, 0, 1)
-  else G.Text(D.TitleText, TX, Y, X + W - DurW - StW - S(20) - TX, H, F, Fg, 0, 1);
+  Avail := X + W - DurW - StW - S(20) - TX;
+  if Playing then HF := BF else HF := F;
+  G.Text(D.TitleText, TX, Y, Avail, H, HF, Fg, 0, 1);
+  { the track's artist behind the title, where room is left for it }
+  if D.ArtistText <> '' then
+  begin
+    TitleW := Ceil(TextWidth(D.TitleText, HF)) + S(14);
+    if Avail - TitleW >= S(ARTIST_TEXT_MIN_W) then
+      G.Text(D.ArtistText, TX + TitleW, Y, Avail - TitleW, H, F, Dim, 0, 1);
+  end;
   DrawStars(G, X + W - DurW - StW - S(8), Y + H / 2, StSz, D.Rating, IfC(Playing, clAccentText, clTextDim));
   G.Text(D.DurationStr, X + W - DurW, Y, DurW, H, F, Dim, 2, 1);
+end;
+
+{ the "Disc n" heading above the first track of a disc: the text and a
+  hairline to the right of it }
+procedure TPlaylistPane.DrawLead(Sender: TObject; G: TGfx; Row: Integer; X, Y, W, H: Single; State: TAuRowState);
+var
+  E: Integer;
+  F: TGfxFont;
+  T: string;
+  TW: Single;
+begin
+  E := List.Data[Row];
+  if (E < 0) or (E >= FCount) then Exit;
+  T := Format('Disc %d', [FEntries[E].DiscNum]);
+  F := UIFont(List.TextSize - 1, True);
+  TW := Ceil(TextWidth(T, F));
+  G.Text(T, X, Y + S(3), TW + S(4), H - S(3), F, clTextDim, 0, 1);
+  G.FillRect(X + TW + S(12), Y + S(3) + (H - S(3)) / 2, Math.Max(0, W - TW - S(12)), 1, WithAlpha(clText, 30));
 end;
 
 { a click on the stars sets the rating (a header: all its tracks) }
@@ -1246,7 +2493,6 @@ end;
 procedure TPlaylistPane.FollowEntry(E: Integer);
 var
   R, I: Integer;
-  Rc: TRect;
   InView: Boolean;
 begin
   R := RowOfEntry(E);
@@ -1260,8 +2506,7 @@ begin
       end;
   { (in view? - asked before the row is selected: selecting brings a row to
     the edge of the list by itself) }
-  Rc := List.RowRect(R);
-  InView := (Rc.Bottom > Rc.Top) and (Rc.Top >= 0) and (Rc.Bottom <= List.ClientHeight);
+  InView := List.RowInView(R);
   List.SelectOnly(R);
   if not InView then
     List.EnsureVisible(R, True);
@@ -1328,7 +2573,8 @@ const
     (T: 'Falling Hours'; Sec: 388; R: 2), (T: 'Burning Hours'; Sec: 484; R: 2),
     (T: 'Small Signal'; Sec: 460; R: 1), (T: 'Late Waltz'; Sec: 262; R: 1));
 
-  procedure Add(const Album, Artist, Folder: string; Year, No: Integer; const D: TDemoTrack);
+  procedure Add(const Album, Artist, Folder: string; Year, Disc, No: Integer; const D: TDemoTrack;
+    const Guest: string = '');
   begin
     SetLength(FEntries, FCount + 1);
     FEntries[FCount] := Default(TPlEntry);
@@ -1336,8 +2582,9 @@ const
     FEntries[FCount].Album := Album;
     FEntries[FCount].AlbumArtist := Artist;
     FEntries[FCount].Artist := Artist;
+    if Guest <> '' then FEntries[FCount].Artist := Artist + '; ' + Guest;
     FEntries[FCount].Year := Year;
-    FEntries[FCount].DiscNum := 1;
+    FEntries[FCount].DiscNum := Disc;
     FEntries[FCount].TrackNum := No;
     FEntries[FCount].Seconds := D.Sec;
     FEntries[FCount].DurationStr := FormatDuration(D.Sec);
@@ -1345,6 +2592,7 @@ const
     FEntries[FCount].FolderDir := Folder;
     FEntries[FCount].FilePath := Folder + '\' + D.T + '.flac';
     FEntries[FCount].GroupKey := Album;
+    FEntries[FCount].Seq := FCount;
     Inc(FNextId);
     FEntries[FCount].Id := FNextId;
     Inc(FCount);
@@ -1356,8 +2604,12 @@ begin
   FCount := 0;
   SetLength(FEntries, 0);
   FDemo := True;
-  for I := 0 to High(A1) do Add('Silence, Noise and Calm', 'Andy Lu', 'D:\Music\Andy Lu\Silence', 2026, I + 1, A1[I]);
-  for I := 0 to High(A2) do Add('Silent Skies', 'Northern Lights Quartet', 'D:\Music\NLQ\Silent Skies', 2005, I + 1, A2[I]);
+  { the first album with a guest on one track, the second on two discs }
+  for I := 0 to High(A1) do
+    if I = 3 then Add('Silence, Noise and Calm', 'Andy Lu', 'D:\Music\Andy Lu\Silence', 2026, 1, I + 1, A1[I], 'Ida Feld')
+    else Add('Silence, Noise and Calm', 'Andy Lu', 'D:\Music\Andy Lu\Silence', 2026, 1, I + 1, A1[I]);
+  for I := 0 to High(A2) do
+    Add('Silent Skies', 'Northern Lights Quartet', 'D:\Music\NLQ\Silent Skies', 2005, 1 + I div 3, I mod 3 + 1, A2[I]);
   FPlaying := 0;
   Rebuild;
   { the demo's ratings are its own (no user stats) }

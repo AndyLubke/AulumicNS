@@ -12,6 +12,12 @@ unit TestSettings;
   and line ends around it are ignored; anything that is not 16 to 64 letters
   and digits, a missing file and an oversized file give no key.
   Only files in a temporary folder are used.
+
+  A remembered window position (uSettingsManager.FitWindowToWorkAreas) with
+  made-up monitor layouts: a window inside a work area is left alone; one
+  that hangs over an edge, lies in a corner no monitor shows, or was on a
+  monitor that is gone comes wholly onto the monitor it covers most or the
+  nearest one; a window larger than the work area is made as small as it.
   =============================================================================}
 
 interface
@@ -35,6 +41,19 @@ type
     procedure WhatIsNoKeyGivesNone;
     procedure AMissingFileGivesNone;
     procedure AnOversizedFileGivesNone;
+  end;
+
+  TTestWindowFit = class(TTestCase)
+  private
+    function Fit(const AAreas: array of TRect; L, T, W, H: Integer): string;
+  published
+    procedure AWindowInsideIsLeftAlone;
+    procedure AWindowOverAnEdgeComesBack;
+    procedure AWindowOfAMonitorThatIsGoneGoesToTheNearest;
+    procedure ACornerNoMonitorShowsIsNoPlace;
+    procedure AWindowLargerThanTheScreenIsMadeToFit;
+    procedure AMonitorLeftOfThePrimaryHasNegativePositions;
+    procedure WithoutMonitorsNothingChanges;
   end;
 
 implementation
@@ -109,7 +128,73 @@ begin
   AssertEquals('', KeyOf(SAMPLE_KEY + #13#10 + StringOfChar('x', 5000)));
 end;
 
+{ ---- window positions ---- }
+
+const
+  { a 1920 x 1080 screen with a 40 pixel taskbar at the bottom }
+  FULL_HD: TRect = (Left: 0; Top: 0; Right: 1920; Bottom: 1040);
+  { a higher monitor to the right of it, its top 360 pixels above }
+  TALL_RIGHT: TRect = (Left: 1920; Top: -360; Right: 4480; Bottom: 1040);
+  { a monitor to the left of the primary one }
+  LEFT_OF: TRect = (Left: -1920; Top: 0; Right: 0; Bottom: 1040);
+
+function TTestWindowFit.Fit(const AAreas: array of TRect; L, T, W, H: Integer): string;
+begin
+  FitWindowToWorkAreas(AAreas, L, T, W, H);
+  Result := Format('%d,%d %dx%d', [L, T, W, H]);
+end;
+
+procedure TTestWindowFit.AWindowInsideIsLeftAlone;
+begin
+  AssertEquals('100,80 1200x800', Fit([FULL_HD], 100, 80, 1200, 800));
+  AssertEquals('filling the work area', '0,0 1920x1040', Fit([FULL_HD], 0, 0, 1920, 1040));
+  AssertEquals('on the second monitor', '2000,-300 1200x800', Fit([FULL_HD, TALL_RIGHT], 2000, -300, 1200, 800));
+end;
+
+procedure TTestWindowFit.AWindowOverAnEdgeComesBack;
+begin
+  AssertEquals('right', '720,80 1200x800', Fit([FULL_HD], 1500, 80, 1200, 800));
+  AssertEquals('left and top', '0,0 1200x800', Fit([FULL_HD], -300, -50, 1200, 800));
+  AssertEquals('under the taskbar', '100,240 1200x800', Fit([FULL_HD], 100, 600, 1200, 800));
+  { across two monitors: onto the one that shows most of it }
+  AssertEquals('mostly on the left one', '720,80 1200x800', Fit([FULL_HD, TALL_RIGHT], 1000, 80, 1200, 800));
+  AssertEquals('mostly on the right one', '1920,80 1200x800', Fit([FULL_HD, TALL_RIGHT], 1700, 80, 1200, 800));
+end;
+
+procedure TTestWindowFit.AWindowOfAMonitorThatIsGoneGoesToTheNearest;
+begin
+  { it was on a monitor at the right that is no longer connected }
+  AssertEquals('720,80 1200x800', Fit([FULL_HD], 2400, 80, 1200, 800));
+  AssertEquals('far away', '720,240 1200x800', Fit([FULL_HD], 30000, 30000, 1200, 800));
+  AssertEquals('to the nearer of two: its left edge', '-1920,80 1200x800', Fit([FULL_HD, LEFT_OF], -5000, 80, 1200, 800));
+end;
+
+procedure TTestWindowFit.ACornerNoMonitorShowsIsNoPlace;
+begin
+  { above the lower monitor, left of the higher one: inside the rectangle
+    around both, on neither }
+  AssertEquals('down onto the lower monitor', '100,0 1200x300', Fit([FULL_HD, TALL_RIGHT], 100, -340, 1200, 300));
+end;
+
+procedure TTestWindowFit.AWindowLargerThanTheScreenIsMadeToFit;
+begin
+  AssertEquals('0,0 1920x1040', Fit([FULL_HD], -200, -100, 3000, 2000));
+  AssertEquals('only too high', '100,0 1200x1040', Fit([FULL_HD], 100, 50, 1200, 1400));
+end;
+
+procedure TTestWindowFit.AMonitorLeftOfThePrimaryHasNegativePositions;
+begin
+  AssertEquals('-1800,100 1200x800', Fit([FULL_HD, LEFT_OF], -1800, 100, 1200, 800));
+  AssertEquals('over its left edge', '-1920,100 1200x800', Fit([FULL_HD, LEFT_OF], -2500, 100, 1200, 800));
+end;
+
+procedure TTestWindowFit.WithoutMonitorsNothingChanges;
+begin
+  AssertEquals('5000,5000 1200x800', Fit([], 5000, 5000, 1200, 800));
+end;
+
 initialization
+  RegisterTest(TTestWindowFit);
   RegisterTest(TTestLastFmKeyFile);
 
 end.

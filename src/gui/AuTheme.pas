@@ -91,9 +91,15 @@ function UIScale: Single;
 procedure UseDpiOf(C: TControl);
 function MonitorDpiAt(X, Y: Integer): Integer;
 function WindowDpi(H: HWND): Integer;
+const
+  ROW_DENSITY_COMPACT = 0.82;
+
 { the user's text size (1 = normal), applied by the UIFont functions }
 var
   FontScale: Single = 1.0;
+  { the row height of the lists (playlist, library tree) as a part of the
+    normal one: 1 = normal, ROW_DENSITY_COMPACT = compact rows }
+  RowDensity: Single = 1.0;
 
 function UIFont(Size: Single = 13; Bold: Boolean = False): TGfxFont;
 function UIFontI(Size: Single = 13): TGfxFont;

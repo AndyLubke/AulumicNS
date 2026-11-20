@@ -309,7 +309,7 @@ end;
 
 procedure TAuTreeView.UpdateRowHeight;
 begin
-  FRowH := Math.Max(S(18), Round(SF(FTextSize * FontScale) * 2.05));
+  FRowH := Math.Max(S(18), Round(SF(FTextSize * FontScale) * 2.05 * RowDensity));
 end;
 
 procedure TAuTreeView.SetTextSize(V: Single);
@@ -543,9 +543,11 @@ begin
   N.FExpanded := True;
   NodeExpandChanged(N);
   if Assigned(FOnExpanded) then FOnExpanded(Self, N);
-  { show as many of the new children as fit }
+  { show as many of the new children as fit - not inside an update: finding
+    the row lists all rows again, once per node that is opened }
+  if FUpdating > 0 then Exit;
   R := RowOf(N);
-  if (R >= 0) and (FUpdating = 0) then
+  if R >= 0 then
   begin
     if R + N.Count >= FTop + VisibleRows then
       FScroll.Position := Math.Min(R, R + N.Count - VisibleRows + 1);

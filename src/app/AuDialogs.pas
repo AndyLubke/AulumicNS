@@ -28,7 +28,25 @@ function ALMessageDlg(const ATitle, AMsg: string; const CustomYesCaption,
   CustomNoCaption: string; ShowCancel: Boolean = False;
   DefaultButton: TMsgDlgBtn = mbYes; AKind: TALMsgKind = mkAuto): TModalResult; overload;
 
+{ An error that nothing caught, in the themed message window - also before
+  the main window exists and after it is gone. One at a time: an error raised
+  while the window is open is not shown. The plain system box is used only
+  when the themed window itself cannot be shown. }
+procedure ShowErrorBox(E: Exception);
+{ makes ShowErrorBox the handler of every exception that escapes an event
+  (Application.OnException); the main window puts its own in front while it
+  lives, which writes the log first }
+procedure InstallErrorBox;
+
+var
+  { no error windows at all: the tool modes of the debug build, which nobody
+    watches and which must end by themselves }
+  ErrorBoxesOff: Boolean = False;
+
 implementation
+
+uses
+  uAppStrings, uOSUtils;
 
 type
   TBtnDef = record
@@ -112,6 +130,52 @@ begin
   end;
 end;
 
+const
+  SYSTEM_BOX_ERROR_ICON = $10;   // MB_ICONERROR
+
+type
+  TErrorBoxHandler = class
+    procedure AppException(Sender: TObject; E: Exception);
+  end;
+
+var
+  GErrorBoxHandler: TErrorBoxHandler = nil;
+  GInErrorBox: Boolean = False;
+
+procedure ShowErrorBox(E: Exception);
+var
+  T: string;
+begin
+  if ErrorBoxesOff or GInErrorBox or (E = nil) then Exit;
+  GInErrorBox := True;
+  try
+    T := E.Message;
+    if Trim(T) = '' then T := E.ClassName;
+    T := SafeFormat(FMT_ERR_UNEXPECTED, [T]);
+    try
+      ALMessageDlg(TITLE_ERROR, T, [mbOK], mbOK, mkError);
+    except
+      try
+        Application.MessageBox(PChar(T), PChar(TITLE_ERROR), SYSTEM_BOX_ERROR_ICON);
+      except
+      end;
+    end;
+  finally
+    GInErrorBox := False;
+  end;
+end;
+
+procedure TErrorBoxHandler.AppException(Sender: TObject; E: Exception);
+begin
+  ShowErrorBox(E);
+end;
+
+procedure InstallErrorBox;
+begin
+  if GErrorBoxHandler = nil then GErrorBoxHandler := TErrorBoxHandler.Create;
+  Application.OnException := @GErrorBoxHandler.AppException;
+end;
+
 procedure ALMessageDlg(const ATitle, AMsg: string; AKind: TALMsgKind);
 begin
   ALMessageDlg(ATitle, AMsg, [mbOK], mbOK, AKind);
@@ -184,5 +248,8 @@ begin
   Result := ShowDlg(ATitle, AMsg, Defs, DefaultButton, AKind);
   if (Result = mrCancel) and not ShowCancel then Result := mrNo;
 end;
+
+finalization
+  FreeAndNil(GErrorBoxHandler);
 
 end.

@@ -41,7 +41,7 @@ unit uInputBlock;
 interface
 
 uses
-  Windows;
+  Classes, Windows;
 
 procedure BeginInputBlock;
 procedure EndInputBlock;
@@ -55,6 +55,18 @@ function DiscardPendingInput: Integer;
 
 // True for the messages the block drops
 function IsInputMessage(AMsg: UINT): Boolean;
+
+{ Called now and then by work that keeps the window's thread busy for
+  seconds (building a large playlist, opening a whole branch of the library
+  tree, checking the files of a playlist). It tells Windows that the thread
+  is alive: a thread that does not look at its messages for 5 s gets its
+  window greyed out with "Not responding". No message is taken out of the
+  queue and none is handled, so nothing the user did meanwhile runs in the
+  middle of the work; only messages SENT to the thread's windows are
+  answered (the hang watchdog's among them). It looks at most every
+  KEEP_ALIVE_MS, so it may be called in every pass of a loop; on another
+  thread it does nothing. }
+procedure KeepWindowAlive;
 
 implementation
 
@@ -76,6 +88,24 @@ var
   BlockThread: DWORD = 0;
   AllowWnd   : HWND = 0;
   Escaped    : Boolean = False;
+
+const
+  KEEP_ALIVE_MS = 250;
+
+var
+  GKeepAliveTick: QWord = 0;
+
+procedure KeepWindowAlive;
+var
+  Msg: TMsg;
+  Now_: QWord;
+begin
+  if GetCurrentThreadId <> MainThreadID then Exit;
+  Now_ := GetTickCount64;
+  if Now_ - GKeepAliveTick < KEEP_ALIVE_MS then Exit;
+  GKeepAliveTick := Now_;
+  PeekMessageW(Msg, 0, 0, 0, PM_NOREMOVE);
+end;
 
 function IsInputMessage(AMsg: UINT): Boolean;
 begin

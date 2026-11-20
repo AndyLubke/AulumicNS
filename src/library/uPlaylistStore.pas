@@ -44,6 +44,10 @@ type
     Entries   : TPlaylistEntries; // normal playlists
     Collapsed : array of string;  // header texts / albums of collapsed groups
     LastFile  : string;           // the selected track when the playlist was left
+    SortMode  : Integer;          // the order of the groups shown (0 = as added)
+    TopFile   : string;           // the track at the top of the list when the playlist was left
+    FlatCols  : string;           // the columns of its flat list ('' = the default; the pane's text)
+    FlatSort  : string;           // the columns its flat list is sorted by ('' = playlist order)
     Modified  : TDateTime;
   end;
 
@@ -157,9 +161,16 @@ end;
 const
   ENTRY_MIN_BYTES = 9 * 4 + 5 * 4;
 
+const
+  VIEW_MARK = #1;
+  VIEW_SORT = 'sort=';
+  VIEW_TOP  = 'top=';
+  VIEW_COLS = 'cols=';
+  VIEW_FLAT_SORT = 'fsort=';
+
 procedure WritePlaylist(W: TDbWriter; const P: TStoredPlaylist);
 var
-  I: Integer;
+  I, N: Integer;
 begin
   W.Str(P.Name);
   W.U8(Ord(P.Kind));
@@ -169,16 +180,30 @@ begin
   W.Str(P.Query);
   W.Str(P.LastFile);
   W.Dbl(P.Modified);
-  W.U32(Length(P.Collapsed));
+  { The file has no version number, and every build must be able to read
+    it: the view values travel in the list of collapsed names, as entries
+    that start with VIEW_MARK (no header text does). A build that does not
+    know them takes them for names of groups that are not there. }
+  N := Length(P.Collapsed);
+  if P.SortMode <> 0 then Inc(N);
+  if P.TopFile <> '' then Inc(N);
+  if P.FlatCols <> '' then Inc(N);
+  if P.FlatSort <> '' then Inc(N);
+  W.U32(N);
   for I := 0 to High(P.Collapsed) do W.Str(P.Collapsed[I]);
+  if P.SortMode <> 0 then W.Str(VIEW_MARK + VIEW_SORT + IntToStr(P.SortMode));
+  if P.TopFile <> '' then W.Str(VIEW_MARK + VIEW_TOP + P.TopFile);
+  if P.FlatCols <> '' then W.Str(VIEW_MARK + VIEW_COLS + P.FlatCols);
+  if P.FlatSort <> '' then W.Str(VIEW_MARK + VIEW_FLAT_SORT + P.FlatSort);
   W.U32(Length(P.Entries));
   for I := 0 to High(P.Entries) do WriteEntry(W, P.Entries[I]);
 end;
 
 function ReadPlaylist(R: TDbReader): TStoredPlaylist;
 var
-  I, N: Integer;
+  I, N, M: Integer;
   K: Byte;
+  S: string;
 begin
   Result := Default(TStoredPlaylist);
   Result.Name      := R.Str;
@@ -193,7 +218,27 @@ begin
   Result.Modified  := R.Dbl;
   N := R.Count(4);
   SetLength(Result.Collapsed, N);
-  for I := 0 to N - 1 do Result.Collapsed[I] := R.Str;
+  M := 0;
+  for I := 0 to N - 1 do
+  begin
+    S := R.Str;
+    if (S <> '') and (S[1] = VIEW_MARK) then
+    begin
+      Delete(S, 1, 1);
+      if Copy(S, 1, Length(VIEW_SORT)) = VIEW_SORT then
+        Result.SortMode := StrToIntDef(Copy(S, Length(VIEW_SORT) + 1, MaxInt), 0)
+      else if Copy(S, 1, Length(VIEW_TOP)) = VIEW_TOP then
+        Result.TopFile := Copy(S, Length(VIEW_TOP) + 1, MaxInt)
+      else if Copy(S, 1, Length(VIEW_COLS)) = VIEW_COLS then
+        Result.FlatCols := Copy(S, Length(VIEW_COLS) + 1, MaxInt)
+      else if Copy(S, 1, Length(VIEW_FLAT_SORT)) = VIEW_FLAT_SORT then
+        Result.FlatSort := Copy(S, Length(VIEW_FLAT_SORT) + 1, MaxInt);
+      Continue;
+    end;
+    Result.Collapsed[M] := S;
+    Inc(M);
+  end;
+  SetLength(Result.Collapsed, M);
   N := R.Count(ENTRY_MIN_BYTES);
   SetLength(Result.Entries, N);
   for I := 0 to N - 1 do Result.Entries[I] := ReadEntry(R);

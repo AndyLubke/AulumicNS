@@ -63,6 +63,7 @@ type
     FStatus: TStatusStrip;
     FToast: TAuToast;
     FMainMenu, FPlaylistMenu, FViewMenu, FDeviceMenu, FRateMenu, FArtistMenu, FThemeMenu: TAuMenu;
+    FShuffleMenu, FRepeatMenu, FMainViewMenu: TAuMenu;   // sub menus of the main menu (ticked in MainMenuPopup)
     FCtxMenu: TAuMenu;           // the last context menu (kept until its item ran)
     FIconBig, FIconSmall: HICON;
     FTone: TAuToneForm;
@@ -74,7 +75,7 @@ type
     FPlayingPath: string;
     FPlayingId: Integer;
     FCurrentMeta: TAudioMetadata;
-    FOverflowArtists: TStringArray;   // the banner's "more artists" menu
+    FMenuPeople: TPersonArray;        // the banner's "+n more" menu
     FCoverEntry: TPlEntry;            // the playlist header whose cover was clicked
     FSigDevice: string;               // the device name of the open signal path
     FIsCurrentDsd, FIsCurrentDoP, FIsCurrentDsdToPcm: Boolean;
@@ -391,6 +392,20 @@ type
     procedure MnShowInExplorer(Sender: TObject);
     procedure RevealPath(const APath: string);
     procedure MnOverflowArtist(Sender: TObject);
+    procedure MnPlSticky(Sender: TObject);
+    procedure SortClick(Sender: TObject);
+    procedure MnSort(Sender: TObject);
+    procedure MnSortReverse(Sender: TObject);
+    procedure PlViewChanged(Sender: TObject);
+    procedure MnShuffleMode(Sender: TObject);
+    procedure MnRepeatMode(Sender: TObject);
+    procedure MnNewPlaylist(Sender: TObject);
+    procedure MnViewCompact(Sender: TObject);
+    procedure MnViewPeakMeter(Sender: TObject);
+    procedure MnViewCursorFollows(Sender: TObject);
+    procedure MnPlFavourite(Sender: TObject);
+    function SelectionIsFavourite: Boolean;
+    procedure MnLibAccordion(Sender: TObject);
     procedure MainMenuPopup(Sender: TObject);
   protected
     procedure CreateWnd; override;
@@ -461,20 +476,17 @@ begin
   if Trim(ErrText) = '' then ErrText := E.ClassName;
   FInExceptionDialog := True;
   try
-    try
-      ALMessageDlg(TITLE_ERROR, SafeFormat(FMT_ERR_UNEXPECTED, [ErrText]), [mbOK], mbOK, mkError);
-    except
-      try
-        Application.ShowException(E);
-      except
-      end;
-    end;
+    ShowErrorBox(E);
   finally
     FInExceptionDialog := False;
   end;
 end;
 
 procedure TMainForm.StartWatchAsync(Data: PtrInt);
+{$IFDEF DEBUG}
+var
+  BusyUntil: QWord;
+{$ENDIF}
 begin
   if FShuttingDown then Exit;
   NameThisThread('UI');
@@ -485,6 +497,26 @@ begin
     hang report must be written, then "answered again") }
   if Application.HasOption('test-hang') then
     Sleep(1000 * EnsureRange(StrToIntDef(Application.GetOptionValue('test-hang'), 8), 1, 60));
+  { --help-probe=<report>: drives the help window and checks it (AuHelp.RunHelpProbe);
+    the exit code is the number of failed checks }
+  if Application.HasOption('help-probe') then
+  begin
+    ExitCode := RunHelpProbe(Application.GetOptionValue('help-probe'));
+    Close;
+    Exit;
+  end;
+  { --test-busy=<s>: the window's thread works for <s> seconds without
+    handling messages, as a long action does, and calls KeepWindowAlive:
+    Windows must not call the window hung and no hang report is written }
+  if Application.HasOption('test-busy') then
+  begin
+    BusyUntil := GetTickCount64 + 1000 * QWord(EnsureRange(StrToIntDef(Application.GetOptionValue('test-busy'), 12), 1, 60));
+    while GetTickCount64 < BusyUntil do
+    begin
+      Sleep(20);
+      KeepWindowAlive;
+    end;
+  end;
   {$ENDIF}
 end;
 
@@ -843,7 +875,8 @@ begin
   WriteShutDownTrace('Destroy: closing the tool windows');
   try
     StopHangWatch;     // (when the close did not go through FormCloseQuery)
-    Application.OnException := nil;
+    { from here on the handler that needs no main window }
+  InstallErrorBox;
     Application.RemoveOnQueryEndSessionHandler(@AppQueryEndSession);
     Application.RemoveOnEndSessionHandler(@AppEndSession);
     Application.RemoveAsyncCalls(Self);
@@ -1009,6 +1042,12 @@ begin
   FMid.Parent := Self;
   FMid.Align := alClient;
   FMid.BackRole := crBg;
+  {$IFDEF DEBUG}
+  { --test-error=start: the main window fails while it is built (the error
+    window of a start that goes wrong) }
+  if Application.GetOptionValue('test-error') = 'start' then
+    raise Exception.Create('Test error: the main window could not be built.');
+  {$ENDIF}
   FLib := TLibraryPane.Create(Self);
   FLib.Parent := FMid;
   FLib.Align := alLeft;
@@ -1031,6 +1070,7 @@ begin
   FMainSplit.OnMoved := @MainSplitMoved;
   FMid.OnResize := @MidResize;
   FPl := TPlaylistPane.Create(Self);
+  FPl.List.StickyHeaders := Dat.StickyHeaders;
   FPl.Parent := FMid;
   FPl.Align := alClient;
   FPl.List.TextSize := PaneTextPx(Dat.PlayListFontSize);
@@ -1041,6 +1081,9 @@ begin
   FPl.BtnPlaylist.OnClick := @PlaylistDrop;
   FPl.BtnPlaylist.Caption := LBL_DEFAULT_PLAYLIST;
   FPl.BtnView.OnClick := @ViewClick;
+  FPl.BtnSort.OnClick := @SortClick;
+  FPl.BtnSortDir.OnClick := @MnSortReverse;
+  FPl.OnViewChange := @PlViewChanged;
   FPl.BtnEdit.OnClick := @EditClick;
 
   FToast := TAuToast.Create(Self);
@@ -1070,15 +1113,23 @@ begin
   M := FMainMenu.AddSub('File', icFolder);
   M.Add('Add files...', @MnAddFiles, icPlus, 'Ctrl+O');
   M.Add('Add folder...', @MnAddFolder, icFolderPlus);
-  M.AddSeparator;
-  M.Add('Import playlist...', @MnImportM3U, icImport);
-  M.Add('Export playlist...', @MnExportM3U, icExport);
   M := FMainMenu.AddSub('Playback', icPlay);
   M.Add('Play / pause', @PlayClick, icPlay, 'Space');
   M.Add('Stop', @StopClick, icStopSolid);
   M.Add('Previous', @PrevClick, icPrev);
   M.Add('Next', @NextClick, icNext);
   M.AddSeparator;
+  { (the item's Tag is the mode: Ord(TShuffleMode) / Ord(TRepeatMode)) }
+  FShuffleMenu := M.AddSub('Shuffle', icShuffle);
+  FShuffleMenu.Add('Off', @MnShuffleMode, icNone, '', Ord(smOff));
+  FShuffleMenu.Add('Tracks', @MnShuffleMode, icNone, '', Ord(smTrack));
+  FShuffleMenu.Add('Albums', @MnShuffleMode, icNone, '', Ord(smAlbum));
+  FRepeatMenu := M.AddSub('Repeat', icRepeat);
+  FRepeatMenu.Add('Off', @MnRepeatMode, icNone, '', Ord(rmOff));
+  FRepeatMenu.Add('All', @MnRepeatMode, icNone, '', Ord(rmAll));
+  FRepeatMenu.Add('One track', @MnRepeatMode, icNone, '', Ord(rmOne));
+  M.AddSeparator;
+  M.Add('Tone Control...', @ToneClick, icSliders, 'Ctrl+T');
   M.Add('Jump to Now Playing', @JumpClick, icLocate, 'Ctrl+J');
   M := FMainMenu.AddSub('Library', icLibrary);
   M.Add('Search', @MnSearch, icSearch, 'Ctrl+F');
@@ -1087,17 +1138,22 @@ begin
   M.AddSeparator;
   M.Add('Library folders...', @MnLibraryFolders, icFolderPlus);
   M := FMainMenu.AddSub('Playlist', icPlaylist);
+  M.Add('New playlist...', @MnNewPlaylist, icPlus);
   M.Add('Playlist Manager...', @MnPlaylistManager, icEdit, 'Alt+P');
-  M.Add('Clear the playlist', @MnClearList, icTrash);
-  M := FMainMenu.AddSub('Tools', icSliders);
-  M.Add('Edit properties...', @MnProperties, icTag, 'Alt+Enter');
-  M.Add('Calculate ReplayGain', @MnReplayGain, icWave);
   M.AddSeparator;
-  M.Add('Show log...', @MnLog, icLog, 'Ctrl+L');
-  M.Add('Show Debug Queue', @MnDebugQueue, icBug, 'Ctrl+D');
-  FMainMenu.AddSeparator;
-  FMainMenu.Add('Preferences...', @MnPrefs, icSettings, 'Ctrl+P');
-  Sub := FMainMenu.AddSub('Theme', icSun);
+  M.Add('Import playlist...', @MnImportM3U, icImport);
+  M.Add('Export playlist...', @MnExportM3U, icExport);
+  M.AddSeparator;
+  M.Add('Expand all', @MnPlExpandAll, icTriDown);
+  M.Add('Collapse all', @MnPlCollapseAll, icTriRight);
+  M.AddSeparator;
+  M.Add('Remove dead items', @MnRemoveDead, icTrash);
+  M.Add('Clear the playlist', @MnClearList, icTrash);
+  { the switches of Preferences that are changed now and then, at hand
+    (ticked in MainMenuPopup; the items after the separator in this order) }
+  M := FMainMenu.AddSub('View', icEye);
+  FMainViewMenu := M;
+  Sub := M.AddSub('Theme', icSun);
   FThemeMenu := Sub;
   Sub.Add('Dark', @MnThemeDark, icMoon, '', 0);
   Sub.Add('Light', @MnThemeLight, icSun, '', 1);
@@ -1108,6 +1164,19 @@ begin
     It := Sub.Add(AccentNames[I], @MnAccent, icNone, '', I);
     It.Tag := I;
   end;
+  M.AddSeparator;
+  M.Add('Compact rows', @MnViewCompact);
+  M.Add('Peak meter', @MnViewPeakMeter);
+  M.Add('Keep album headers in view', @MnPlSticky);
+  M.Add('Cursor follows playback', @MnViewCursorFollows);
+  M := FMainMenu.AddSub('Tools', icSliders);
+  M.Add('Properties...', @MnProperties, icTag, 'Alt+Enter');
+  M.Add('Calculate ReplayGain...', @MnReplayGain, icWave);
+  M.AddSeparator;
+  M.Add('Show log...', @MnLog, icLog, 'Ctrl+L');
+  M.Add('Show Debug Queue...', @MnDebugQueue, icBug, 'Ctrl+D');
+  FMainMenu.AddSeparator;
+  FMainMenu.Add('Preferences...', @MnPrefs, icSettings, 'Ctrl+P');
   FMainMenu.AddSeparator;
   FMainMenu.Add('Help...', @MnHelp, icHelp, 'F1');
   FMainMenu.Add('About...', @MnAbout, icInfo);
@@ -1130,6 +1199,56 @@ begin
   FThemeMenu.Item(1).Checked := ThemeMode = tmLight;
   FThemeMenu.Item(2).Checked := ThemeMode = tmSystem;
   for I := 0 to AccentCount - 1 do FThemeMenu.Item(4 + I).Checked := AccentIndex = I;
+  { the shuffle and repeat mode }
+  for I := 0 to FShuffleMenu.Count - 1 do
+    FShuffleMenu.Item(I).Checked := (FPlayback <> nil) and (Ord(FPlayback.ShuffleMode) = FShuffleMenu.Item(I).Tag);
+  for I := 0 to FRepeatMenu.Count - 1 do
+    FRepeatMenu.Item(I).Checked := (FPlayback <> nil) and (Ord(FPlayback.RepeatMode) = FRepeatMenu.Item(I).Tag);
+  { the switches of the View menu (after the Theme sub menu and a separator) }
+  FMainViewMenu.Item(2).Checked := AppSettings.Data.CompactRows;
+  FMainViewMenu.Item(3).Checked := AppSettings.Data.ShowPeakmeter;
+  FMainViewMenu.Item(4).Checked := AppSettings.Data.StickyHeaders;
+  FMainViewMenu.Item(5).Checked := AppSettings.Data.CursorFollowsPlayback;
+end;
+
+{ the mode of the item's Tag: the playback manager only steps through its
+  modes, so it is stepped until it is there }
+procedure TMainForm.MnShuffleMode(Sender: TObject);
+var
+  I: Integer;
+begin
+  if FPlayback = nil then Exit;
+  for I := 1 to Ord(High(TShuffleMode)) do
+    if Ord(FPlayback.ShuffleMode) <> TAuMenuItem(Sender).Tag then FPlayback.ToggleShuffle;
+end;
+
+procedure TMainForm.MnRepeatMode(Sender: TObject);
+var
+  I: Integer;
+begin
+  if FPlayback = nil then Exit;
+  for I := 1 to Ord(High(TRepeatMode)) do
+    if Ord(FPlayback.RepeatMode) <> TAuMenuItem(Sender).Tag then FPlayback.ToggleRepeat;
+end;
+
+procedure TMainForm.MnViewCompact(Sender: TObject);
+begin
+  AppSettings.Data.CompactRows := not AppSettings.Data.CompactRows;
+  if AppSettings.Data.CompactRows then RowDensity := ROW_DENSITY_COMPACT else RowDensity := 1.0;
+  FLib.Tree.DpiChanged;
+  FPl.List.DpiChanged;
+end;
+
+procedure TMainForm.MnViewPeakMeter(Sender: TObject);
+begin
+  AppSettings.Data.ShowPeakmeter := not AppSettings.Data.ShowPeakmeter;
+  FBanner.ShowMeter := AppSettings.Data.ShowPeakmeter;
+  FBanner.Changed;
+end;
+
+procedure TMainForm.MnViewCursorFollows(Sender: TObject);
+begin
+  AppSettings.Data.CursorFollowsPlayback := not AppSettings.Data.CursorFollowsPlayback;
 end;
 
 procedure TMainForm.ApplyWindowSettings;
@@ -1426,10 +1545,11 @@ procedure TMainForm.BannerMoreArtists(Sender: TObject; ScreenPt: TPoint);
 var
   I: Integer;
 begin
-  FOverflowArtists := FBanner.OverflowArtists;
+  { those the line has no room for, with the roles at the right }
+  FMenuPeople := FBanner.OverflowPeople;
   FArtistMenu.Clear;
-  for I := 0 to High(FOverflowArtists) do
-    FArtistMenu.Add(FOverflowArtists[I], @MnOverflowArtist, icArtist, '', I);
+  for I := 0 to High(FMenuPeople) do
+    FArtistMenu.Add(FMenuPeople[I].Name, @MnOverflowArtist, icArtist, FMenuPeople[I].Roles, I);
   FArtistMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 
@@ -1658,6 +1778,15 @@ begin
     FLib.Tree.TextSize := PaneTextPx(New.LibraryFontSize);
     FPl.List.TextSize := PaneTextPx(New.PlaylistFontSize);
     FLib.Tree.Accordion := New.AccordionEnabled;
+    FPl.List.StickyHeaders := New.StickyHeaders;
+    FPl.List.Invalidate;
+    { the row height of both panes }
+    if Old.CompactRows <> New.CompactRows then
+    begin
+      if New.CompactRows then RowDensity := ROW_DENSITY_COMPACT else RowDensity := 1.0;
+      FLib.Tree.DpiChanged;
+      FPl.List.DpiChanged;
+    end;
     FBanner.ShowMeter := New.ShowPeakmeter;
     FBanner.Changed;
     { the engine }
@@ -1709,15 +1838,15 @@ begin
   Close;
 end;
 
-{ an artist of the banner's "more artists" menu (the item's Tag indexes
-  FOverflowArtists; no caption as state) }
+{ a person of the banner's "+n more" menu (the item's Tag indexes
+  FMenuPeople; no caption as state) }
 procedure TMainForm.MnOverflowArtist(Sender: TObject);
 var
   I: PtrInt;
 begin
   I := TAuMenuItem(Sender).Tag;
-  if (I >= 0) and (I <= High(FOverflowArtists)) then
-    ShowArtistInfo(Self, FLibrary, FOverflowArtists[I]);
+  if (I >= 0) and (I <= High(FMenuPeople)) then
+    ShowArtistInfo(Self, FLibrary, FMenuPeople[I].Name);
 end;
 
 {$IFDEF DEBUG}
@@ -1726,9 +1855,67 @@ end;
 { renders the client area of the window into a PNG file: every control
   paints itself into one bitmap (RenderTo), so the capture does not depend
   on the window being composited on screen }
+{ Also writes down where the parts of the main window are in that picture
+  (anchors.txt in the shot folder: shot|place|x|y, the middle of the place in
+  1/10000 of the picture, then its width and height). The help puts its numbered markers there, so they
+  stay right when the layout changes. A new place: one line here, then its
+  name can be used in the help text. }
 procedure TMainForm.CaptureWindow(const AName: string);
+var
+  SL: TStringList;
+  Org: TPoint;
+
+  procedure Put(const APlace: string; const AScreen: TRect);
+  begin
+    if (ClientWidth <= 0) or (ClientHeight <= 0) or (AScreen.Right <= AScreen.Left) then Exit;
+    SL.Add(Format('%s|%s|%d|%d|%d|%d', [AName, APlace,
+      EnsureRange(Round(((AScreen.Left + AScreen.Right) / 2 - Org.X) * 10000 / ClientWidth), 0, 10000),
+      EnsureRange(Round(((AScreen.Top + AScreen.Bottom) / 2 - Org.Y) * 10000 / ClientHeight), 0, 10000),
+      EnsureRange(Round((AScreen.Right - AScreen.Left) * 10000 / ClientWidth), 0, 10000),
+      EnsureRange(Round((AScreen.Bottom - AScreen.Top) * 10000 / ClientHeight), 0, 10000)]));
+  end;
+
+  { the part of the control from AX0 .. AX1 and AY0 .. AY1 of its size (a
+    marker in the middle of the banner or of the transport bar would sit on
+    the text or on the Play button: a free part of them is named) }
+  procedure PutPart(const APlace: string; C: TControl; AX0, AX1, AY0, AY1: Single);
+  var
+    P: TPoint;
+  begin
+    if (C = nil) or not C.IsVisible then Exit;
+    P := C.ClientToScreen(Point(0, 0));
+    Put(APlace, Rect(P.X + Round(C.Width * AX0), P.Y + Round(C.Height * AY0),
+      P.X + Round(C.Width * AX1), P.Y + Round(C.Height * AY1)));
+  end;
+
+  procedure PutControl(const APlace: string; C: TControl);
+  begin
+    PutPart(APlace, C, 0, 1, 0, 1);
+  end;
+
 begin
   SaveImage(FShotDir + AName + '.png');
+  SL := TStringList.Create;
+  try
+    if FileExists(FShotDir + 'anchors.txt') then SL.LoadFromFile(FShotDir + 'anchors.txt');
+    Org := ClientToScreen(Point(0, 0));
+    Put('mainmenu', TitleBar.ButtonScreenRect(0));
+    Put('preferences', TitleBar.ButtonScreenRect(1));
+    PutPart('banner', FBanner, 0.45, 0.65, 0.05, 0.5);
+    PutControl('meter', FBanner.Meter);
+    PutControl('search', FLib.Search);
+    PutControl('tree', FLib.Tree);
+    PutControl('selector', FPl.BtnPlaylist);
+    PutControl('sortdir', FPl.BtnSortDir);
+    PutControl('sort', FPl.BtnSort);
+    PutControl('view', FPl.BtnView);
+    PutControl('manager', FPl.BtnEdit);
+    PutControl('playlist', FPl.List);
+    PutPart('transport', FTransport, 0.1, 0.3, 0.35, 1);
+    SL.SaveToFile(FShotDir + 'anchors.txt');
+  finally
+    SL.Free;
+  end;
 end;
 
 procedure TMainForm.ShotTick(Sender: TObject);
@@ -1766,6 +1953,19 @@ procedure TMainForm.ShotTick(Sender: TObject);
     E: TPlEntry;
     B: TGfxBitmap;
     Gi, Gc, Gt, I: Integer;
+
+    { the band, and two made-up members with their roles }
+    procedure DemoPeople(const AArtist: string);
+    var
+      P: TPersonArray;
+    begin
+      P := nil;
+      AddPeople(P, AArtist, False);
+      AddPeople(P, 'Jonas Marlow (piano); Ida Feld (double bass)', True);
+      AddPeople(P, 'Jonas Marlow', False, ROLE_COMPOSER);
+      FBanner.SetPeople(P);
+    end;
+
   begin
     FBanner.Playing := True;
     if FDebugScan and (FPl.EntryCount > 0) and not FPl.IsDemo then
@@ -1774,7 +1974,7 @@ procedure TMainForm.ShotTick(Sender: TObject);
       FBanner.Title := E.Title;
       FBanner.Album := E.Album;
       FBanner.Genre := E.Genre;
-      FBanner.SetArtists([E.Artist]);
+      DemoPeople(E.Artist);
       FBanner.Resolution := Format('%d bit / %s', [E.BitDepth, FormatRateKHz(E.SampleRate)]);
       FBanner.RateText := 'Bit-Perfect: ' + FormatRateKHz(E.SampleRate);
       FPl.GroupInfo(0, Gi, Gc, Gt);
@@ -1795,7 +1995,7 @@ procedure TMainForm.ShotTick(Sender: TObject);
       FBanner.Title := 'Morning Over the Bridge';
       FBanner.Album := 'First Light';
       FBanner.Genre := 'Jazz';
-      FBanner.SetArtists(['The Example Quartet', 'Jonas Marlow']);
+      DemoPeople('The Example Quartet');
       FBanner.Resolution := '16 bit / 44.1 kHz';
       FBanner.RateText := 'Bit-Perfect: 44.1 kHz';
       FBanner.Meta := 'Track 1 of 8  •  1:24 / 47:18';
@@ -1857,7 +2057,21 @@ begin
          DemoBanner;
        end;
     1: CaptureWindow('01-dark-main');
-    2: begin FTransport.SetPlaying(True); FPl.List.SelectOnly(3); DemoPosition; end;
+    2: begin
+         FTransport.SetPlaying(True);
+         FPl.List.SelectOnly(3);
+         DemoPosition;
+         { --shot-flat: the playlist as a flat list with its columns }
+         if Application.HasOption('shot-flat') then
+         begin
+           FPl.SetView(gmFlat, '', '', '', False);
+           FPl.Rebuild;
+           FPl.SortByColumn(pcArtist);
+         end;
+         { --shot-scroll=<px>: the playlist scrolled down (a pinned header) }
+         if Application.HasOption('shot-scroll') then
+           FPl.List.ScrollTo(S(StrToIntDef(Application.GetOptionValue('shot-scroll'), 0)));
+       end;
     3: CaptureWindow('02-dark-playing');
     4: SetTheme(tmLight, AccentIndex);
     5: CaptureWindow('03-light-playing');
@@ -2255,7 +2469,11 @@ begin
     27: begin
           { the help window at the signal path (not used in the help itself) }
           AName := '47-help';
-          Result := CreateHelpForm(Self, 'Signal Path');
+          { (--shot-help-topic=<heading>: the help at another topic) }
+          if Application.HasOption('shot-help-topic') then
+            Result := CreateHelpForm(Self, Application.GetOptionValue('shot-help-topic'))
+          else
+            Result := CreateHelpForm(Self, 'Signal Path');
         end;
     36: begin
           { the About window (no folder of this PC) }

@@ -74,6 +74,7 @@ type
     procedure TrackListsHoldCopies;
     procedure TrackListsStayValidWhenTheLibraryIsReplaced;
     procedure TrackListGettersFindTheRightTracks;
+    procedure TheGettersAnswerAsAPlainWalkWould;
   end;
 
   { Snapshot + journal (uDbStore) }
@@ -460,6 +461,196 @@ begin
 end;
 
 { TTestLibraryAccess }
+
+{ The questions the library tree asks per node (the tracks of a folder, an
+  artist, a genre, an album; the albums of an artist or a genre) are answered
+  from lookup lists. Every answer must be what a walk over all tracks with
+  the condition of the question gives - for names in any case, tags with
+  several names, spaces around them, empty tags - also after a tag changed. }
+procedure TTestLibraryAccess.TheGettersAnswerAsAPlainWalkWould;
+const
+  ARTISTS: array[0..6] of string = ('Alpha', 'alpha; Beta', ' Beta ;Gamma', '', 'Delta;;Alpha', 'GAMMA', 'Epsilon');
+  GENRES: array[0..4] of string = ('Jazz', 'jazz; Rock', '', 'Rock ; Pop', 'POP');
+  ALBUMS: array[0..4] of string = ('First', 'first', ' Second ', '', 'Third');
+var
+  Tracks, Snap: TTrackInfoArray;
+  Folders, Links, Names: TStringList;
+  I, Round: Integer;
+  T: TTrackInfo;
+
+  function Composite(const ATrack: TTrackInfo): string;
+  var
+    Art: string;
+  begin
+    Art := Trim(ATrack.AlbumArtist);
+    if Art = '' then Art := Trim(ATrack.Artist);
+    if Art = '' then Art := 'Unknown Artist';
+    Result := Format('%s - %s', [Art, Trim(ATrack.Album)]);
+  end;
+
+  function AlbumOf(const ATrack: TTrackInfo): string;
+  begin
+    Result := Trim(ATrack.Album);
+    if Result = '' then Result := 'Unknown Album';
+  end;
+
+  { the names of a tag as the tree shows them: each item, or the "unknown" name }
+  procedure Items(const ARaw, AUnknown: string);
+  var
+    Parts: TStringArray;
+    K: Integer;
+  begin
+    if Trim(ARaw) = '' then
+    begin
+      Names.Add(AUnknown);
+      Exit;
+    end;
+    Parts := ARaw.Split([';']);
+    for K := 0 to High(Parts) do
+      if Trim(Parts[K]) <> '' then Names.Add(Trim(Parts[K]));
+  end;
+
+  procedure CheckAll(const AWhen: string);
+  var
+    K, J, Want: Integer;
+    L: TTrackList;
+    SL, WantSL: TStringList;
+    Nm: string;
+  begin
+    Snap := FLib.SnapshotTracks;
+    L := TTrackList.Create;
+    SL := TStringList.Create;
+    WantSL := TStringList.Create;
+    WantSL.Sorted := True;
+    WantSL.Duplicates := dupIgnore;
+    try
+      { artists: their tracks and their albums, and the tracks of each album }
+      Names.Clear;
+      for K := 0 to High(Snap) do
+      begin
+        Items(Snap[K].AlbumArtist, 'Unknown Artist');
+        Items(Snap[K].Artist, 'Unknown Artist');
+      end;
+      for J := 0 to Names.Count - 1 do
+      begin
+        Nm := Names[J];
+        Want := 0;
+        WantSL.Clear;
+        for K := 0 to High(Snap) do
+          if ContainsDelimitedItem(Snap[K].AlbumArtist, Nm) or ContainsDelimitedItem(Snap[K].Artist, Nm) then
+          begin
+            Inc(Want);
+            WantSL.Add(AlbumOf(Snap[K]));
+          end;
+        FLib.GetTracksByArtist(Nm, L);
+        AssertEquals(AWhen + ': tracks of artist "' + Nm + '"', Want, L.Count);
+        FLib.GetAlbumsByArtist(Nm, SL);
+        AssertEquals(AWhen + ': albums of artist "' + Nm + '"', WantSL.Text, SL.Text);
+        if WantSL.Count > 0 then
+        begin
+          Want := 0;
+          for K := 0 to High(Snap) do
+            if (ContainsDelimitedItem(Snap[K].AlbumArtist, Nm) or ContainsDelimitedItem(Snap[K].Artist, Nm)) and
+               SameText(AlbumOf(Snap[K]), WantSL[0]) then Inc(Want);
+          FLib.GetTracksByArtistAndAlbum(Nm, WantSL[0], L);
+          AssertEquals(AWhen + ': tracks of "' + Nm + '" / "' + WantSL[0] + '"', Want, L.Count);
+        end;
+      end;
+      { genres }
+      Names.Clear;
+      for K := 0 to High(Snap) do Items(Snap[K].Genre, 'Unknown Genre');
+      for J := 0 to Names.Count - 1 do
+      begin
+        Nm := Names[J];
+        Want := 0;
+        WantSL.Clear;
+        for K := 0 to High(Snap) do
+          if ContainsDelimitedItem(Snap[K].Genre, Nm) then
+          begin
+            Inc(Want);
+            WantSL.Add(AlbumOf(Snap[K]));
+          end;
+        FLib.GetTracksByGenre(Nm, L);
+        AssertEquals(AWhen + ': tracks of genre "' + Nm + '"', Want, L.Count);
+        FLib.GetAlbumsByGenre(Nm, SL);
+        AssertEquals(AWhen + ': albums of genre "' + Nm + '"', WantSL.Text, SL.Text);
+        if WantSL.Count > 0 then
+        begin
+          Want := 0;
+          for K := 0 to High(Snap) do
+            if ContainsDelimitedItem(Snap[K].Genre, Nm) and SameText(AlbumOf(Snap[K]), WantSL[0]) then Inc(Want);
+          FLib.GetTracksByGenreAndAlbum(Nm, WantSL[0], L);
+          AssertEquals(AWhen + ': tracks of genre "' + Nm + '" / "' + WantSL[0] + '"', Want, L.Count);
+        end;
+      end;
+      { albums and folders }
+      for J := 0 to High(Snap) do
+      begin
+        Nm := Composite(Snap[J]);
+        Want := 0;
+        for K := 0 to High(Snap) do
+          if SameText(Composite(Snap[K]), Trim(Nm)) then Inc(Want);
+        FLib.GetTracksByAlbum(Nm, L);
+        AssertEquals(AWhen + ': tracks of album "' + Nm + '"', Want, L.Count);
+        Nm := Snap[J].FolderDir;
+        Want := 0;
+        for K := 0 to High(Snap) do
+          if SameText(ExcludeTrailingPathDelimiter(Snap[K].FolderDir), ExcludeTrailingPathDelimiter(Nm)) then Inc(Want);
+        FLib.GetTracksInFolder(UpperCase(Nm), L);
+        AssertEquals(AWhen + ': tracks in folder "' + Nm + '"', Want, L.Count);
+      end;
+      FLib.GetTracksByArtist('No Such Artist', L);
+      AssertEquals(AWhen + ': an unknown name', 0, L.Count);
+    finally
+      WantSL.Free;
+      SL.Free;
+      L.Free;
+    end;
+  end;
+
+begin
+  Tracks := nil;
+  SetLength(Tracks, 140);
+  for I := 0 to High(Tracks) do
+  begin
+    Tracks[I] := Default(TTrackInfo);
+    Tracks[I].FolderDir := Format('D:\Music\Folder %d', [I mod 9]);
+    if I mod 4 = 0 then Tracks[I].FolderDir := Tracks[I].FolderDir + '\';
+    Tracks[I].FilePath := Format('D:\Music\Folder %d\%.3d.flac', [I mod 9, I]);
+    Tracks[I].Title := Format('Track %d', [I]);
+    Tracks[I].Artist := ARTISTS[I mod 7];
+    Tracks[I].AlbumArtist := ARTISTS[(I div 3) mod 7];
+    Tracks[I].Genre := GENRES[I mod 5];
+    Tracks[I].Album := ALBUMS[(I div 2) mod 5];
+    Tracks[I].TrackNumber := I mod 12 + 1;
+  end;
+  Folders := TStringList.Create;
+  Links := TStringList.Create;
+  Names := TStringList.Create;
+  Names.Sorted := True;
+  Names.Duplicates := dupIgnore;
+  try
+    Folders.Add('D:\Music');
+    AssertTrue('The library took the tracks', FLib.ReplaceContent(Tracks, Folders, Links) >= 0);
+    AssertEquals('All tracks', Length(Tracks), FLib.GetTrackCount);
+    CheckAll('fresh');
+    { tags changed: the answers follow }
+    for Round := 0 to 2 do
+    begin
+      AssertTrue('A track to change', FLib.TryGetTrack(Tracks[Round * 11].FilePath, T));
+      T.Artist := 'Zeta; alpha';
+      T.AlbumArtist := '';
+      T.Genre := 'Blues';
+      T.Album := 'Fourth';
+      FLib.UpdateRecord(T);
+    end;
+    CheckAll('after edits');
+  finally
+    Names.Free;
+    Links.Free;
+    Folders.Free;
+  end;
+end;
 
 procedure TTestLibraryAccess.SetUp;
 begin

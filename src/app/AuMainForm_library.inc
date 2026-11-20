@@ -256,7 +256,7 @@ begin
   end;
 end;
 
-{ ---- tree actions (Play, Add to / Send to current Playlist) ---- }
+{ ---- tree actions (Play, Add to / Replace current playlist) ---- }
 
 { the tracks of the nodes replace the play list and play from the first }
 procedure TMainForm.LibPlay(const ANodes: TAuTreeNodeArray);
@@ -296,6 +296,7 @@ begin
     if AReplace then FPl.Clear;
     First := FPl.EntryCount;
     FPl.AddTracks(L);             // OnChange: stored, the queue follows
+    if FPl.LastAddedIndex >= 0 then First := FPl.LastAddedIndex;
     FToast.ShowToast(SafeFormat('%d tracks added', [L.Count]), FPl.BtnPlaylist.Caption, icPlaylist, 1800);
     if First < FPl.EntryCount then FPl.List.EnsureVisible(FPl.RowOfEntry(First));
   finally
@@ -334,7 +335,7 @@ begin
   It.Enabled := (Node <> nil) and not IsRoot;
   It := FCtxMenu.Add('Add to current playlist', @MnLibAdd, icPlus);
   It.Enabled := (Node <> nil) and not IsRoot and not FPl.ReadOnly;
-  It := FCtxMenu.Add('Send to current playlist', @MnLibSend, icPlaylist);
+  It := FCtxMenu.Add('Replace current playlist', @MnLibSend, icPlaylist);
   It.Enabled := (Node <> nil) and not IsRoot and not FPl.ReadOnly;
   if (Node <> nil) and not IsRoot and (FPlaylists <> nil) then
     AddToPlaylistMenu(FCtxMenu.AddSub('Add to playlist', icPlaylist), @MnLibAddTo);
@@ -348,11 +349,9 @@ begin
   It.Enabled := (Node <> nil) and not IsTrack;
   It := FCtxMenu.Add('Collapse all', @MnLibCollapseAll, icTriRight);
   It.Enabled := FLib.Tree.RootCount > 0;
-  FCtxMenu.AddSeparator;
-  It := FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
-  It.Enabled := Node <> nil;
-  It := FCtxMenu.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
-  It.Enabled := (Node <> nil) and not IsRoot;
+  { the setting of Preferences > Appearance > Main window, at hand }
+  It := FCtxMenu.Add('Auto-collapse other nodes', @MnLibAccordion);
+  It.Checked := AppSettings.Data.AccordionEnabled;
   FCtxMenu.AddSeparator;
   if (Node <> nil) and FLib.IsVirtualLink(Node) then
   begin
@@ -373,6 +372,11 @@ begin
   It := FCtxMenu.Add('Open folder...', @MnLibOpenFolder, icFolder);
   It.Enabled := (Node <> nil) and OneNode and (Node.Path <> '') and
     FLibrary.IsRootAvailable(Node.Path);
+  It := FCtxMenu.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
+  It.Enabled := (Node <> nil) and not IsRoot;
+  FCtxMenu.AddSeparator;
+  It := FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
+  It.Enabled := Node <> nil;
   FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 
@@ -396,19 +400,33 @@ begin
   if FCtxNode <> nil then FLib.Tree.Toggle(FCtxNode);
 end;
 
+procedure TMainForm.MnLibAccordion(Sender: TObject);
+begin
+  AppSettings.Data.AccordionEnabled := not AppSettings.Data.AccordionEnabled;
+  FLib.Tree.Accordion := AppSettings.Data.AccordionEnabled;
+end;
+
 procedure TMainForm.MnLibExpandAll(Sender: TObject);
-var
-  OldCursor: TCursor;
 begin
   if FCtxNode = nil then Exit;
-  FLib.Tree.BeginUpdate;
-  OldCursor := Screen.Cursor;
-  Screen.Cursor := crHourGlass;
+  { a whole branch of a large library: every node asks the library for its
+    children, which takes a while. Busy meanwhile (the hourglass; what is
+    clicked in that time is dropped), and the window stays alive
+    (TLibraryPane.ExpandAll calls KeepWindowAlive). }
+  BeginBusy;
   try
-    FLib.ExpandAll(FCtxNode);
+    FLib.Tree.BeginUpdate;
+    { (with "Auto-collapse other nodes" every node opened would close the
+      one before it) }
+    FLib.Tree.Accordion := False;
+    try
+      FLib.ExpandAll(FCtxNode);
+    finally
+      FLib.Tree.Accordion := AppSettings.Data.AccordionEnabled;
+      FLib.Tree.EndUpdate;
+    end;
   finally
-    FLib.Tree.EndUpdate;
-    Screen.Cursor := OldCursor;
+    EndBusy;
   end;
 end;
 

@@ -5,7 +5,95 @@
 Coming in the next version
 -------------------------------------------------------------------------------
 
-(Nothing yet.)
+
+Version 1.0.0.12 (20 November 2026)
+-------------------------------------------------------------------------------
+
+Playlists
+  - Sorting. Two new buttons next to the view button set the order of the
+    albums. One chooses the order: Playlist order, Artist, Album, Year or
+    Added to library. The arrow button beside it reverses that order. It's
+    a view: playback follows what is shown, but the order in which the music
+    was added is kept, and "Playlist order" brings it back. Each playlist
+    remembers its choice. While a playlist is sorted, albums can't be dragged
+    to another place, and added music finds its own place. Auto-playlists
+    can be sorted too.
+  - The flat list is a table now. It has a heading row and columns: number,
+    title, artist, album, rating and time, and optionally album artist,
+    year, genre, format, plays, last played and added (right-click the
+    headings). Clicking a heading sorts by it, a second click reverses, and
+    "#" brings the playlist order back; the column sorted by before decides
+    among equal values. Dragging the line between two headings changes the
+    widths. When the columns don't fit beside the title they all get a
+    little narrower; only a very narrow pane leaves columns out. Each
+    playlist keeps its own columns, widths and sort. The track format is no
+    longer used in a flat list, and the date of an auto-playlist is a column
+    of its own.
+  - The header of an album stays at the top of the list while scrolling
+    through its tracks, so it's always clear which album is shown. It works
+    there as usual (cover, stars, the triangle) and moves away when the next
+    album arrives. This can be switched off with "Keep album headers in
+    view" in the main menu (View) or in Preferences > Playlists.
+  - An album on several discs gets a small "Disc 1", "Disc 2" heading above
+    the first track of each disc.
+  - A header shows the number of tracks and the playing time of the album
+    under its stars. It's left out when the header format shows them
+    already, and when the pane is too narrow for it.
+  - In an album whose tracks aren't all by the same artist, the artist is
+    shown behind the title of each track that isn't by the album artist
+    alone. That makes compilations and guest tracks readable. It's left out
+    when the track format shows the artist itself.
+  - Compact rows: a new setting in Preferences > Appearance makes the rows of
+    the playlist and the library tree lower, so more of them fit.
+  - The view button shows the grouping in its icon too (album, folder or
+    list) where it had an eye.
+  - Each playlist remembers its scroll position, also after a restart.
+  - A drop between two albums goes before the album below, not to the end of
+    the playlist.
+  - "Remove dead items" asks before it removes anything. The question gives
+    the number of tracks it found, and the number it keeps because their
+    drive isn't connected.
+  - Fixed: of the albums closed in a playlist, only the first one was closed
+    again on returning to that playlist. All of them are now.
+
+Now Playing banner
+  - The line with the artists, performers and composers is clearer. Everyone
+    is listed once, and their role stands behind the name in smaller text:
+    a performer tagged as "Ida Feld (double bass)" is shown as Ida Feld with
+    "double bass" next to it, and a composer who also plays gets "composer"
+    added. When the line gets too long the roles are left out to make room
+    for more names, and "+n more" at the end lists the others.
+  - Fixed: a comma inside brackets, as in "(piano, synthesizer)", cut a name
+    in two and left a loose "synthesizer)" in the line. In a tag that uses
+    semicolons between the entries, commas now belong to the entry (so
+    "Bach, Johann Sebastian; Gould, Glenn" stays two names).
+  - Fixed: a name was left out when it was part of a longer one already
+    shown (a band next to its leader, for example).
+  - A click on a performer opens Artist Info for the name without the role.
+
+Menus
+  - The main menu and the right-click menus of the playlist and the library
+    are in a clearer order. New: a View menu with the switches that are
+    changed now and then, and Favourite in the playlist's menu, which gives
+    the selected tracks five stars or takes them away.
+
+Speed
+  - Long lists are faster: opening artists, albums, genres and folders in
+    the library tree, and "Expand all", take a fraction of the time, and the
+    window no longer shows "Not responding" during a long action.
+
+Settings
+  - The main window and the Tone Control window always open wholly on a
+    monitor that is connected, above the taskbar. Before, with two monitors
+    of different sizes, or after unplugging one, a window could open where
+    no monitor shows it.
+  - Every stored setting is checked when it is loaded and again before it is
+    saved; a value that cannot be right is replaced by a sensible one.
+
+Help
+  - The help window is easier to read: the picture of the section being read
+    stays in view above the text, and numbers on the pictures show which
+    part the text is about.
 
 
 Version 1.0.0.11 (19 November 2026)

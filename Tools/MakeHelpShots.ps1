@@ -7,7 +7,9 @@
        so the paths in the screenshots are short and name nothing of this PC
     3. runs --shots at 150 % (--shot-dpi=144) with that library
     4. copies the screenshots the help text uses (![caption](name) lines of
-       help\AulumicNS_help.md) into help\shots and shrinks them
+       help\AulumicNS_help.md, with or without {markers} behind them) into
+       help\shots and shrinks them, and with them anchors.txt: where the
+       parts of the main window are in its pictures
        (Tools\ShrinkPng.ps1: 256 colours, optimal PNG filters and deflate;
        2.5 MB -> about 1 MB, agreed 2026-11-11; -Colors 0 keeps them lossless)
     5. writes AulumicNS_help.rc: the help text and those screenshots
@@ -66,7 +68,7 @@ finally {
 if ($failed -ne 0) { exit $failed }
 
 # the screenshots of the help text
-$names = Select-String -Path $md -Pattern '^\s*!\[[^\]]*\]\(([^)]+)\)\s*$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() } |
+$names = Select-String -Path $md -Pattern '^\s*!\[[^\]]*\]\(([^)]+)\)\s*(\{[^}]*\})?\s*$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() } |
   Select-Object -Unique
 if (Test-Path $shotsOut) { Remove-Item $shotsOut -Recurse -Force }
 New-Item -ItemType Directory -Force $shotsOut | Out-Null
@@ -79,6 +81,12 @@ foreach ($n in $names) {
   $res = ('HELPIMG_' + $n.ToUpperInvariant()) -replace '[^A-Z0-9_]', '_'
   $lines += "$res RCDATA `"help\\shots\\$n.png`""
 }
+# where the parts of the main window are in its pictures (the markers of the help)
+$anchors = Join-Path "$work\shots" 'anchors.txt'
+if (Test-Path $anchors) {
+  Copy-Item $anchors (Join-Path $shotsOut 'anchors.txt')
+  $lines += 'AULUMICNSHELPANCHORS RCDATA "help\\shots\\anchors.txt"'
+} else { 'no anchors.txt: markers at named places will be missing' }
 $shrunk = & (Join-Path $PSScriptRoot 'ShrinkPng.ps1') -Folder $shotsOut -Colors $Colors
 $shrunk | Select-Object -Last 1
 $enc = New-Object Text.UTF8Encoding($false)

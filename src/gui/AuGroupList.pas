@@ -13,6 +13,11 @@ unit AuGroupList;
   (OnDrawRow) - the list paints selection, hover, the collapse triangle,
   the three dots menu button and the drop marker.
   Scrolling is in pixels because headers are higher than items.
+  An item may have a lead: a strip above it that belongs to no row and is
+  painted by the owner (OnDrawLead; a "Disc 2" heading inside an album).
+  While the items of a group are in view and its header has scrolled out,
+  the header stays pinned at the top (StickyHeaders) until the next header
+  pushes it away; the pinned header takes the mouse as the header row.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -34,6 +39,7 @@ type
     Lines: Integer;       // header: one or two text lines
     Collapsed: Boolean;
     Selected: Boolean;
+    Lead: Boolean;        // item: a strip above it (OnDrawLead)
   end;
 
   TAuRowArray = array of Integer;
@@ -68,7 +74,8 @@ type
     FDropRow: Integer;            // row index of the drop marker (-1 none)
     FDropAbove: Boolean;
     FEmptyText: string;
-    FOnDrawRow: TAuGLDrawEvent;
+    FSticky: Boolean;
+    FOnDrawRow, FOnDrawLead: TAuGLDrawEvent;
     FOnActivate: TAuGLRowEvent;
     FOnRowClick: TAuGLClickEvent;
     FOnRowContext: TAuGLContextEvent;
@@ -86,7 +93,11 @@ type
     procedure NeedVis;
     function RowH(R: Integer): Integer;
     function VisIndexOf(R: Integer): Integer;
+    function RawVisAt(Y: Integer): Integer;
     function VisAt(Y: Integer): Integer;
+    function VisBelow(Y: Integer): Integer;
+    function StickyHeader(out AY: Integer): Integer;
+    function StickyInset(R: Integer): Integer;
     function ViewW: Integer;
     function GapAbove(R: Integer): Integer;
     function MenuGutter: Integer;
@@ -132,7 +143,22 @@ type
     function AddItem(AData: PtrInt): Integer;
     procedure Changed;
     function HeaderHeight(ALines: Integer): Integer;
+    { a strip above item R for the owner to paint (OnDrawLead) }
+    procedure SetLead(R: Integer; V: Boolean);
+    function LeadHeight: Integer;
+    { the whole row can be seen (not cut off, not under a pinned header) }
+    function RowInView(R: Integer): Boolean;
     procedure EnsureVisible(R: Integer; Center: Boolean = False);
+    { where the owner's row content is drawn: its left edge and width (what
+      OnDrawRow gets as X and W) }
+    function ContentLeft: Integer;
+    function ContentWidth: Integer;
+    { scrolls to this offset in pixels (as far as the content goes) }
+    procedure ScrollTo(APos: Integer);
+    { the first row below the top edge (below a pinned header); -1: none }
+    function TopRow: Integer;
+    { puts row R where TopRow finds it }
+    procedure ScrollRowToTop(R: Integer);
     procedure SelectOnly(R: Integer);
     procedure SelectAll;
     procedure ClearSelection;
@@ -160,6 +186,8 @@ type
     property RowMenu: Boolean read FRowMenu write FRowMenu;
     property DragEnabled: Boolean read FDragEnabled write FDragEnabled;
     property EmptyText: string read FEmptyText write FEmptyText;
+    property StickyHeaders: Boolean read FSticky write FSticky;
+    property OnDrawLead: TAuGLDrawEvent read FOnDrawLead write FOnDrawLead;
     property OnDrawRow: TAuGLDrawEvent read FOnDrawRow write FOnDrawRow;
     property OnActivate: TAuGLRowEvent read FOnActivate write FOnActivate;
     property OnRowClick: TAuGLClickEvent read FOnRowClick write FOnRowClick;
@@ -187,6 +215,7 @@ begin
   FDropRow := -1;
   FMultiSelect := True;
   FRowMenu := True;
+  FSticky := True;
   FDirty := True;
   FScroll := TAuScrollBar.Create(Self);
   FScroll.Parent := Self;
@@ -197,7 +226,7 @@ end;
 
 procedure TAuGroupList.UpdateItemH;
 begin
-  FItemH := Math.Max(S(18), Round(SF(FTextSize * FontScale) * 1.95));
+  FItemH := Math.Max(S(18), Round(SF(FTextSize * FontScale) * 1.95 * RowDensity));
   FScroll.SmallStep := FItemH;
   FDirty := True;
 end;
@@ -236,8 +265,25 @@ end;
 
 function TAuGroupList.GapAbove(R: Integer): Integer;
 begin
-  { a little air above every header but the first }
-  if (FRows[R].Kind = rkHeader) and (R > 0) then Result := S(10) else Result := 0;
+  { a little air above every header but the first; the lead of an item }
+  if FRows[R].Kind = rkHeader then
+  begin
+    if R > 0 then Result := S(10) else Result := 0;
+  end
+  else if FRows[R].Lead then Result := LeadHeight
+  else Result := 0;
+end;
+
+function TAuGroupList.LeadHeight: Integer;
+begin
+  Result := Round(FItemH * 0.9);
+end;
+
+procedure TAuGroupList.SetLead(R: Integer; V: Boolean);
+begin
+  if (R < 0) or (R >= FCount) or (FRows[R].Kind <> rkItem) or (FRows[R].Lead = V) then Exit;
+  FRows[R].Lead := V;
+  Changed;
 end;
 
 procedure TAuGroupList.BeginUpdate;
@@ -278,6 +324,7 @@ begin
   FRows[Result].Lines := EnsureRange(ALines, 1, 2);
   FRows[Result].Collapsed := False;
   FRows[Result].Selected := False;
+  FRows[Result].Lead := False;
   Inc(FCount);
   FDirty := True;
 end;
@@ -299,6 +346,7 @@ begin
   FRows[Result].Lines := 1;
   FRows[Result].Collapsed := False;
   FRows[Result].Selected := False;
+  FRows[Result].Lead := False;
   Inc(FCount);
   FDirty := True;
 end;
@@ -389,7 +437,9 @@ begin
   Result := -1;
 end;
 
-function TAuGroupList.VisAt(Y: Integer): Integer;
+{ the visible row at Y of the scrolled content (-1: a gap, or below the
+  last row); a pinned header is not looked at }
+function TAuGroupList.RawVisAt(Y: Integer): Integer;
 var
   Lo, Hi, M, CY: Integer;
 begin
@@ -407,6 +457,79 @@ begin
   end;
 end;
 
+{ the first visible row whose top is below Y (FVisCount: none) }
+function TAuGroupList.VisBelow(Y: Integer): Integer;
+var
+  Lo, Hi, M, CY: Integer;
+begin
+  NeedVis;
+  CY := Y + FTop;
+  Lo := 0;
+  Hi := FVisCount;
+  while Lo < Hi do
+  begin
+    M := (Lo + Hi) div 2;
+    if FVisY[M] > CY then Hi := M else Lo := M + 1;
+  end;
+  Result := Lo;
+end;
+
+{ The header pinned at the top and where its top is (0, or above the edge
+  while the next header pushes it out); -1 when none is pinned: the group at
+  the top edge still shows its header in place, or the list has no groups. }
+function TAuGroupList.StickyHeader(out AY: Integer): Integer;
+var
+  V, HV, K, HR, HH: Integer;
+begin
+  Result := -1;
+  AY := 0;
+  if not FSticky then Exit;
+  NeedVis;
+  if (FVisCount = 0) or (FTop <= 0) then Exit;
+  { the first row that reaches below the top edge }
+  V := RawVisAt(0);
+  if V < 0 then V := VisBelow(0);
+  if V >= FVisCount then Exit;
+  HR := FVis[V];
+  if FRows[HR].Kind <> rkHeader then HR := FRows[HR].Group;
+  if HR < 0 then Exit;
+  HV := VisIndexOf(HR);
+  if (HV < 0) or (FVisY[HV] >= FTop) then Exit;
+  HH := RowH(HR);
+  { the next header, when it is near enough to push }
+  K := V + 1;
+  while (K < FVisCount) and (FVisY[K] - FTop < HH + S(10)) do
+  begin
+    if FRows[FVis[K]].Kind = rkHeader then
+    begin
+      AY := Math.Min(0, FVisY[K] - GapAbove(FVis[K]) - FTop - HH);
+      Break;
+    end;
+    Inc(K);
+  end;
+  if AY + HH <= 0 then Exit;
+  Result := HR;
+end;
+
+{ how much of the top a pinned header covers for item R: the height of its
+  group's header (0: a header, no group, or a list too low for both) }
+function TAuGroupList.StickyInset(R: Integer): Integer;
+begin
+  Result := 0;
+  if (not FSticky) or (R < 0) or (R >= FCount) or (FRows[R].Kind <> rkItem) or (FRows[R].Group < 0) then Exit;
+  Result := RowH(FRows[R].Group);
+  if Result + GapAbove(R) + RowH(R) > ClientHeight then Result := 0;
+end;
+
+function TAuGroupList.VisAt(Y: Integer): Integer;
+var
+  HR, SY: Integer;
+begin
+  HR := StickyHeader(SY);
+  if (HR >= 0) and (Y >= 0) and (Y < SY + RowH(HR)) then Exit(VisIndexOf(HR));
+  Result := RawVisAt(Y);
+end;
+
 function TAuGroupList.RowAtPoint(X, Y: Integer): Integer;
 var
   V: Integer;
@@ -417,11 +540,28 @@ end;
 
 function TAuGroupList.RowRect(R: Integer): TRect;
 var
-  V: Integer;
+  V, SY: Integer;
 begin
   V := VisIndexOf(R);
   if V < 0 then Exit(Rect(0, 0, 0, 0));
+  { a pinned header is where it is painted }
+  if (FRows[R].Kind = rkHeader) and (StickyHeader(SY) = R) then
+    Exit(Rect(0, SY, ViewW, SY + RowH(R)));
   Result := Rect(0, FVisY[V] - FTop, ViewW, FVisY[V] - FTop + RowH(R));
+end;
+
+function TAuGroupList.RowInView(R: Integer): Boolean;
+var
+  V, Y, HR, SY, TopLimit: Integer;
+begin
+  V := VisIndexOf(R);
+  if V < 0 then Exit(False);
+  Y := FVisY[V] - FTop;
+  TopLimit := 0;
+  HR := StickyHeader(SY);
+  if HR = R then Exit(True);
+  if HR >= 0 then TopLimit := SY + RowH(HR);
+  Result := (Y >= TopLimit) and (Y + RowH(R) <= ClientHeight);
 end;
 
 function TAuGroupList.IsVisibleRow(R: Integer): Boolean;
@@ -487,6 +627,12 @@ begin
     end;
   end;
   Changed;
+  { a header collapsed while it was pinned: back into view at its own place }
+  if V and (FUpdating = 0) then
+  begin
+    J := VisIndexOf(I);
+    if (J >= 0) and (FVisY[J] - GapAbove(I) < FTop) then EnsureVisible(I);
+  end;
   if Assigned(FOnCollapseChange) then FOnCollapseChange(Self);
 end;
 
@@ -526,7 +672,9 @@ begin
   Above := True;
   if V < 0 then
   begin
-    R := -1;
+    { a gap: before the row below it; below the last row: at the end }
+    V := VisBelow(Y);
+    if V < FVisCount then R := FVis[V] else R := -1;
     Exit;
   end;
   R := FVis[V];
@@ -635,18 +783,65 @@ end;
 
 procedure TAuGroupList.EnsureVisible(R: Integer; Center: Boolean);
 var
-  V, Y, H: Integer;
+  V, Y, H, Inset: Integer;
 begin
   UpdateScroll;
   V := VisIndexOf(R);
   if V < 0 then Exit;
   Y := FVisY[V];
   H := RowH(R);
+  { an item must come out from under its pinned header }
+  Inset := StickyInset(R);
   if Center then FScroll.Position := Y - (ClientHeight - H) div 2
-  else if Y - GapAbove(R) < FTop then FScroll.Position := Y - GapAbove(R)
+  else if Y - GapAbove(R) < FTop + Inset then FScroll.Position := Y - GapAbove(R) - Inset
   else if Y + H > FTop + ClientHeight then FScroll.Position := Y + H - ClientHeight;
   FTop := FScroll.Position;
   Invalidate;
+end;
+
+procedure TAuGroupList.ScrollTo(APos: Integer);
+begin
+  UpdateScroll;
+  FScroll.Position := APos;
+  FTop := FScroll.Position;
+  Invalidate;
+end;
+
+function TAuGroupList.ContentLeft: Integer;
+begin
+  Result := S(30);
+end;
+
+function TAuGroupList.ContentWidth: Integer;
+begin
+  Result := ViewW - S(30) - MenuGutter - S(4);
+end;
+
+function TAuGroupList.TopRow: Integer;
+var
+  HR, SY, Y, V: Integer;
+begin
+  Result := -1;
+  NeedVis;
+  if FVisCount = 0 then Exit;
+  Y := 0;
+  HR := StickyHeader(SY);
+  if HR >= 0 then Y := SY + RowH(HR);
+  V := RawVisAt(Y);
+  if V < 0 then V := VisBelow(Y);
+  if V >= FVisCount then V := FVisCount - 1;
+  Result := FVis[V];
+end;
+
+procedure TAuGroupList.ScrollRowToTop(R: Integer);
+var
+  V: Integer;
+begin
+  UpdateScroll;
+  V := VisIndexOf(R);
+  if V < 0 then Exit;
+  if FRows[R].Kind = rkHeader then ScrollTo(FVisY[V])
+  else ScrollTo(FVisY[V] - GapAbove(R) - StickyInset(R));
 end;
 
 procedure TAuGroupList.MoveFocusVis(V: Integer; Shift: TShiftState);
@@ -672,33 +867,15 @@ end;
 procedure TAuGroupList.DoPaint(G: TGfx);
 var
   V, R, Y, VW, H: Integer;
-  Bg: TARGB;
-  St: TAuRowState;
   Foc: Boolean;
-  CX: Single;
-begin
-  G.FillRect(0, 0, Width, Height, EffBack);
-  NeedVis;
-  VW := ViewW;
-  Foc := Focused;
-  if (FVisCount = 0) and (FEmptyText <> '') then
+
+  { row R with its top at Y }
+  procedure PaintRow(R, Y: Integer);
+  var
+    Bg: TARGB;
+    St: TAuRowState;
+    CX: Single;
   begin
-    G.Text(FEmptyText, S(20), 0, VW - S(40), ClientHeight, UIFont(13), clTextFaint, 1, 1, tfWrap);
-    Exit;
-  end;
-  HotSet(FHot, FHoverRow, Self);
-  { the first visible row }
-  V := VisAt(0);
-  if V < 0 then
-  begin
-    V := 0;
-    while (V < FVisCount) and (FVisY[V] + RowH(FVis[V]) <= FTop) do Inc(V);
-  end;
-  while V < FVisCount do
-  begin
-    R := FVis[V];
-    Y := FVisY[V] - FTop;
-    if Y >= ClientHeight then Break;
     H := RowH(R);
     St := [];
     if FRows[R].Selected then Include(St, rsSelected);
@@ -735,7 +912,40 @@ begin
       if FDropAbove then G.FillRound(S(8), Y - SF(1.5), VW - S(16), SF(3), SF(1.5), clAccent)
       else G.FillRound(S(8), Y + H - SF(1.5), VW - S(16), SF(3), SF(1.5), clAccent);
     end;
+  end;
+
+begin
+  G.FillRect(0, 0, Width, Height, EffBack);
+  NeedVis;
+  VW := ViewW;
+  Foc := Focused;
+  if (FVisCount = 0) and (FEmptyText <> '') then
+  begin
+    G.Text(FEmptyText, S(20), 0, VW - S(40), ClientHeight, UIFont(13), clTextFaint, 1, 1, tfWrap);
+    Exit;
+  end;
+  HotSet(FHot, FHoverRow, Self);
+  { the first visible row }
+  V := RawVisAt(0);
+  if V < 0 then V := VisBelow(0);
+  while V < FVisCount do
+  begin
+    R := FVis[V];
+    Y := FVisY[V] - FTop;
+    if FRows[R].Lead and Assigned(FOnDrawLead) and (Y - LeadHeight < ClientHeight) then
+      FOnDrawLead(Self, G, R, S(30), Y - LeadHeight, VW - S(30) - MenuGutter - S(4), LeadHeight, []);
+    if Y >= ClientHeight then Break;
+    PaintRow(R, Y);
     Inc(V);
+  end;
+  { the pinned header, over the rows that scroll under it }
+  R := StickyHeader(Y);
+  if R >= 0 then
+  begin
+    H := RowH(R);
+    G.FillRect(0, Y, VW, H + S(2), EffBack);
+    PaintRow(R, Y);
+    G.FillRect(0, Y + H + S(1), VW, S(1), WithAlpha(clText, 34));
   end;
 end;
 

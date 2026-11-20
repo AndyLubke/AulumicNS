@@ -112,7 +112,7 @@ const
 implementation
 
 uses
-  uAppConsts, uAppStrings, uAudioUtils, uSettingsManager;
+  uInputBlock, uAppConsts, uAppStrings, uAudioUtils, uSettingsManager;
 
 { multi-line tags flattened }
 function CleanNodeText(const S: string): string;
@@ -690,6 +690,7 @@ begin
   try
     for I := 0 to High(ANodes) do
     begin
+      KeepWindowAlive;
       N := ANodes[I];
       Part.Clear;
       case NodeType(N) of
@@ -705,6 +706,7 @@ begin
             FLib.GetVirtualLinkTargets(N.Path, Links);
             for J := 0 to Links.Count - 1 do
             begin
+              KeepWindowAlive;
               Sub.Clear;
               FLib.GetTracksInFolderRecursive(ExcludeTrailingPathDelimiter(Links[J]), Sub);
               Part.AddList(Sub);
@@ -733,6 +735,8 @@ var
   I: Integer;
 begin
   if (N = nil) or (NodeType(N) = lntTrack) then Exit;
+  { a whole branch of a large library takes a while: the window stays alive }
+  KeepWindowAlive;
   N.Expanded := True;
   for I := 0 to N.Count - 1 do ExpandAll(N[I]);
 end;

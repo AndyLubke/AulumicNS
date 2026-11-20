@@ -481,25 +481,12 @@ end;
 procedure TMainForm.UpdateBanner;
 var
   M: TAudioMetadata;
-  Names: array of string;
-  Parts: TStringArray;
+  People: TPersonArray;
   E, Idx, Cnt, Total: Integer;
   Data: TBytes;
   B, Before: TGfxBitmap;
   Ext: string;
   St: PUserTrackStats;
-
-  procedure AddNames(const Raw: string);
-  var
-    K: Integer;
-  begin
-    Parts := SplitTags(Raw);
-    for K := 0 to High(Parts) do
-    begin
-      SetLength(Names, Length(Names) + 1);
-      Names[High(Names)] := Parts[K];
-    end;
-  end;
 
 begin
   if FPlayingPath = '' then
@@ -515,12 +502,14 @@ begin
   FBanner.Album := M.Album;
   if Trim(M.Genre) <> '' then FBanner.Genre := FormatTagString(M.Genre, 0)
   else FBanner.Genre := LBL_UNKNOWN_GENRE;
-  Names := nil;
-  AddNames(M.AlbumArtist);
-  AddNames(M.Artist);
-  AddNames(M.Performer);
-  AddNames(M.Composer);
-  FBanner.SetArtists(Names);
+  { each person once: the artists, then the performers with their roles
+    (the bracket behind a name), then the composers }
+  People := nil;
+  AddPeople(People, M.AlbumArtist, False);
+  AddPeople(People, M.Artist, False);
+  AddPeople(People, M.Performer, True);
+  AddPeople(People, M.Composer, False, ROLE_COMPOSER);
+  FBanner.SetPeople(People);
   { "Track 1 of 8  •  4:33 / 47:17" }
   E := FPl.IndexOfId(FPlayingId);
   FPl.GroupInfo(E, Idx, Cnt, Total);
@@ -977,6 +966,7 @@ var
   T: TToneState;
   A: TManagerConfig;
   Si: TSignalInfo;
+  TL, TT, TW, TH: Integer;
 begin
   if FTone = nil then
   begin
@@ -984,9 +974,16 @@ begin
     FTone.OnChange := @ToneChanged;
     if AppSettings.Data.ToneWinLeft <> VAL_UNINITIALIZED_POS then
     begin
+      { where it was, but wholly on a monitor that is there now (with the
+        size the window has at this scaling) }
+      TL := AppSettings.Data.ToneWinLeft;
+      TT := AppSettings.Data.ToneWinTop;
+      TW := FTone.Width;
+      TH := FTone.Height;
+      FitWindowToWorkAreas(MonitorWorkAreas, TL, TT, TW, TH);
       FTone.Position := poDesigned;
-      FTone.Left := AppSettings.Data.ToneWinLeft;
-      FTone.Top := AppSettings.Data.ToneWinTop;
+      FTone.Left := TL;
+      FTone.Top := TT;
     end;
   end;
   if FTone.Visible then

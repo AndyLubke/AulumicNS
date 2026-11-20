@@ -31,6 +31,7 @@ begin
     if FindFirst(LongPath(Dir + '*'), faAnyFile, SR) = 0 then
     try
       repeat
+        KeepWindowAlive;        // (a large or slow folder)
         if (SR.Name = '.') or (SR.Name = '..') then Continue;
         if (SR.Attr and faDirectory) <> 0 then
         begin
@@ -97,6 +98,8 @@ begin
         FPl.AddFiles(L);
         First := Before;
       end;
+      { (a sorted playlist puts them where they belong) }
+      if (FPl.EntryCount > Before) and (FPl.LastAddedIndex >= 0) then First := FPl.LastAddedIndex;
     finally
       EndBusy;
     end;
@@ -156,6 +159,7 @@ begin
   try
     for I := 0 to FPl.EntryCount - 1 do
     begin
+      KeepWindowAlive;
       En := FPl.Entry(I);
       New(Q);
       Q^.FilePath := En.FilePath;

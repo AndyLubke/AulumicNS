@@ -9,7 +9,7 @@ unit AuBanner;
     cover  Title                               FLAC        |peak |
            Album (link)                        24 bit/96   |meter|
            Genre                               Stereo      |     |
-           Artist • Performer • Composer (...)  Rate (link) |     |
+           Name role • Name role • +2 more     Rate (link) |     |
            Track 1 of 8 • 4:33 / 47:17  [badge] [book] [heart]
   The main menu and Preferences buttons are in the title bar
   (TAuTitleBar.AddButton), not here.
@@ -27,7 +27,7 @@ interface
 
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuIcons, AuControls, AuExtra, AuAppIcon;
+  AuGfx, AuTheme, AuIcons, AuControls, AuExtra, AuAppIcon, uMetaUtils;
 
 type
   TBannerHot = (bhNone, bhCover, bhAlbum, bhArtist, bhMoreArtists,
@@ -45,7 +45,8 @@ type
     FAmbient: TARGB;
     FPlaying: Boolean;
     FTitle, FAlbum, FGenre, FMeta: string;
-    FArtists: TStringList;
+    FPeople: TPersonArray;
+    FShowRoles: Boolean;
     FCodec, FResolution, FChannels, FRate, FNotice: string;
     FBadge: TBannerBadge;
     FBadgeText: string;
@@ -72,6 +73,8 @@ type
     function GradTop: TARGB;
     function GradBottom: TARGB;
     function FontPx(Pt: Single): Single;
+    function MoreText: string;
+    function RoleFont: TGfxFont;
   protected
     procedure DoPaint(G: TGfx); override;
     procedure Resize; override;
@@ -85,8 +88,13 @@ type
     procedure DpiChanged; override;
     { the cover (the banner keeps its own copy; nil = the logo) }
     procedure SetCover(B: TGfxBitmap);
+    { the people of the track, in the order shown: a name is a link, its
+      roles follow it smaller and dimmer. When not all fit with their
+      roles the line shows the names alone, and "+n more" for the rest. }
+    procedure SetPeople(const APeople: TPersonArray);
     procedure SetArtists(const Names: array of string);
-    function OverflowArtists: TStringArray;
+    { the people behind "+n more": those the line has no room for }
+    function OverflowPeople: TPersonArray;
     procedure Clear;
     procedure Changed;
     { the colour at the top of the banner gradient (the title bar above it) }
@@ -182,12 +190,13 @@ const
   InfoW = 180;        // the source information column (at least; wider when its text needs it)
   TextMinW = 160;     // what the title column keeps at the least
   MeterW = 22;        // the width of the peak meter
+  RolePt = 10.5;      // the roles behind a name (the names are 12 pt)
+  RoleGap = 6;        // between a name and its roles
 
 constructor TNowPlayingBanner.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FocusOnClick := False;
-  FArtists := TStringList.Create;
   FShowMeter := True;
   FHot := bhNone;
   FDown := bhNone;
@@ -202,7 +211,6 @@ end;
 destructor TNowPlayingBanner.Destroy;
 begin
   if FCover <> nil then DisposeBitmap(FCover);
-  FArtists.Free;
   inherited Destroy;
 end;
 
@@ -213,7 +221,7 @@ begin
   FAlbum := '';
   FGenre := '';
   FMeta := '';
-  FArtists.Clear;
+  FPeople := nil;
   FCodec := '';
   FResolution := '';
   FChannels := '';
@@ -237,40 +245,32 @@ begin
   Invalidate;
 end;
 
-procedure TNowPlayingBanner.SetArtists(const Names: array of string);
-var
-  I, J: Integer;
-  N: string;
-  Dup: Boolean;
+procedure TNowPlayingBanner.SetPeople(const APeople: TPersonArray);
 begin
-  FArtists.Clear;
-  for I := 0 to High(Names) do
-  begin
-    N := Trim(Names[I]);
-    if N = '' then Continue;
-    { skip names already shown (also as a part of another name) }
-    Dup := False;
-    for J := 0 to FArtists.Count - 1 do
-      if SameText(FArtists[J], N) or (Pos(LowerCase(N), LowerCase(FArtists[J])) > 0) or
-         (Pos(LowerCase(FArtists[J]), LowerCase(N)) > 0) then
-      begin
-        Dup := True;
-        Break;
-      end;
-    if not Dup then FArtists.Add(N);
-  end;
+  FPeople := Copy(APeople);
 end;
 
-function TNowPlayingBanner.OverflowArtists: TStringArray;
+procedure TNowPlayingBanner.SetArtists(const Names: array of string);
 var
   I: Integer;
 begin
-  Result := nil;
-  for I := FShownArtists to FArtists.Count - 1 do
-  begin
-    SetLength(Result, Length(Result) + 1);
-    Result[High(Result)] := FArtists[I];
-  end;
+  FPeople := nil;
+  for I := 0 to High(Names) do AddPeople(FPeople, Names[I], False);
+end;
+
+function TNowPlayingBanner.OverflowPeople: TPersonArray;
+begin
+  Result := Copy(FPeople, FShownArtists, Length(FPeople) - FShownArtists);
+end;
+
+function TNowPlayingBanner.MoreText: string;
+begin
+  Result := Format('+%d more', [Length(FPeople) - FShownArtists]);
+end;
+
+function TNowPlayingBanner.RoleFont: TGfxFont;
+begin
+  Result := UIFont(FontPx(RolePt));
 end;
 
 procedure TNowPlayingBanner.Changed;
@@ -377,10 +377,34 @@ end;
 procedure TNowPlayingBanner.Layout;
 var
   R: Single;
-  Step, H, TopY, BotY, CoverSz, InfoL, InfoR, TextL, TextR, X, Y, RowH, I, W, MoreW, DotW: Integer;
-  F: TGfxFont;
+  Step, H, TopY, BotY, CoverSz, InfoL, InfoR, TextL, TextR, X, Y, RowH, W, MoreW, DotW: Integer;
+  N, LineH: Integer;
+  F, FR: TGfxFont;
   MeterOn: Boolean;
   H0: TBannerHot;
+
+  { Lays the people out from TextL and returns how many fit; all but the
+    last must leave room for "+n more". X ends behind the last one's dot. }
+  function FitPeople(WithRoles: Boolean): Integer;
+  var
+    K, EW: Integer;
+  begin
+    Result := 0;
+    X := TextL;
+    SetLength(FArtistRects, N);
+    for K := 0 to N - 1 do
+    begin
+      EW := Ceil(TextWidth(FPeople[K].Name, F));
+      if WithRoles and (FPeople[K].Roles <> '') then
+        EW := EW + S(RoleGap) + Ceil(TextWidth(FPeople[K].Roles, FR));
+      if (K = N - 1) and (X + EW > TextR) then Break;
+      if (K < N - 1) and (X + EW + MoreW > TextR) then Break;
+      FArtistRects[K] := Rect(X, Y, X + EW, Y + LineH);
+      Inc(Result);
+      X := X + EW + DotW;
+    end;
+  end;
+
 begin
   for H0 := Low(TBannerHot) to High(TBannerHot) do FRects[H0] := Rect(0, 0, 0, 0);
   SetLength(FArtistRects, 0);
@@ -455,33 +479,29 @@ begin
   else if H >= MinH + Step then Inc(Y, Ceil(UIFont(FontPx(14 - (1 - R) * 4), True).LineHeight) + S(10));
   if H >= MinH + Step * 2 then
     Inc(Y, Ceil(UIFont(FontPx(12 - (1 - R) * 3)).LineHeight) + S(10));
-  { the artists line: as many names as fit, then "(...)" }
-  if (FArtists.Count > 0) and (H >= MinH + Step * 3) then
+  { the people line: everyone with their roles when that fits; otherwise the
+    names alone, as many as fit, then "+n more" }
+  N := Length(FPeople);
+  FShowRoles := False;
+  if (N > 0) and (H >= MinH + Step * 3) then
   begin
     F := UIFont(FontPx(12));
-    MoreW := Ceil(TextWidth(' (...)', F)) + S(6);
+    FR := RoleFont;
+    LineH := Ceil(F.LineHeight);
     DotW := Ceil(TextWidth(' • ', F)) + S(8);
-    X := TextL;
-    SetLength(FArtistRects, FArtists.Count);
-    for I := 0 to FArtists.Count - 1 do
-    begin
-      W := Ceil(TextWidth(FArtists[I], F));
-      if (I = FArtists.Count - 1) and (X + W > TextR) then Break;
-      if (I < FArtists.Count - 1) and (X + W + MoreW > TextR) then Break;
-      FArtistRects[I] := Rect(X, Y, X + W, Y + Ceil(F.LineHeight));
-      Inc(FShownArtists);
-      X := X + W + DotW;
-    end;
-    if (FShownArtists = 0) and (FArtists.Count > 0) then
+    MoreW := DotW + Ceil(TextWidth(Format('+%d more', [N]), F)) + S(4);
+    FShowRoles := FitPeople(True) = N;
+    if FShowRoles then FShownArtists := N else FShownArtists := FitPeople(False);
+    if FShownArtists = 0 then
     begin
       { at least the first, cut off }
-      FArtistRects[0] := Rect(TextL, Y, Math.Max(TextL + S(20), TextR - MoreW), Y + Ceil(F.LineHeight));
+      FArtistRects[0] := Rect(TextL, Y, Math.Max(TextL + S(20), TextR - MoreW), Y + LineH);
       FShownArtists := 1;
       X := FArtistRects[0].Right + DotW;
     end;
     SetLength(FArtistRects, FShownArtists);
-    if FShownArtists < FArtists.Count then
-      FRects[bhMoreArtists] := Rect(X - DotW + S(2), Y, X - DotW + S(2) + MoreW, Y + Ceil(F.LineHeight));
+    if FShownArtists < N then
+      FRects[bhMoreArtists] := Rect(X, Y, X + Ceil(TextWidth(MoreText, F)), Y + LineH);
   end;
 end;
 
@@ -512,7 +532,9 @@ procedure TNowPlayingBanner.DoPaint(G: TGfx);
 var
   R: Single;
   Step, H, TopY, BotY, TextL, TextR, InfoL, InfoR, Y, I, RowH: Integer;
-  F: TGfxFont;
+  NameW, RoleDY: Integer;
+  IsHot: Boolean;
+  F, FR: TGfxFont;
   Fg, C: TARGB;
   Rc: TRect;
   T: string;
@@ -580,22 +602,29 @@ begin
   if Length(FArtistRects) > 0 then
   begin
     F := UIFont(FontPx(12));
+    FR := RoleFont;
+    { the smaller role text stands on the line of the names }
+    RoleDY := Round((F.LineHeight - FR.LineHeight) * 0.8);
     for I := 0 to High(FArtistRects) do
     begin
       Rc := FArtistRects[I];
-      if (FHot = bhArtist) and (FHotArtist = I) then Fg := clAccentText else Fg := clText;
-      G.Text(FArtists[I], Rc.Left, Rc.Top, Rc.Right - Rc.Left + S(2), Rc.Bottom - Rc.Top + S(2), F, Fg, 0, 0);
-      if (FHot = bhArtist) and (FHotArtist = I) then
-        G.FillRect(Rc.Left, Rc.Bottom - S(1), Math.Min(Rc.Right - Rc.Left, Ceil(TextWidth(FArtists[I], F))), SF(1.2), Fg);
-      if (I < High(FArtistRects)) or (FShownArtists < FArtists.Count) then
-        if I < High(FArtistRects) then
-          G.Text(' • ', Rc.Right + S(2), Rc.Top, S(30), Rc.Bottom - Rc.Top + S(2), F, clTextDim, 0, 0);
+      IsHot := (FHot = bhArtist) and (FHotArtist = I);
+      Fg := IfC(IsHot, clAccentText, clText);
+      NameW := Math.Min(Rc.Right - Rc.Left, Ceil(TextWidth(FPeople[I].Name, F)));
+      G.Text(FPeople[I].Name, Rc.Left, Rc.Top, NameW + S(2), Rc.Bottom - Rc.Top + S(2), F, Fg, 0, 0);
+      if IsHot then G.FillRect(Rc.Left, Rc.Bottom - S(1), NameW, SF(1.2), Fg);
+      if FShowRoles and (FPeople[I].Roles <> '') then
+        G.Text(FPeople[I].Roles, Rc.Left + NameW + S(RoleGap), Rc.Top + RoleDY,
+          Rc.Right - Rc.Left - NameW - S(RoleGap) + S(2), Rc.Bottom - Rc.Top + S(2), FR, clTextDim, 0, 0);
+      if (I < High(FArtistRects)) or (FShownArtists < Length(FPeople)) then
+        G.Text(' • ', Rc.Right + S(2), Rc.Top, S(30), Rc.Bottom - Rc.Top + S(2), F, clTextDim, 0, 0);
     end;
     Rc := FRects[bhMoreArtists];
     if Rc.Right > Rc.Left then
     begin
-      if FHot = bhMoreArtists then Fg := clAccentText else Fg := clText;
-      G.Text(' (...)', Rc.Left, Rc.Top, Rc.Right - Rc.Left + S(4), Rc.Bottom - Rc.Top + S(2), F, Fg, 0, 0);
+      Fg := IfC(FHot = bhMoreArtists, clAccentText, clTextDim);
+      G.Text(MoreText, Rc.Left, Rc.Top, Rc.Right - Rc.Left + S(4), Rc.Bottom - Rc.Top + S(2), F, Fg, 0, 0);
+      if FHot = bhMoreArtists then G.FillRect(Rc.Left, Rc.Bottom - S(1), Rc.Right - Rc.Left, SF(1.2), Fg);
     end;
   end;
   { meta line, at the bottom of the text column }
@@ -697,7 +726,7 @@ begin
   case H of
     bhCover: if Assigned(FOnCover) then FOnCover(Self);
     bhAlbum: if Assigned(FOnAlbum) then FOnAlbum(Self);
-    bhArtist: if Assigned(FOnArtist) and (A >= 0) and (A < FArtists.Count) then FOnArtist(Self, FArtists[A]);
+    bhArtist: if Assigned(FOnArtist) and (A >= 0) and (A < Length(FPeople)) then FOnArtist(Self, FPeople[A].Name);
     bhMoreArtists: if Assigned(FOnMoreArtists) then FOnMoreArtists(Self, ClientToScreen(Point(Rc.Left, Rc.Bottom + S(4))));
     bhRate: if Assigned(FOnRate) then FOnRate(Self, ClientToScreen(Point(Rc.Left, Rc.Bottom + S(4))));
     bhBadge: if Assigned(FOnBadge) then FOnBadge(Self, ClientToScreen(Point(Rc.Left, Rc.Bottom + S(4))));

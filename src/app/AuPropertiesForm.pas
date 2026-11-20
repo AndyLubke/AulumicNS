@@ -5,8 +5,7 @@ unit AuPropertiesForm;
   Copyright (C) 2026 André Lubke
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
-  The Properties dialog (the tag editor; Main menu > Tools > Edit
-  Properties..., Alt+Enter, the library and playlist menus):
+  The Properties dialog (the tag editor; Main menu > Tools > Properties..., Alt+Enter, the library and playlist menus):
     left        the files (a dot marks a changed one, ! one whose tag could
                 not be read - it is never saved)
     Tags        Title, Artist, Album Artist, Album, Genre, Year, Track, Disc,

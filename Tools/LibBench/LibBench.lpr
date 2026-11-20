@@ -108,6 +108,59 @@ begin
   try Lib.GetAlbumsByArtist(GArtist, SL); ACount := SL.Count; finally SL.Free; end;
 end;
 
+{ what "Expand all" on the Artists and on the Albums category asks the
+  library: every artist's albums and the tracks of each, every album's tracks
+  (the count is the number of tracks listed) }
+procedure OpExpandAllArtists(out ACount: Integer);
+var
+  Artists, Albums: TStringList;
+  TL: TTrackList;
+  I, J: Integer;
+begin
+  ACount := 0;
+  Artists := TStringList.Create;
+  Albums := TStringList.Create;
+  TL := TTrackList.Create;
+  try
+    Lib.GetUniqueArtists(Artists);
+    for I := 0 to Artists.Count - 1 do
+    begin
+      Lib.GetAlbumsByArtist(Artists[I], Albums);
+      for J := 0 to Albums.Count - 1 do
+      begin
+        Lib.GetTracksByArtistAndAlbum(Artists[I], Albums[J], TL);
+        Inc(ACount, TL.Count);
+      end;
+    end;
+  finally
+    TL.Free;
+    Albums.Free;
+    Artists.Free;
+  end;
+end;
+
+procedure OpExpandAllAlbums(out ACount: Integer);
+var
+  Albums: TStringList;
+  TL: TTrackList;
+  I: Integer;
+begin
+  ACount := 0;
+  Albums := TStringList.Create;
+  TL := TTrackList.Create;
+  try
+    Lib.GetUniqueAlbums(Albums);
+    for I := 0 to Albums.Count - 1 do
+    begin
+      Lib.GetTracksByAlbum(Albums[I], TL);
+      Inc(ACount, TL.Count);
+    end;
+  finally
+    TL.Free;
+    Albums.Free;
+  end;
+end;
+
 procedure OpAlbumsByGenre(out ACount: Integer);
 var SL: TStringList;
 begin
@@ -671,6 +724,8 @@ begin
     Run('GetTracksByArtist', @OpTracksByArtist);
     Run('GetTracksByGenre', @OpTracksByGenre);
     Run('GetTracksByAlbum', @OpTracksByAlbum);
+    Run('Expand all: Artists', @OpExpandAllArtists);
+    Run('Expand all: Albums', @OpExpandAllAlbums);
     Run('GetSubFolders (root)', @OpSubFolders);
     Run('GetTracksInFolder (one album)', @OpTracksInFolder);
     Run('GetTracksInFolderRecursive (one album)', @OpFolderRecursive);

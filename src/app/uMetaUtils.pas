@@ -15,8 +15,36 @@ interface
 uses
   Classes, SysUtils, ALMetadata;
 
-// Returns a clean array of items (perfect for your UI layout math)
+// The entries of a tag with several values (artists, genres), trimmed, empty
+// ones left out. A semicolon always separates. A comma followed by a space
+// and the "featuring" words separate only outside brackets, and the comma
+// only in a tag without semicolons: "Yang Bao (piano, synthesizer); Jeeihn
+// Kim (violin)" is two entries, "Bach, Johann Sebastian; Gould, Glenn" too.
 function SplitTags(const RawTags: string): TStringArray;
+
+type
+  // A person of the playing track; Roles is 'piano, synthesizer' or ''
+  TPerson = record
+    Name: string;
+    Roles: string;
+  end;
+  TPersonArray = array of TPerson;
+
+const
+  ROLE_COMPOSER = 'composer';
+
+// 'Jeeihn Kim (violin)' -> 'Jeeihn Kim', 'violin'. The role is the last
+// bracket pair, round or square, at the end of the text; a name without one,
+// or with nothing before the bracket, is returned whole with no role.
+procedure SplitNameRole(const AText: string; out AName, ARole: string);
+
+// Adds the entries of a tag to the list. A name that is in the list already
+// (compared without regard to case) is not added again; its roles are joined.
+// AWithRoles: a bracket at the end of an entry is its role (the performer
+// tag); otherwise the entry is the name as it stands. ARole: a role every
+// entry of this tag gets (ROLE_COMPOSER).
+procedure AddPeople(var AList: TPersonArray; const ARawTag: string;
+  AWithRoles: Boolean; const ARole: string = '');
 
 function StripAccents(const S: string): string;
 
@@ -55,7 +83,7 @@ function ExtractReplayGain(const AllTags, TargetKeys: string): double;
 implementation
 
 uses
-  AuAudioTypes, LCLIntf, Math, StrUtils, uAppStrings, uAppConsts, md5, uOSUtils, AuGfx;
+  AuAudioTypes, LCLIntf, LazUTF8, Math, StrUtils, uAppStrings, uAppConsts, md5, uOSUtils, AuGfx;
 
 const
 
@@ -96,41 +124,156 @@ end;
 // Splits tags with multiple entries to a string array
 function SplitTags(const RawTags: string): TStringArray;
 var
-  RawParts: TStringArray;
-  I, ValidCount: Integer;
-  S, Token: string;
+  I, Start, Depth, Skip, Count: Integer;
+  HasSemicolon: Boolean;
+  C: Char;
+  Token: string;
+
+  // The entry from Start up to (not including) AEnd
+  procedure Flush(AEnd: Integer);
+  var
+    Part: string;
+  begin
+    Part := Trim(Copy(RawTags, Start, AEnd - Start));
+    if Part = '' then Exit;
+    if Count = Length(Result) then SetLength(Result, Count * 2 + 8);
+    Result[Count] := Part;
+    Inc(Count);
+  end;
+
 begin
-  // Initialize managed Result to nil to silence Warning 5093
   Result := nil;
   if Trim(RawTags) = '' then
     Exit;
 
-  // 1. Standardize basic punctuation separators to semicolons
-  S := StringReplace(RawTags, '; ', ';', [rfReplaceAll]);
-  S := StringReplace(S, ', ', ';', [rfReplaceAll]);
-
-  // 2. Loop through our localized tokens and convert them to semicolons
-  for Token in FEAT_TOKENS do
-    S := StringReplace(S, Token, ';', [rfReplaceAll, rfIgnoreCase]);
-
-  // 3. Perform the native split
-  RawParts := S.Split([';']);
-
-  SetLength(Result, Length(RawParts));
-  ValidCount := 0;
-
-  // 4. Clean and pack the array (preserving original tag capitalization)
-  for I := 0 to High(RawParts) do
+  HasSemicolon := Pos(';', RawTags) > 0;
+  Count := 0;
+  Depth := 0;
+  Start := 1;
+  I := 1;
+  while I <= Length(RawTags) do
   begin
-    S := Trim(RawParts[I]);
-    if S <> '' then
+    C := RawTags[I];
+    Skip := 0;                 // > 0: a separator of this many characters is here
+    if C = ';' then
     begin
-      Result[ValidCount] := S;
-      Inc(ValidCount);
+      // also ends a bracket that was never closed, so it cannot swallow the rest
+      Depth := 0;
+      Skip := 1;
+    end
+    else if C in ['(', '['] then Inc(Depth)
+    else if C in [')', ']'] then
+    begin
+      if Depth > 0 then Dec(Depth);
+    end
+    else if Depth = 0 then
+    begin
+      if C = ',' then
+      begin
+        if (not HasSemicolon) and (I < Length(RawTags)) and (RawTags[I + 1] = ' ') then Skip := 2;
+      end
+      else if C = ' ' then
+        for Token in FEAT_TOKENS do
+          if SameText(Copy(RawTags, I, Length(Token)), Token) then
+          begin
+            Skip := Length(Token);
+            Break;
+          end;
+    end;
+    if Skip > 0 then
+    begin
+      Flush(I);
+      Inc(I, Skip);
+      Start := I;
+    end
+    else Inc(I);
+  end;
+  Flush(Length(RawTags) + 1);
+  SetLength(Result, Count);
+end;
+
+procedure SplitNameRole(const AText: string; out AName, ARole: string);
+var
+  S: string;
+  I, Depth: Integer;
+begin
+  S := Trim(AText);
+  AName := S;
+  ARole := '';
+  if (S = '') or not (S[Length(S)] in [')', ']']) then Exit;
+  // back to the bracket that opens the last pair
+  Depth := 0;
+  for I := Length(S) downto 1 do
+    if S[I] in [')', ']'] then Inc(Depth)
+    else if S[I] in ['(', '['] then
+    begin
+      Dec(Depth);
+      if Depth = 0 then
+      begin
+        if Trim(Copy(S, 1, I - 1)) = '' then Exit;
+        AName := Trim(Copy(S, 1, I - 1));
+        ARole := Trim(Copy(S, I + 1, Length(S) - I - 1));
+        Exit;
+      end;
+    end;
+end;
+
+procedure AddPeople(var AList: TPersonArray; const ARawTag: string;
+  AWithRoles: Boolean; const ARole: string);
+var
+  Parts: TStringArray;
+  K, P: Integer;
+  PersonName, Role: string;
+
+  // Adds the comma-separated roles of ARoles that the person does not have yet
+  procedure JoinRoles(var APerson: TPerson; const ARoles: string);
+  var
+    Fresh, Have: TStringArray;
+    A, B: Integer;
+    One: string;
+    Found: Boolean;
+  begin
+    Fresh := ARoles.Split([',']);
+    for A := 0 to High(Fresh) do
+    begin
+      One := Trim(Fresh[A]);
+      if One = '' then Continue;
+      Found := False;
+      Have := APerson.Roles.Split([',']);
+      for B := 0 to High(Have) do
+        if UTF8LowerCase(Trim(Have[B])) = UTF8LowerCase(One) then
+        begin
+          Found := True;
+          Break;
+        end;
+      if Found then Continue;
+      if APerson.Roles = '' then APerson.Roles := One
+      else APerson.Roles := APerson.Roles + ', ' + One;
     end;
   end;
 
-  SetLength(Result, ValidCount);
+begin
+  Parts := SplitTags(ARawTag);
+  for K := 0 to High(Parts) do
+  begin
+    if AWithRoles then SplitNameRole(Parts[K], PersonName, Role)
+    else
+    begin
+      PersonName := Parts[K];
+      Role := '';
+    end;
+    if PersonName = '' then Continue;
+    P := 0;
+    while (P < Length(AList)) and (UTF8LowerCase(AList[P].Name) <> UTF8LowerCase(PersonName)) do Inc(P);
+    if P = Length(AList) then
+    begin
+      SetLength(AList, P + 1);
+      AList[P].Name := PersonName;
+      AList[P].Roles := '';
+    end;
+    JoinRoles(AList[P], Role);
+    JoinRoles(AList[P], ARole);
+  end;
 end;
 
 // Strips accents (used when searching by the user)

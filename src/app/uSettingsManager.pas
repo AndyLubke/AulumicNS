@@ -15,6 +15,19 @@ interface
 uses
   Classes, SysUtils, IniFiles, Forms, uPlaybackManager;
 
+type
+  TWorkAreas = array of TRect;
+
+{ Puts a window wholly on one monitor. AAreas are the work areas of the
+  monitors (the screen without the taskbar). The window goes to the one it
+  covers most, or - when it is on none of them, a monitor that is gone - to
+  the nearest; it is made as small as that area when it is larger, and moved
+  so that all of it is inside. A window that is inside an area already is
+  not touched. Without areas nothing happens. }
+procedure FitWindowToWorkAreas(const AAreas: array of TRect; var ALeft, ATop, AWidth, AHeight: Integer);
+{ the work areas of the monitors as they are now }
+function MonitorWorkAreas: TWorkAreas;
+
 function SettingsAdjust(aNum, aMin, aMax : integer) : integer;
 { The size (96-DPI units) a tool window opens with: the
   remembered one (0 = ADefW / ADefH), at most 92 % of the work area at the
@@ -75,6 +88,10 @@ type
     DefaultTrackFormat  : string;
     // The selection moves to the track that starts playing
     CursorFollowsPlayback: Boolean;
+    // An album header stays at the top of the playlist while its tracks scroll
+    StickyHeaders       : Boolean;
+    // Lower rows in the playlist and the library tree
+    CompactRows         : Boolean;
     ShowPeakmeter       : boolean;
     LastFMApiKey        : string;
 
@@ -164,6 +181,8 @@ const
   KEY_HEADER_FORMAT     = 'DefaultHeaderFormat';
   KEY_TRACK_FORMAT      = 'DefaultTrackFormat';
   KEY_CURSOR_FOLLOWS    = 'CursorFollowsPlayback';
+  KEY_STICKY_HEADERS    = 'StickyHeaders';
+  KEY_COMPACT_ROWS      = 'CompactRows';
 
   KEY_DEVICE_ID         = 'OutputDeviceID';
   KEY_DOP               = 'UseDoP';
@@ -249,6 +268,73 @@ const
   VAL_DEF_WIN_STATE       = Ord(wsMaximized);
   VAL_DEF_GROUPING_MODE   = 0; // gmAlbum
   VAL_DEF_DBL_CLICK       = 0; // Play Immediately
+
+procedure FitWindowToWorkAreas(const AAreas: array of TRect; var ALeft, ATop, AWidth, AHeight: Integer);
+var
+  I, Best: Integer;
+  BestCover, Cover, BestDist, Dist: Int64;
+  IW, IH, CX, CY, DX, DY: Int64;
+  A: TRect;
+begin
+  if Length(AAreas) = 0 then Exit;
+  if AWidth < 1 then AWidth := 1;
+  if AHeight < 1 then AHeight := 1;
+  { the area the window covers most ... }
+  Best := -1;
+  BestCover := 0;
+  for I := 0 to High(AAreas) do
+  begin
+    IW := Int64(Min(ALeft + AWidth, AAreas[I].Right)) - Max(ALeft, AAreas[I].Left);
+    IH := Int64(Min(ATop + AHeight, AAreas[I].Bottom)) - Max(ATop, AAreas[I].Top);
+    if (IW <= 0) or (IH <= 0) then Continue;
+    Cover := IW * IH;
+    if Cover > BestCover then
+    begin
+      BestCover := Cover;
+      Best := I;
+    end;
+  end;
+  { ... or the one nearest to its middle }
+  if Best < 0 then
+  begin
+    CX := Int64(ALeft) + AWidth div 2;
+    CY := Int64(ATop) + AHeight div 2;
+    BestDist := High(Int64);
+    for I := 0 to High(AAreas) do
+    begin
+      DX := 0;
+      if CX < AAreas[I].Left then DX := AAreas[I].Left - CX
+      else if CX > AAreas[I].Right then DX := CX - AAreas[I].Right;
+      DY := 0;
+      if CY < AAreas[I].Top then DY := AAreas[I].Top - CY
+      else if CY > AAreas[I].Bottom then DY := CY - AAreas[I].Bottom;
+      Dist := DX * DX + DY * DY;
+      if Dist < BestDist then
+      begin
+        BestDist := Dist;
+        Best := I;
+      end;
+    end;
+  end;
+  if Best < 0 then Exit;
+  A := AAreas[Best];
+  if (A.Right <= A.Left) or (A.Bottom <= A.Top) then Exit;
+  if AWidth > A.Right - A.Left then AWidth := A.Right - A.Left;
+  if AHeight > A.Bottom - A.Top then AHeight := A.Bottom - A.Top;
+  if ALeft < A.Left then ALeft := A.Left;
+  if ALeft + AWidth > A.Right then ALeft := A.Right - AWidth;
+  if ATop < A.Top then ATop := A.Top;
+  if ATop + AHeight > A.Bottom then ATop := A.Bottom - AHeight;
+end;
+
+function MonitorWorkAreas: TWorkAreas;
+var
+  I: Integer;
+begin
+  Result := nil;
+  SetLength(Result, Screen.MonitorCount);
+  for I := 0 to Screen.MonitorCount - 1 do Result[I] := Screen.Monitors[I].WorkareaRect;
+end;
 
 function SettingsAdjust(aNum, aMin, aMax : integer) : integer;
 begin
@@ -647,6 +733,8 @@ begin
   Data.DefaultHeaderFormat := FIniFile.ReadString(SEC_UI, KEY_HEADER_FORMAT, HEADER_FORMAT_OPTIONS[0].DataStr);
   Data.DefaultTrackFormat  := FIniFile.ReadString(SEC_UI, KEY_TRACK_FORMAT,  TRACK_FORMAT_OPTIONS[0].DataStr);
   Data.CursorFollowsPlayback := FIniFile.ReadBool(SEC_UI, KEY_CURSOR_FOLLOWS, True);
+  Data.StickyHeaders := FIniFile.ReadBool(SEC_UI, KEY_STICKY_HEADERS, True);
+  Data.CompactRows   := FIniFile.ReadBool(SEC_UI, KEY_COMPACT_ROWS, False);
 
   Data.ShowPeakMeter := FIniFile.ReadBool(SEC_UI, KEY_SHOWPEAKMETER, True);
   // No key is built in (the source is public): the user's own
@@ -727,6 +815,24 @@ procedure TAppSettings.SanitizeValues;
     end;
   end;
 
+const
+  MIN_TOOL_SIZE = 200;          // a tool window is never remembered smaller ...
+  MAX_STORED_PIXELS = 20000;    // ... and no stored size is larger than this
+  PREFS_PAGE_LAST = 8;          // the last page of Preferences (the dialog checks the number again)
+
+var
+  ToneW, ToneH: Integer;
+
+  procedure SaneToolSize(var W, H: Integer);
+  begin
+    if (W = 0) and (H = 0) then Exit;
+    if (W < MIN_TOOL_SIZE) or (H < MIN_TOOL_SIZE) or (W > MAX_STORED_PIXELS) or (H > MAX_STORED_PIXELS) then
+    begin
+      W := 0;
+      H := 0;
+    end;
+  end;
+
 begin
   if (Ord(Data.WinState) < Ord(Low(TWindowState))) or
      (Ord(Data.WinState) > Ord(High(TWindowState))) then
@@ -734,28 +840,48 @@ begin
   else if Data.WinState = wsMinimized then
     Data.WinState := wsNormal;
 
-  if Data.WinWidth > Screen.DesktopWidth then
-    Data.WinWidth := Screen.DesktopWidth;
-
-  if Data.WinHeight > Screen.DesktopHeight then
-    Data.WinHeight := Screen.DesktopHeight;
-
-  // Support multi-monitor negative DesktopLeft / DesktopTop coordinates
-  if Data.WinLeft <> VAL_UNINITIALIZED_POS then
+  // The main window: wholly on a monitor that is there now, above the
+  // taskbar. (The rectangle around all monitors would not do: with monitors
+  // of different sizes it has corners that no monitor shows.)
+  if Data.WinWidth < MIN_FORM_WIDTH then Data.WinWidth := MIN_FORM_WIDTH;
+  if Data.WinHeight < MIN_FORM_HEIGHT then Data.WinHeight := MIN_FORM_HEIGHT;
+  if (Data.WinLeft <> VAL_UNINITIALIZED_POS) and (Data.WinTop <> VAL_UNINITIALIZED_POS) then
+    FitWindowToWorkAreas(MonitorWorkAreas, Data.WinLeft, Data.WinTop, Data.WinWidth, Data.WinHeight)
+  else
   begin
-    Data.WinLeft := SettingsAdjust(Data.WinLeft, Screen.DesktopLeft,
-                                   Screen.DesktopLeft + Screen.DesktopWidth - Data.WinWidth);
-    Data.WinTop  := SettingsAdjust(Data.WinTop,  Screen.DesktopTop,
-                                   Screen.DesktopTop + Screen.DesktopHeight - Data.WinHeight);
+    Data.WinLeft := VAL_UNINITIALIZED_POS;
+    Data.WinTop := VAL_UNINITIALIZED_POS;
   end;
 
-  if Data.ToneWinLeft <> VAL_UNINITIALIZED_POS then
+  // The Tone Control window: onto a monitor with its nominal size; the main
+  // window fits it again with its real size when it is shown
+  if (Data.ToneWinLeft = VAL_UNINITIALIZED_POS) or (Data.ToneWinTop = VAL_UNINITIALIZED_POS) then
   begin
-    Data.ToneWinLeft := SettingsAdjust(Data.ToneWinLeft, Screen.DesktopLeft,
-                                       Screen.DesktopLeft + Screen.DesktopWidth - FORM_TONE_POPUP_WIDTH);
-    Data.ToneWinTop  := SettingsAdjust(Data.ToneWinTop,  Screen.DesktopTop,
-                                       Screen.DesktopTop + Screen.DesktopHeight - FORM_TONE_POPUP_HEIGHT);
+    Data.ToneWinLeft := VAL_UNINITIALIZED_POS;
+    Data.ToneWinTop := VAL_UNINITIALIZED_POS;
+  end
+  else
+  begin
+    ToneW := FORM_TONE_POPUP_WIDTH;
+    ToneH := FORM_TONE_POPUP_HEIGHT;
+    FitWindowToWorkAreas(MonitorWorkAreas, Data.ToneWinLeft, Data.ToneWinTop, ToneW, ToneH);
   end;
+
+  // The remembered sizes of the tool windows (96-DPI units; 0 = none): a
+  // size that cannot be right is forgotten, the window opens at its default
+  SaneToolSize(Data.CoverWinW, Data.CoverWinH);
+  SaneToolSize(Data.ArtistWinW, Data.ArtistWinH);
+  SaneToolSize(Data.PropsWinW, Data.PropsWinH);
+
+  // The panes (unscaled; the main window fits them to its own size)
+  Data.TopPanelHeight := SettingsAdjust(Data.TopPanelHeight, 0, MAX_STORED_PIXELS);
+  Data.LeftPanelWidth := SettingsAdjust(Data.LeftPanelWidth, 0, MAX_STORED_PIXELS);
+  Data.LibraryFontSize  := SettingsAdjust(Data.LibraryFontSize,  FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
+  Data.PlayListFontSize := SettingsAdjust(Data.PlayListFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
+  Data.ThemeMode  := SettingsAdjust(Data.ThemeMode, 0, 2);
+  Data.Accent     := SettingsAdjust(Data.Accent, 0, 5);
+  Data.UIFontSize := SettingsAdjust(Data.UIFontSize, 80, 130);
+  Data.PrefsPage := SettingsAdjust(Data.PrefsPage, 0, PREFS_PAGE_LAST);
 
   if Trim(Data.ActivePlaylist) = '' then
     Data.ActivePlaylist := LBL_DEFAULT_PLAYLIST;
@@ -852,6 +978,9 @@ begin
     Data.WinHeight := AForm.RestoredHeight;
   end;
 
+  { nothing out of range is ever written (the same checks as after loading) }
+  SanitizeValues;
+
   FIniFile.WriteInteger(SEC_WINDOW, KEY_WIN_LEFT,   Data.WinLeft);
   FIniFile.WriteInteger(SEC_WINDOW, KEY_WIN_TOP,    Data.WinTop);
   FIniFile.WriteInteger(SEC_WINDOW, KEY_WIN_WIDTH,  Data.WinWidth);
@@ -934,6 +1063,8 @@ begin
   FIniFile.WriteString(SEC_UI, KEY_HEADER_FORMAT,      Data.DefaultHeaderFormat);
   FIniFile.WriteString(SEC_UI, KEY_TRACK_FORMAT,       Data.DefaultTrackFormat);
   FIniFile.WriteBool(SEC_UI, KEY_CURSOR_FOLLOWS,       Data.CursorFollowsPlayback);
+  FIniFile.WriteBool(SEC_UI, KEY_STICKY_HEADERS,       Data.StickyHeaders);
+  FIniFile.WriteBool(SEC_UI, KEY_COMPACT_ROWS,         Data.CompactRows);
 
   FIniFile.WriteBool(SEC_UI, KEY_SHOWPEAKMETER,        Data.ShowPeakMeter);
   // The key the user entered (empty = none, see Load)

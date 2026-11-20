@@ -227,7 +227,7 @@ type
     FFolders: TStringList;
     FFolderList: TAuListView;
     FBtnAdd, FBtnRemove, FBtnScan, FBtnRepair: TAuButton;
-    FWatch, FRescan, FAccordion, FCursorFollows: TAuSwitch;
+    FWatch, FRescan, FAccordion, FCursorFollows, FStickyHeaders, FCompactRows: TAuSwitch;
     FDblClick: TAuCombo;
     FScanning: Boolean;
     { output }
@@ -462,6 +462,7 @@ begin
   Result := False;
   if GPrefs <> nil then Exit;
   if APage < 0 then APage := AppSettings.Data.PrefsPage;
+  APage := EnsureRange(APage, 0, PREFS_SHORTCUTS);
   F := TPrefsForm.CreatePrefs(AOwner, AFolders, APage);
   GPrefs := F;
   try
@@ -1290,6 +1291,8 @@ begin
   FCursorFollows := SwitchRow('Cursor follows playback',
     'When a track starts, the selection moves to it and it scrolls into view. Only in the playlist ' +
     'that is playing; other playlists stay where you left them.');
+  FStickyHeaders := SwitchRow('Keep album headers in view',
+    'While you scroll through an album, its header stays at the top of the playlist.');
   EndPage;
 end;
 
@@ -1425,6 +1428,8 @@ begin
   FTextSize.SetItems(['Small', 'Normal', 'Large', 'Larger']);
   SideRow('Text size', 'The size of the text in all windows (the panes have their own sizes below).',
     FTextSize, CTRL_W + 30, 36);
+  FCompactRows := SwitchRow('Compact rows',
+    'Lower rows in the playlist and the library tree, so more of them fit on the screen.');
   BeginCard(CARD_MAINWINDOW, 'Main window', icHome, @SumMainWindow);
   Section('Library tree');
   FDblClick := ComboRow('Double click',
@@ -1523,6 +1528,8 @@ begin
   SelectOption(FDblClick, DBLCLICK_OPTIONS, IntToStr(D.DoubleClickAction));
   FAccordion.Checked := D.AccordionEnabled;
   FCursorFollows.Checked := D.CursorFollowsPlayback;
+  FStickyHeaders.Checked := D.StickyHeaders;
+  FCompactRows.Checked := D.CompactRows;
   { output }
   FWasapiId := D.WasapiDeviceID;
   FAsioId := D.AsioDriverID;
@@ -1590,6 +1597,8 @@ begin
   D.DoubleClickAction := OptionInt(FDblClick, DBLCLICK_OPTIONS, 0);
   D.AccordionEnabled := FAccordion.Checked;
   D.CursorFollowsPlayback := FCursorFollows.Checked;
+  D.StickyHeaders := FStickyHeaders.Checked;
+  D.CompactRows := FCompactRows.Checked;
   { output }
   D.OutputApi := SelectedApi;
   D.WasapiDeviceID := FWasapiId;

@@ -182,6 +182,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestSettings"/>
       </Unit>
+      <Unit>
+        <Filename Value="TestMetaNames.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestMetaNames"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
