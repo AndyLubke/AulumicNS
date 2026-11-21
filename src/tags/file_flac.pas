@@ -45,10 +45,11 @@ type
     FChannels: byte;
     FBitsPerSample: byte;
     fMediaProperty: TMediaProperty;
-    // ---> AUDIT FIX: True when a picture block could not be read or the file
+    // True when a picture block could not be read or the file
     // has more than one comment block. SaveToFile then refuses to save, because
     // the old picture / comment blocks are replaced by what was read.
     FReadIncomplete: boolean;
+    FLeadingData: boolean;
   protected
     function GetDuration: int64; override;
     function GetTags: TTags; override;
@@ -57,12 +58,15 @@ type
     function LoadFromFile(const AFileName: Tfilename): boolean; override;
     function SaveToFile(const AFileName: Tfilename): boolean; override;
     function isUpdateable: boolean; override;
+    // True when the file has something in front of its FLAC data (an ID3v2
+    // tag, as some programs write it). SaveToFile writes the FLAC data only.
+    property HasLeadingData: boolean read FLeadingData;
   end;
 
 implementation
 
 uses
-  CommonFunctions, AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  CommonFunctions, AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 const
   FLAC_IDENTIFIER           = 'fLaC';
@@ -189,6 +193,7 @@ begin
   FChannels       := 0;
   FBitsPerSample  := 0;
   FReadIncomplete := False;
+  FLeadingData    := False;
   VorbisBlocks    := 0;
   fMediaProperty  := Default(TMediaProperty);
 
@@ -203,6 +208,7 @@ begin
 
       if not SkipID3AndFindFlacMarker(fStream) then
         Exit(False);
+      FLeadingData := fStream.Position > 0;
 
       if fStream.Read(Header, SizeOf(Header)) < SizeOf(Header) then
         Exit(False);
@@ -257,7 +263,7 @@ begin
         case BlockType of
           BLOCK_TYPE_VORBIS_COMMENT:
           begin
-            // ---> AUDIT FIX: A second comment block would replace the first in
+            // A second comment block would replace the first in
             // memory (ReadFromStream clears), so its comments would be lost
             Inc(VorbisBlocks);
             if VorbisBlocks > 1 then
@@ -276,7 +282,7 @@ begin
           end;
           BLOCK_TYPE_PICTURE:
           begin
-            // ---> AulumicNS: text only: the picture stays in the file (and
+            // text only: the picture stays in the file (and
             // this reader must never save: it would drop the pictures)
             if FTextOnly then
               FReadIncomplete := True
@@ -286,7 +292,7 @@ begin
               try
                 BlockMem.CopyFrom(fStream, BlockLength);
                 BlockMem.Position := 0;
-                // ---> AUDIT FIX: A picture that cannot be read would be dropped
+                // A picture that cannot be read would be dropped
                 // on save (all old picture blocks are replaced)
                 if not fTags.ReadImageFromStream(BlockMem) then
                   FReadIncomplete := True;
@@ -348,7 +354,7 @@ begin
   DestStream   := nil;
   SetLength(Blocks, 0);
 
-  // ---> AUDIT FIX: Never rewrite a file whose comments or pictures were only
+  // Never rewrite a file whose comments or pictures were only
   // partly read: everything that was not read would be lost
   if FReadIncomplete or (Assigned(fTags) and fTags.ReadIncomplete) then
     Exit(False);
@@ -426,7 +432,7 @@ begin
         if (not Assigned(Img)) or (not Assigned(Img.Image)) or (Img.Image.Size <= 0) then
           Continue;
 
-        // ---> FIXED: Silently skip any picture block that would overflow the
+        // Silently skip any picture block that would overflow the
         // 24-bit FLAC block header ($FFFFFF) so ReplayGain / text tag saves
         // still succeed without failing!
         if Img.Image.Size > (MAX_FLAC_BLOCK_SIZE - 1024) then
@@ -466,7 +472,7 @@ begin
         Img.Image.Position := 0;
         Blocks[NewIdx].Data.CopyFrom(Img.Image, Img.Image.Size);
 
-        // ---> FIXED: Restored silent cleanup if the assembled block exceeds 16 MB
+        // A block of more than 16 MB cannot be written: the picture is left out
         if Blocks[NewIdx].Data.Size > MAX_FLAC_BLOCK_SIZE then
         begin
           Blocks[NewIdx].Data.Free;

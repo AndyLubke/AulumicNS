@@ -98,12 +98,134 @@ type
     property PlaybackManager: TPlayBackManager read FPlaybackManager write FPlaybackManager;
   end;
 
+{ Writes ARaw, a tag as it stood in AFile before a repair, into AFolder as
+  "<file name>.<date-time>.id3" and adds a line (time, copy, the file's path)
+  to index.txt there. ABackupFile: the copy's full path. False when it could
+  not be written. }
+function SaveTagBackup(const AFile: string; const ARaw: TBytes; const AFolder: string;
+  out ABackupFile: string): Boolean;
+{ The newest copy that SaveTagBackup made for AFile and that is still in
+  AFolder: its full path ('' = none) and, in AWhen, the time it was made as
+  index.txt has it. }
+function FindTagBackup(const AFile, AFolder: string; out AWhen: string): string;
+
 implementation
 
 uses
-  AuAudioTypes, Math, baseTag, AudioTag, tag_id3V2, tag_vorbis, uAppConsts, uEngineStateManager,
+  AuAudioTypes, Math, baseTag, AudioTag, tag_id3V2, tag_vorbis, file_flac, uAppConsts, uEngineStateManager,
   uMetaUtils, uOSUtils, AuLog, uAudioUtils, ALMetadata, uAppStrings,
   Forms, Controls, Dialogs, AuDialogs;
+
+function FindTagBackup(const AFile, AFolder: string; out AWhen: string): string;
+var
+  Dir, Line, CopyName: string;
+  SL: TStringList;
+  FS: TFileStream;
+  I, P1, P2: Integer;
+begin
+  Result := '';
+  AWhen  := '';
+  if (AFile = '') or (AFolder = '') then Exit;
+  Dir := IncludeTrailingPathDelimiter(AFolder);
+  if not FileExists(LongPath(Dir + 'index.txt')) then Exit;
+  SL := TStringList.Create;
+  try
+    try
+      FS := TFileStream.Create(LongPath(Dir + 'index.txt'), fmOpenRead or fmShareDenyNone);
+      try
+        SL.LoadFromStream(FS);
+      finally
+        FS.Free;
+      end;
+    except
+      Exit;
+    end;
+    // a line: time, tab, name of the copy, tab, path of the file; the newest last
+    for I := SL.Count - 1 downto 0 do
+    begin
+      Line := SL[I];
+      P1 := Pos(#9, Line);
+      if P1 = 0 then Continue;
+      P2 := Pos(#9, Copy(Line, P1 + 1, MaxInt));
+      if P2 = 0 then Continue;
+      if not SameText(Copy(Line, P1 + P2 + 1, MaxInt), AFile) then Continue;
+      CopyName := ExtractFileName(Copy(Line, P1 + 1, P2 - 1));
+      if (CopyName = '') or not FileExists(LongPath(Dir + CopyName)) then Continue;
+      AWhen  := Copy(Line, 1, P1 - 1);
+      Result := Dir + CopyName;
+      Exit;
+    end;
+  finally
+    SL.Free;
+  end;
+end;
+
+{ The bytes of a copy of a tag; nil when it cannot be read or is no size a tag has }
+function LoadTagBackup(const ABackupFile: string): TBytes;
+var
+  FS: TFileStream;
+begin
+  Result := nil;
+  try
+    FS := TFileStream.Create(LongPath(ABackupFile), fmOpenRead or fmShareDenyNone);
+    try
+      if (FS.Size < 10) or (FS.Size > 300 * 1024 * 1024) then Exit;
+      SetLength(Result, FS.Size);
+      FS.ReadBuffer(Result[0], FS.Size);
+    finally
+      FS.Free;
+    end;
+  except
+    Result := nil;
+  end;
+end;
+
+function SaveTagBackup(const AFile: string; const ARaw: TBytes; const AFolder: string;
+  out ABackupFile: string): Boolean;
+var
+  Dir, Name, Stamp, Line: string;
+  FS: TFileStream;
+  N: Integer;
+begin
+  Result := False;
+  ABackupFile := '';
+  if (Length(ARaw) = 0) or (AFolder = '') then Exit;
+  try
+    Dir := IncludeTrailingPathDelimiter(AFolder);
+    if not ForceDirectories(Dir) then Exit;
+    Name := ExtractFileName(AFile);
+    if Length(Name) > 120 then Name := Copy(Name, 1, 120);
+    Stamp := FormatDateTime('yyyymmdd-hhnnss', Now);
+    ABackupFile := Dir + Name + '.' + Stamp + '.id3';
+    N := 1;
+    while FileExists(LongPath(ABackupFile)) do
+    begin
+      Inc(N);
+      ABackupFile := Dir + Name + '.' + Stamp + '-' + IntToStr(N) + '.id3';
+    end;
+    FS := TFileStream.Create(LongPath(ABackupFile), fmCreate);
+    try
+      FS.WriteBuffer(ARaw[0], Length(ARaw));
+    finally
+      FS.Free;
+    end;
+    // the list of the copies: which file each one belongs to
+    Line := FormatDateTime('yyyy-mm-dd hh:nn:ss', Now) + #9 + ExtractFileName(ABackupFile) + #9 + AFile + LineEnding;
+    if FileExists(LongPath(Dir + 'index.txt')) then
+      FS := TFileStream.Create(LongPath(Dir + 'index.txt'), fmOpenReadWrite or fmShareDenyWrite)
+    else
+      FS := TFileStream.Create(LongPath(Dir + 'index.txt'), fmCreate);
+    try
+      FS.Seek(0, soEnd);
+      FS.WriteBuffer(Line[1], Length(Line));
+    finally
+      FS.Free;
+    end;
+    Result := True;
+  except
+    Result := False;
+  end;
+end;
 
 const
   MAX_CUSTODIAN_COVER_BYTES = 15 * BYTES_PER_MB; // 15 MB safety ceiling
@@ -1150,7 +1272,13 @@ var
   TempMeta       : TAudioMetadata;
   FailReason     : string;
   LockUsers      : string;
-  PartialTag     : Boolean;
+  LeadingData    : Boolean;
+  Repaired       : Boolean;
+  RepairKept     : Integer;
+  RepairRescued  : Integer;
+  RepairBytes    : Int64;
+  BackupFile     : string;
+  Restored       : Boolean;
   StampTime      : Int64;
   StampSize      : Int64;
 
@@ -1194,7 +1322,13 @@ begin
   FJobFailed           := False;
   FJobFailReason       := '';
   FailReason           := '';
-  PartialTag           := False;
+  LeadingData          := False;
+  Repaired             := False;
+  RepairKept           := 0;
+  RepairRescued        := 0;
+  RepairBytes          := 0;
+  BackupFile           := '';
+  Restored             := False;
 
   // Acquire FileLockRegistry BEFORE pausing audio so no
   // background scanner can open the file during the transition!
@@ -1243,7 +1377,9 @@ begin
       TagsPrepared := False;
       TagObj       := nil;
       try
-        TagObj := GetFileTagsObject(Job^.FilePath);
+        // a tag that shall be repaired is read past its damage
+        TagObj := GetFileTagsObject(Job^.FilePath, False,
+          (Job^.ActionType = matTagEditor) and Job^.TagEditor.RepairTag);
         if not Assigned(TagObj) then
         begin
           ReportSkip(LOG_SKIP_FILE_UNREADABLE);
@@ -1269,15 +1405,42 @@ begin
             end;
           matTagEditor:
             begin
-              WriteTagEditorTags(TagObj, Job^.TagEditor);
-              TagsPrepared := True;
+              if Job^.TagEditor.RestoreTagFrom <> '' then
+              begin
+                // the undo of a repair: the old tag as it was, no field
+                TagsPrepared := (TagObj.Tags is TID3Tags) and
+                  TID3Tags(TagObj.Tags).SetRawForWrite(LoadTagBackup(Job^.TagEditor.RestoreTagFrom));
+                Restored := TagsPrepared;
+                if not TagsPrepared then
+                  FailReason := LOG_SKIP_NO_TAG_COPY;
+              end
+              else
+              begin
+                WriteTagEditorTags(TagObj, Job^.TagEditor);
+                TagsPrepared := True;
+              end;
             end;
         end;
 
-        // Remember whether the tag was only partly readable, so the
-        // discarded part can be reported after a successful save
-        if TagObj.Tags is TID3Tags then
-          PartialTag := TID3Tags(TagObj.Tags).HasUnreadableData;
+        // A save writes the FLAC data without what stood in front of it
+        if TagObj is TFlacReader then
+          LeadingData := TFlacReader(TagObj).HasLeadingData;
+
+        // A repair: the tag as it stands in the file is copied first. Without
+        // the copy the file is left as it is.
+        if TagsPrepared and (TagObj.Tags is TID3Tags) and TID3Tags(TagObj.Tags).Recovered then
+        begin
+          RepairKept    := TagObj.Tags.Count;
+          RepairRescued := TID3Tags(TagObj.Tags).RecoverRescued;
+          RepairBytes   := TID3Tags(TagObj.Tags).RecoverDiscarded;
+          Repaired      := SaveTagBackup(Job^.FilePath, TID3Tags(TagObj.Tags).RecoverRaw,
+            AppTagBackupDir, BackupFile);
+          if not Repaired then
+          begin
+            TagsPrepared := False;
+            FailReason   := LOG_SKIP_NO_TAG_BACKUP;
+          end;
+        end;
 
         if TagsPrepared then
         begin
@@ -1285,7 +1448,7 @@ begin
           if not WriteOK then
             FailReason := TagObj.LastUpdateError;
         end
-        else
+        else if FailReason = '' then
           FailReason := LOG_SKIP_TAGS_NOT_PREPARED;
 
       finally
@@ -1325,8 +1488,31 @@ begin
         Exit;
       end;
 
-      if PartialTag then
-        LogSafe(SafeFormat(FMT_LOG_META_PARTIAL_TAG, [ExtractFileName(Job^.FilePath)]));
+      if LeadingData then
+        LogSafe(SafeFormat(FMT_LOG_META_LEADING_REMOVED, [ExtractFileName(Job^.FilePath)]));
+      if Repaired then
+        LogSafe(SafeFormat(FMT_LOG_META_REPAIRED, [ExtractFileName(Job^.FilePath), RepairKept,
+          RepairRescued, RepairBytes, ExtractFileName(BackupFile)]));
+      if Restored then
+      begin
+        LogSafe(SafeFormat(FMT_LOG_META_RESTORED, [ExtractFileName(Job^.FilePath),
+          ExtractFileName(Job^.TagEditor.RestoreTagFrom)]));
+        // the library record gets what the file says now
+        TempMeta := ReadTrackMetadata(Job^.FilePath, False, False, True);
+        Job^.TagEditor.Current.Title       := TempMeta.Title;
+        Job^.TagEditor.Current.Artist      := TempMeta.Artist;
+        Job^.TagEditor.Current.AlbumArtist := TempMeta.AlbumArtist;
+        Job^.TagEditor.Current.Album       := TempMeta.Album;
+        Job^.TagEditor.Current.Genre       := TempMeta.Genre;
+        Job^.TagEditor.Current.Composer    := TempMeta.Composer;
+        Job^.TagEditor.Current.Performer   := TempMeta.Performer;
+        Job^.TagEditor.Current.DateStr     := TempMeta.DateStr;
+        Job^.TagEditor.Current.Track       := TempMeta.TrackNumber;
+        Job^.TagEditor.Current.Disc        := TempMeta.DiscNumber;
+        Job^.TagEditor.Current.Comment     := TempMeta.Comment;
+        Job^.TagEditor.HasCover            := TempMeta.HasCover;
+        TempMeta := Default(TAudioMetadata);
+      end;
 
       // New date and size of the saved file for the library record
       if not GetScanStamp(Job^.FilePath, StampTime, StampSize) then

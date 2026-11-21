@@ -514,6 +514,8 @@ The tabs {2} switch between the tags and the Inspector.
 - **Several tracks:** Fields that differ between the selected tracks show *Multiple values*; Title and Track stay unique per track. A value typed in a shared field is applied to all selected tracks. Only the changed fields are written.
 - {4} **Cover:** **Load...** chooses an image file, **Search the web** looks for the cover online, **Remove** takes the cover out of the selected files. An image file can also be dropped on the window or pasted with Ctrl+V.
 - {5} **Save:** Writes the changes. They're written in the background, so listening can go on. **Cancel** (or Esc) drops them. DFF files can be tagged too.
+- **Damaged tag:** A WAV, DSF or DFF file whose tag is damaged isn't saved, because whatever lies behind the damage would be lost. The line at the bottom says so and a **Repair tag...** button appears next to Cancel. It shows how many fields can be read, how many of them were found behind the damage and how many unreadable bytes go, and asks before anything happens. After Yes the fields show the recovered values and can be edited; **Save** writes the repaired tag. The audio isn't touched, and a copy of the old tag is kept in the folder `TagBackups` of the data folder.
+- **Undo repair:** For a single file whose tag was repaired, an **Undo repair...** button stands in the same place. After the question, **Save** puts the old tag back exactly as it was, with its damage; tag changes made since the repair are lost. The copy stays in `TagBackups`, so the tag can be repaired again later.
 
 ## 2. Inspector tab
 

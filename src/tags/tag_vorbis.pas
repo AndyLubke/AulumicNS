@@ -38,6 +38,12 @@ type
   TVorbisFrame = class(TFrameElement)
   private
     fValue: string;
+    // The comment as it stands in the file, and the name it was read under.
+    // While neither name nor value is changed, WriteToStream writes these
+    // bytes again: text in another encoding than UTF-8 and the capitals of
+    // the name stay as they are.
+    fRaw: RawByteString;
+    fRawID: string;
   protected
     function GetAsString: string; override;
     procedure SetAsString(const AValue: string); override;
@@ -50,7 +56,7 @@ type
 
   TVorbisTags = class(TTags)
   private
-    // ---> AUDIT FIX: True when ReadFromStream could not read every comment
+    // True when ReadFromStream could not read every comment
     // (damaged length, oversized or malformed comment, too many comments,
     // damaged vendor field). Savers refuse to rewrite the file in that case,
     // because the comments that were not read would be lost.
@@ -82,6 +88,8 @@ end;
 
 procedure TVorbisFrame.SetAsString(const AValue: string);
 begin
+  if AValue <> fValue then
+    fRaw := '';
   fValue := AValue;
 end;
 
@@ -106,7 +114,7 @@ begin
 
   fSize := LEtoN(AStream.ReadDWord);
 
-  // ---> AUDIT FIX 2.3: If fSize is invalid, advance AStream.Position to AStream.Size
+  // If fSize is invalid, advance AStream.Position to AStream.Size
   // so TVorbisTags.ReadFromStream breaks immediately instead of reading comment
   // text as the next 4-byte length field!
   if (fSize = 0) or (Int64(fSize) > (AStream.Size - AStream.Position)) or (fSize > MAX_VORBIS_FRAME_SIZE) then
@@ -128,6 +136,8 @@ begin
   begin
     ID     := UpperCase(Copy(TmpSt, 1, iSep - 1));
     fValue := Copy(TmpSt, iSep + 1, MaxInt);
+    fRaw   := Data;
+    fRawID := ID;
     Result := True;
   end;
 end;
@@ -135,10 +145,18 @@ end;
 function TVorbisFrame.WriteToStream(AStream: TStream): DWord;
 var
   fSize: Cardinal;
-  // ---> AUDIT FIX: Explicit UTF8String guarantees byte-accurate length and WriteBuffer
+  // Explicit UTF8String guarantees byte-accurate length and WriteBuffer
   Data: UTF8String;
 begin
   Result := 0;
+  // not changed since it was read: the bytes of the file
+  if (fRaw <> '') and (ID = fRawID) then
+  begin
+    fSize := Length(fRaw);
+    AStream.WriteDWord(NtoLE(fSize));
+    AStream.WriteBuffer(fRaw[1], fSize);
+    Exit(fSize);
+  end;
   Data   := UTF8Encode(ID + '=' + fValue);
   fSize  := Length(Data);
   AStream.WriteDWord(NtoLE(fSize));
@@ -269,7 +287,7 @@ function TVorbisTags.WriteToStream(AStream: TStream): DWord;
 var
   fSize: Cardinal;
   i: LongInt;
-  // ---> AUDIT FIX: Explicit UTF8String guarantees byte-accurate length and WriteBuffer
+  // Explicit UTF8String guarantees byte-accurate length and WriteBuffer
   VendorUTF8: UTF8String;
 begin
   VendorUTF8 := UTF8Encode(Vendor);
@@ -345,7 +363,7 @@ begin
     end;
 
     Frame := TVorbisFrame.Create;
-    // ---> AUDIT FIX 4.1: Free Frame if ReadFromStream raises an exception before Add(Frame)
+    // Free Frame if ReadFromStream raises an exception before Add(Frame)
     try
       ReadOk := Frame.ReadFromStream(AStream);
     except
@@ -358,9 +376,9 @@ begin
     else
     begin
       FreeAndNil(Frame);
-      // ---> AUDIT FIX: This comment (and possibly the rest) was not read
+      // This comment (and possibly the rest) was not read
       fReadIncomplete := True;
-      // ---> AUDIT FIX 2.3: If ReadFromStream hit a corrupt length header, it
+      // If ReadFromStream hit a corrupt length header, it
       // moves AStream.Position to AStream.Size so we Break here instead of desyncing!
       if AStream.Position >= AStream.Size then
         Break;

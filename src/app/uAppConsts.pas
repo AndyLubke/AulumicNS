@@ -200,6 +200,7 @@ var
   AppCacheThumbsDir : string;
   AppMusicInfoDir   : string;
   AppLogDir         : string;   // the log file (the data folder)
+  AppTagBackupDir   : string;   // the copies of tags as they were before a repair
 
 implementation
 
@@ -218,5 +219,6 @@ initialization
   AppMusicInfoDir   := AppDataDir + FOLDER_MUSICINFO;
   AppCacheThumbsDir := CacheDir + 'Thumbs\';
   AppLogDir         := AppDataDir;
+  AppTagBackupDir   := AppDataDir + 'TagBackups\';
 
 end.

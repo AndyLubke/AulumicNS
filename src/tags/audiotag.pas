@@ -40,16 +40,19 @@ procedure RegisterTagReader(const Extensions: string;
 function LoadTags(Song: TSong): boolean;
 function ExtractTags(FileName: string): TCommonTags; overload;
 function ExtractTags(FileTags: TTagReader): TCommonTags; overload;
-// ---> AulumicNS: ATextOnly: embedded pictures are not loaded (see
+// ATextOnly: embedded pictures are not loaded (see
 // basetag.TagReadTextOnly); such a reader cannot save
-function GetFileTagsObject(FileName: string; ATextOnly: boolean = False): TTagReader;
+// ARecover: a damaged ID3v2 tag is read as far as it can be repaired (see
+// basetag.TagReadRecover)
+function GetFileTagsObject(FileName: string; ATextOnly: boolean = False;
+  ARecover: boolean = False): TTagReader;
 function IdentifyKind(FileName: string): TTagReaderClass;
 
 implementation
 
 uses
   strutils, file_Dummy,
-  AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 type
   RTagReader = record
@@ -100,18 +103,21 @@ begin
   end;
 end;
 
-function GetFileTagsObject(FileName: string; ATextOnly: boolean): TTagReader;
+function GetFileTagsObject(FileName: string; ATextOnly: boolean; ARecover: boolean): TTagReader;
 var
   kind: TTagReaderClass;
-  Before: boolean;
+  Before, BeforeRecover: boolean;
 begin
   kind   := IdentifyKind(FileName);
   Before := TagReadTextOnly;
+  BeforeRecover   := TagReadRecover;
   TagReadTextOnly := ATextOnly;
+  TagReadRecover  := ARecover;
   try
     Result := kind.Create(FileName);
   finally
     TagReadTextOnly := Before;
+    TagReadRecover  := BeforeRecover;
   end;
 end;
 
@@ -130,7 +136,7 @@ begin
   end;
 
   ext := LowerCase(Trim(ExtractFileExt(FileName)));
-  // ---> AUDIT FIX: Guard against empty extensions (Pos('', S) returns 1!)
+  // Guard against empty extensions (Pos('', S) returns 1!)
   // and match against ';' delimiter so '.mp3' never partially matches '.mp34'
   if ext = '' then
     Exit;

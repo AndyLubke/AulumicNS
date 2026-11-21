@@ -686,7 +686,7 @@ begin
       Free;
     end;
   if Application.HasOption('touch-pdf') then Pdf := Application.GetOptionValue('touch-pdf');
-  ExitCode := RunTouchProbe(Self, FPl.List, FLib.Tree, Pdf, FTouchReport);
+  ExitCode := RunTouchProbe(Self, FPl.List, FLib.Tree, FLib.Tiles.Grid, @FLib.ShowDemoTiles, Pdf, FTouchReport);
   Close;
 end;
 

@@ -37,8 +37,8 @@ uses
   uPlaylistFile, uPlaylistRows, uAutoPlaylist, uPlaylistImport, uPlaylistStore,
   { tags (the AulumicTag units) }
   audiotag, basetag, commonfunctions, id3v1genres, song, registerallreader, file_dsf, file_dff, file_dummy,
-  file_flac, file_monkey, file_mp3, file_mp4, file_ogg, file_opus, file_wave, file_wma, tag_ape,
-  tag_dummy, tag_id3v2, tag_mp4, tag_vorbis, tag_wma,
+  file_flac, file_wave,
+  tag_dummy, tag_id3v2, tag_vorbis,
   AuMainForm;
 
 {$R *.res}

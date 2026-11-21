@@ -24,6 +24,13 @@ const
   GESTURE_PAN_NONE = 0;
   GESTURE_PAN_V = 1;
   GESTURE_PAN_VH = 3;
+  { How far (unscaled) beside an edge that can be dragged - a splitter, the
+    edge of a column - a finger still takes hold of it. The mouse has to hit
+    the edge as it is drawn. }
+  TOUCH_EDGE_REACH = 12;
+
+{ True while the mouse message in work was made by Windows from a touch or a pen }
+function MouseFromTouch: Boolean;
 
 type
   TAuRowEvent = procedure(Sender: TObject; Index: Integer) of object;
@@ -83,6 +90,11 @@ type
       GESTURE_PAN_NONE (a touch drag stays a mouse drag: sliders, scroll
       bars, splitters) }
     function GesturePan: Integer; virtual;
+    { True when a finger that goes down at X, Y (client) drags something of
+      this control that a pan gesture would take away from it - an edge that
+      is dragged up or down in a control that also scrolls. That touch then
+      gives no pan and arrives as mouse messages. }
+    function TouchDragAt(X, Y: Integer): Boolean; virtual;
     { a row-based list: the rows the finger's DY pixels add up to (the rest
       is kept for the next call); to add to the scroll position }
     function PanRows(DY, ARowH: Integer): Integer;
@@ -704,7 +716,12 @@ type
     it is dragged (a small window of its own above the panes: nothing below
     it is painted); the target gets its new size once, when the button or the
     finger is let go. Resizing and repainting the panes in software at every
-    mouse move would make the drag lag behind the hand on a slow PC. }
+    mouse move would make the drag lag behind the hand on a slow PC.
+    For a finger the splitter reaches TOUCH_EDGE_REACH further on both
+    sides than it is drawn: a touch that lands there on a neighbouring
+    control drags the splitter (TakeTouch). A touch that does not move is
+    handed back to that control as a click, and the mouse keeps the splitter
+    at its drawn width. }
 
   TAuSplitter = class(TAuControl)
   private
@@ -718,6 +735,14 @@ type
     FLive: Boolean;
     FMinSize, FMaxSize: Integer;
     FOnMoved: TNotifyEvent;
+    { a drag taken over from a touch on a neighbouring control: that
+      control's window and its press (given back when the finger did not
+      move), and whether the finger moved }
+    FTouchFrom: HWND;
+    FTouchWP: WPARAM;
+    FTouchLP: LPARAM;
+    FTouchMoved: Boolean;
+    procedure BeginDragAt(const AScreenPt: TPoint);
     procedure SetTarget(V: TControl);
     function IsVertical: Boolean;
     procedure ApplySize(ASize: Integer);
@@ -744,6 +769,9 @@ type
     property OnMoved: TNotifyEvent read FOnMoved write FOnMoved;
     { True while it is being dragged }
     property Dragging: Boolean read FDrag;
+    { A finger went down at AScreenPt on the window AFrom (its press: AWP,
+      ALP): the splitter takes the mouse and is dragged from there. }
+    procedure TakeTouch(AFrom: HWND; AWP: WPARAM; ALP: LPARAM; const AScreenPt: TPoint);
   end;
 
   { TAuCover - cover art picture with rounded corners or a generated placeholder }
@@ -1024,6 +1052,11 @@ begin
   Result := GESTURE_PAN_V;
 end;
 
+function TAuControl.TouchDragAt(X, Y: Integer): Boolean;
+begin
+  Result := False;
+end;
+
 function TAuControl.ScrollOffset: Integer;
 begin
   Result := 0;
@@ -1103,10 +1136,45 @@ begin
   Result := PWideChar(PtrUInt(GestureAtom));
 end;
 
+
+{ The splitter that a finger at AScreenPt on AControl takes hold of: one of
+  AControl's form that is shown, with the point on it or within the reach
+  beside it. nil = none (also when AControl is a splitter itself). }
+function SplitterInTouchReach(AControl: TControl; const AScreenPt: TPoint): TAuSplitter; forward;
+
+type
+  { the lParam of WM_GESTURENOTIFY }
+  TGestureNotify_ = record
+    cbSize: UINT;
+    dwFlags: DWORD;
+    hwndTarget: HWND;
+    ptsLocation: packed record x, y: SmallInt; end;   // screen
+    dwInstanceID: DWORD;
+  end;
+  PGestureNotify_ = ^TGestureNotify_;
+
+function MouseFromTouch: Boolean;
+begin
+  Result := (PtrUInt(GetMessageExtraInfo) and $FFFFFF00) = $FF515700;
+end;
+
+{ this touch gives no pan gesture on AWnd }
+procedure BlockPan(AWnd: HWND);
+var
+  Cfg: TGestureConfig_;
+begin
+  Cfg.dwID := GID_PAN_;
+  Cfg.dwWant := 0;
+  Cfg.dwBlock := GC_PAN_;
+  SetGestureConfig_(AWnd, 0, 1, @Cfg, SizeOf(Cfg));
+end;
+
 function GestureProc(Wnd: HWND; Msg: UINT; WP: WPARAM; LP: LPARAM): LRESULT; stdcall;
 var
   C: TAuControl;
   Old: Windows.WNDPROC;
+  Sp: TAuSplitter;
+  Pt: Windows.TPoint;
 begin
   C := TAuControl(Pointer(GetPropW(Wnd, GestureProp)));
   if C = nil then Exit(DefWindowProcW(Wnd, Msg, WP, LP));
@@ -1116,7 +1184,39 @@ begin
         { configured here and not passed on (as in Microsoft's sample): the
           parents would configure themselves too }
         C.ConfigureGestures;
+        { a finger beside a splitter: no pan, so that its drag arrives as
+          mouse messages and the splitter can take it }
+        if LP <> 0 then
+        begin
+          Pt.x := PGestureNotify_(LP)^.ptsLocation.x;
+          Pt.y := PGestureNotify_(LP)^.ptsLocation.y;
+          if SplitterInTouchReach(C, Classes.Point(Pt.x, Pt.y)) <> nil then
+            BlockPan(Wnd)
+          else
+          begin
+            { or on an edge of the control itself that is dragged }
+            Windows.ScreenToClient(Wnd, Pt);
+            UseDpiOf(C);
+            if C.TouchDragAt(Pt.x, Pt.y) then BlockPan(Wnd);
+          end;
+        end;
         Exit(0);
+      end;
+    WM_LBUTTONDOWN:
+      { a press that comes from a finger, beside a splitter: the splitter
+        is dragged }
+      if MouseFromTouch then
+      begin
+        Pt.x := SmallInt(LP and $FFFF);
+        Pt.y := SmallInt((LP shr 16) and $FFFF);
+        Windows.ClientToScreen(Wnd, Pt);
+        Sp := SplitterInTouchReach(C, Classes.Point(Pt.x, Pt.y));
+        if Sp <> nil then
+        begin
+          UseDpiOf(C);
+          Sp.TakeTouch(Wnd, WP, LP, Classes.Point(Pt.x, Pt.y));
+          Exit(0);
+        end;
       end;
     WM_GESTURE_:
       begin
@@ -4356,9 +4456,50 @@ end;
 
 { ---- TAuSplitter ---- }
 
+var
+  { every splitter there is (SplitterInTouchReach) }
+  SplitterList: TFPList = nil;
+
+function SplitterInTouchReach(AControl: TControl; const AScreenPt: TPoint): TAuSplitter;
+var
+  I, Reach: Integer;
+  Sp: TAuSplitter;
+  Form: TCustomForm;
+  R: Windows.TRect;
+begin
+  Result := nil;
+  if (SplitterList = nil) or (AControl = nil) or (AControl is TAuSplitter) then Exit;
+  Form := GetParentForm(AControl);
+  if Form = nil then Exit;
+  for I := 0 to SplitterList.Count - 1 do
+  begin
+    Sp := TAuSplitter(SplitterList[I]);
+    if (Sp.FTarget = nil) or (not Sp.HandleAllocated) or (not Sp.Enabled) or
+       (GetParentForm(Sp) <> Form) or (not IsWindowVisible(Sp.Handle)) then Continue;
+    if not Windows.GetWindowRect(Sp.Handle, R) then Continue;
+    UseDpiOf(Sp);
+    Reach := S(TOUCH_EDGE_REACH);
+    { wider across its line only: along the line it ends where it is drawn }
+    if Sp.IsVertical then
+    begin
+      Dec(R.Top, Reach);
+      Inc(R.Bottom, Reach);
+    end
+    else
+    begin
+      Dec(R.Left, Reach);
+      Inc(R.Right, Reach);
+    end;
+    if (AScreenPt.X >= R.Left) and (AScreenPt.X < R.Right) and
+       (AScreenPt.Y >= R.Top) and (AScreenPt.Y < R.Bottom) then Exit(Sp);
+  end;
+end;
+
 constructor TAuSplitter.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  if SplitterList = nil then SplitterList := TFPList.Create;
+  SplitterList.Add(Self);
   Width := S(5);
   Cursor := crHSplit;
   FMinSize := S(160);
@@ -4483,6 +4624,7 @@ end;
 
 destructor TAuSplitter.Destroy;
 begin
+  if SplitterList <> nil then SplitterList.Remove(Self);
   Application.RemoveAsyncCalls(Self);
   HideGhost;
   inherited Destroy;
@@ -4492,15 +4634,34 @@ procedure TAuSplitter.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: 
 begin
   inherited MouseDown(Button, Shift, X, Y);
   if (Button <> mbLeft) or (FTarget = nil) then Exit;
+  FTouchFrom := 0;
+  BeginDragAt(ClientToScreen(Point(X, Y)));
+end;
+
+procedure TAuSplitter.TakeTouch(AFrom: HWND; AWP: WPARAM; ALP: LPARAM; const AScreenPt: TPoint);
+begin
+  if (FTarget = nil) or (not HandleAllocated) or FDrag then Exit;
+  FTouchFrom := AFrom;
+  FTouchWP := AWP;
+  FTouchLP := ALP;
+  FTouchMoved := False;
+  { the moves and the release of this touch come here }
+  Windows.SetCapture(Handle);
+  BeginDragAt(AScreenPt);
+  Invalidate;
+end;
+
+procedure TAuSplitter.BeginDragAt(const AScreenPt: TPoint);
+begin
   FDrag := True;
   if IsVertical then
   begin
-    FStartX := ClientToScreen(Point(X, Y)).Y;
+    FStartX := AScreenPt.Y;
     FStartW := FTarget.Height;
   end
   else
   begin
-    FStartX := ClientToScreen(Point(X, Y)).X;
+    FStartX := AScreenPt.X;
     FStartW := FTarget.Width;
   end;
   FNewW := FStartW;
@@ -4546,6 +4707,7 @@ begin
   end;
   if IsVertical then D := ClientToScreen(Point(X, Y)).Y - FStartX
   else D := ClientToScreen(Point(X, Y)).X - FStartX;
+  if Abs(D) > S(4) then FTouchMoved := True;
   if FTarget.Align in [alRight, alBottom] then D := -D;
   W := FStartW + D;
   if W < FMinSize then W := FMinSize;
@@ -4575,9 +4737,33 @@ begin
 end;
 
 procedure TAuSplitter.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  From: HWND;
 begin
   inherited MouseUp(Button, Shift, X, Y);
-  if Button = mbLeft then EndDrag(True);
+  if Button <> mbLeft then Exit;
+  From := FTouchFrom;
+  FTouchFrom := 0;
+  if From = 0 then
+  begin
+    EndDrag(True);
+    Exit;
+  end;
+  { a drag taken over from a touch }
+  if HandleAllocated and (Windows.GetCapture = Handle) then Windows.ReleaseCapture;
+  if FTouchMoved then EndDrag(True)
+  else
+  begin
+    { the finger did not move: a tap on the control it touched. The press
+      goes there now (posted messages are not from a touch, so they are not
+      taken over again). }
+    EndDrag(False);
+    if IsWindow(From) then
+    begin
+      PostMessageW(From, WM_LBUTTONDOWN, FTouchWP, FTouchLP);
+      PostMessageW(From, WM_LBUTTONUP, FTouchWP and not WPARAM(MK_LBUTTON), FTouchLP);
+    end;
+  end;
 end;
 
 { the capture went to another window in the middle of a drag (Alt+Tab, a
@@ -4593,7 +4779,11 @@ end;
 
 procedure TAuSplitter.CaptureLost(Data: PtrInt);
 begin
-  if FDrag and HandleAllocated and (Windows.GetCapture <> Handle) then EndDrag(False);
+  if FDrag and HandleAllocated and (Windows.GetCapture <> Handle) then
+  begin
+    FTouchFrom := 0;
+    EndDrag(False);
+  end;
 end;
 { ---- TAuCover ---- }
 
@@ -4792,6 +4982,7 @@ initialization
   Application.AddOnUserInputHandler(@CaretHandler.UserInput);
 
 finalization
+  FreeAndNil(SplitterList);
   FreePaintBuffer;
   if Application <> nil then Application.RemoveOnUserInputHandler(@CaretHandler.UserInput);
   CaretTimer.Free;

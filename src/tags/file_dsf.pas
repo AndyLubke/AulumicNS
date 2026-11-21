@@ -32,10 +32,10 @@ type
     FTotalSamples: int64;
     FChannels: cardinal;
     FPointerToID3: int64;
-    // ---> AUDIT FIX 2.6: Tracks the physical end of the 'data' chunk so a
+    // Tracks the physical end of the 'data' chunk so a
     // corrupt FPointerToID3 can never point inside the audio payload!
     FDataEndOffset: int64;
-    // ---> AUDIT FIX: True when the ID3 tag was larger than MAX_DSF_ID3_SIZE and
+    // True when the ID3 tag was larger than MAX_DSF_ID3_SIZE and
     // therefore only partially (or not) loaded; SaveToFile then refuses to save.
     FTagTruncated: boolean;
     fMediaProperty: TMediaProperty;
@@ -52,7 +52,7 @@ type
 implementation
 
 uses
-  CommonFunctions, AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  CommonFunctions, AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 const
   MAX_DSF_ID3_SIZE = 64 * 1024 * 1024; // 64 MB safety cap for embedded ID3v2 block
@@ -157,7 +157,7 @@ begin
         fStream.Read(FTotalSamples, 8);
       end;
 
-      // ---> AUDIT FIX 2.6: Locate the 'data' chunk header and record its end
+      // Locate the 'data' chunk header and record its end
       // offset so FPointerToID3 is verified to sit at or past the audio data!
       if (ChunkSize >= 28) and ((DSDStart + ChunkSize + 12) <= fStream.Size) then
       begin
@@ -280,9 +280,9 @@ begin
   DestStream   := nil;
   MemoryStream := nil;
 
-  // ---> AUDIT FIX: Never rewrite a tag that was only partially loaded
+  // Never rewrite a tag that was only partially loaded
   // (oversized frames skipped, or the tag exceeded the 64 MB read cap)
-  if FTagTruncated or (Assigned(fTags) and fTags.HasSkippedFrames) then
+  if FTagTruncated or (Assigned(fTags) and (fTags.HasSkippedFrames or fTags.HasUnreadableData)) then
     Exit(False);
 
   try
@@ -314,7 +314,7 @@ begin
       // Verify that StartOffset actually points to the 'DSD ' chunk!
       if (SourceStream.Read(ChunkID, 4) = 4) and (ChunkID = 'DSD ') then
       begin
-        // ---> AUDIT FIX 2.6: Require FPointerToID3 to be >= FDataEndOffset so
+        // Require FPointerToID3 to be >= FDataEndOffset so
         // saving tags can never cut off the end of the 'data' chunk!
         MinEndOffset := StartOffset + 92;
         if FDataEndOffset > MinEndOffset then
@@ -328,7 +328,7 @@ begin
         SourceStream.Position := StartOffset;
         DestStream.CopyFrom(SourceStream, AudioDataSize);
 
-        if Assigned(fTags) and (fTags.Count > 0) then
+        if Assigned(fTags) and ((fTags.Count > 0) or fTags.HasRawForWrite) then
         begin
           // Zero padding on trailing DSF ID3 tags to avoid dead bloat
           fTags.Padding := 0;

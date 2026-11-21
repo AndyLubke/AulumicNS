@@ -5,7 +5,7 @@
   sound chunk) and the ID3v2 tag that DSDIFF players store in an 'ID3 '
   chunk - inside the FRM8 container or right after it (both are found in
   the wild). The tag is parsed with OvoTag's ID3v2 class, as in file_dsf.
-  Writing (milestone 5, the tag editor): the file is rebuilt chunk by chunk
+  Writing: the file is rebuilt chunk by chunk
   - every chunk but the old 'ID3 ' chunks is copied unchanged, the new tag
   goes into one 'ID3 ' chunk at the end of the FRM8 container (where
   foobar2000 and JRiver put it) and the container size is set anew. A tag
@@ -267,7 +267,7 @@ var
   Pad: byte;
 begin
   Result := False;
-  if FTagTruncated or (Assigned(fTags) and fTags.HasSkippedFrames) then Exit(False);
+  if FTagTruncated or (Assigned(fTags) and (fTags.HasSkippedFrames or fTags.HasUnreadableData)) then Exit(False);
   Src := nil;
   Dst := nil;
   Tag := nil;
@@ -281,7 +281,7 @@ begin
       if FormEnd > Src.Size then FormEnd := Src.Size;
       { the new tag first: a frame that cannot be written stops the save }
       Tag := TMemoryStream.Create;
-      if Assigned(fTags) and (fTags.Count > 0) then
+      if Assigned(fTags) and ((fTags.Count > 0) or fTags.HasRawForWrite) then
       begin
         fTags.Padding := 0;
         fTags.WriteToStream(Tag);

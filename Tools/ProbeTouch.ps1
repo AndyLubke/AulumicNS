@@ -10,7 +10,7 @@
   gives; the mouse checks use real input (SendInput). Each check compares the
   control's scroll position before and after.
 
-  It checks: the playlist, the library tree, a Preferences page (the swipe
+  It checks: the playlist, the library tree, the album tiles, a Preferences page (the swipe
   starts on a setting), the help and a booklet (swipes turn one page).
 
   The script copies the debug exe to a scratch folder (its Data\ stays apart

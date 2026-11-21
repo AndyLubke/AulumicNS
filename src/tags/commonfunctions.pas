@@ -113,7 +113,7 @@ begin
     Result := Copy(DateString, 1, 4);
 end;
 
-// ---> AUDIT FIX: Check Length(YearString) = 4 BEFORE indexing YearString[1..4]!
+// Check Length(YearString) = 4 BEFORE indexing YearString[1..4]!
 function isValidYear(const YearString: string): boolean;
 var
   i: Integer;
@@ -129,7 +129,7 @@ begin
   Result := True;
 end;
 
-// ---> AUDIT FIX: Check lower bound (>= 0) as well as upper bound (<= ID3_MaxGenreExtended)
+// Check lower bound (>= 0) as well as upper bound (<= ID3_MaxGenreExtended)
 function ExtractGenre(const GenreString: string; offset: integer = 0): string;
 var
   GenreNumber, TargetIdx: integer;
@@ -196,7 +196,7 @@ begin
   Result := Trim(Result);
 end;
 
-// ---> AUDIT FIX: Use SwapEndian instead of broken shr 24/16/8 on 8-bit bytes!
+// SwapEndian on the whole value: a shift of the single bytes would give 0
 function Swap32(const Figure: DWORD): DWORD;
 begin
   Result := SwapEndian(Figure);
@@ -249,7 +249,7 @@ begin
   SetLength(Result, l);
 end;
 
-// ---> AUDIT FIX: Respect the size parameter instead of reading past the buffer with PAnsiChar!
+// Respect the size parameter instead of reading past the buffer with PAnsiChar!
 function ExtractString_ANSI(p: pbyte; size: cardinal): string;
 var
   RawS: RawByteString;

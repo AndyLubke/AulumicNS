@@ -145,6 +145,9 @@ type
     procedure ShowScanning(AScanning: Boolean);
     { demo content for the screenshots (debug --shots): no library needed }
     procedure FillDemo;
+    { made-up albums as tiles in the tree's place, and back to the tree: for
+      the touch probe, which needs more tiles than fit and no library }
+    procedure ShowDemoTiles(AOn: Boolean);
     function NodeType(N: TAuTreeNode): TLibNodeType;
     function Category(N: TAuTreeNode): TLibCategory;
     function IsVirtualLink(N: TAuTreeNode): Boolean;
@@ -1430,6 +1433,51 @@ begin
   Tree.Expand(N);
   Tree.MakeVisible(N);
   FocusList;
+end;
+
+procedure TLibraryPane.ShowDemoTiles(AOn: Boolean);
+const
+  DEMO_ALBUMS = 60;
+var
+  L: TTrackList;
+  T: TTrackInfo;
+  I, K: Integer;
+begin
+  if not AOn then
+  begin
+    FTileMode := False;
+    Tiles.SetTracks(nil, nil, '', '', '', False);
+    Tiles.Visible := False;
+    Tree.Visible := True;
+    TopResize(nil);
+    Exit;
+  end;
+  L := TTrackList.Create;
+  try
+    for I := 1 to DEMO_ALBUMS do
+      for K := 1 to 2 do
+      begin
+        T := Default(TTrackInfo);
+        T.FolderDir := Format('D:\Music\Artist %d\Album %.2d', [(I - 1) mod 9 + 1, I]);
+        T.FilePath := T.FolderDir + Format('\%.2d.flac', [K]);
+        T.Title := Format('Track %d', [K]);
+        T.AlbumArtist := Format('Artist %d', [(I - 1) mod 9 + 1]);
+        T.Artist := T.AlbumArtist;
+        T.Album := Format('Album %.2d', [I]);
+        T.TrackNumber := K;
+        T.Year := 1990 + I mod 30;
+        L.Add(T);
+      end;
+    FTileMode := True;
+    FTileAll := True;
+    Tiles.Grid.TextSize := Tree.TextSize;
+    Tiles.SetTracks(L, nil, '', LBL_ALL_ALBUMS, '', False);
+    Tiles.Visible := True;
+    Tree.Visible := False;
+    TopResize(nil);
+  finally
+    L.Free;
+  end;
 end;
 
 procedure TLibraryPane.ShowScanning(AScanning: Boolean);

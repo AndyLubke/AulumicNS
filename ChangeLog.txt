@@ -6,6 +6,35 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.16 (21 November 2026)
+-------------------------------------------------------------------------------
+
+Tags
+  - Fixed: in WAV, DSF and DFF files a tag with an empty field in the middle
+    lost the fields behind it (often the cover) when the file was saved.
+  - Fixed: fields with several values (for example two artists) in WAV, DSF
+    and DFF files were shown glued together. They are now separated.
+  - Saving a FLAC file leaves every field that was not edited exactly as it
+    was.
+  - A WAV, DSF or DFF file with a damaged tag is no longer saved, so nothing
+    in it can get lost. The log names the file and the reason.
+  - Repair tag: for such a file Properties shows a "Repair tag..." button.
+    It finds the fields behind the damage (often the cover), shows what will
+    be kept and asks first; Save then writes the repaired tag. The audio is
+    not touched and a copy of the old tag is kept.
+  - Undo repair: for a file whose tag was repaired, Properties shows an
+    "Undo repair..." button that puts the old tag back exactly as it was.
+  - Some further improvements in reading and writing tags.
+
+Touch
+  - The borders between the panes are easier to take hold of with a finger:
+    a touch just beside a border drags it too. Nothing changes for the
+    mouse, and the borders look the same.
+  - The same for the column edges of the playlist's list view and of the
+    lists in other windows, and for the lower edge of the picture in the
+    help, which can now be dragged with a finger.
+
+
 Version 1.1.0.15 (21 November 2026)
 -------------------------------------------------------------------------------
 

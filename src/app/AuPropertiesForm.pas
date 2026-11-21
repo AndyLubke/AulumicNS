@@ -39,8 +39,8 @@ implementation
 
 uses
   AuAudioTypes, Graphics, LCLIntf, DateUtils, ALMetadata, uMetaUtils, uAppConsts, uAppStrings, uOSUtils,
-  uMetadataPayloads, uEngineStateManager, uUserStatsManager, uLibraryTypes, AuLog, 
-  uSettingsManager;
+  uMetadataPayloads, uEngineStateManager, uUserStatsManager, uLibraryTypes, AuLog,
+  uSettingsManager, AuDialogs, AudioTag, baseTag, tag_id3v2, uMetadataCustodian;
 
 type
   TTagField = (tfTitle, tfArtist, tfAlbumArtist, tfAlbum, tfGenre, tfYear, tfTrack, tfDisc,
@@ -65,6 +65,11 @@ type
     FCover: TAuCover;
     FCoverInfo, FCoverLbl, FCoverNote, FTagsNote: TAuLabel;
     FBtnLoad, FBtnWeb, FBtnClear, FBtnSave, FBtnCancel: TAuButton;
+    // shown while a selected file has a damaged tag that is not yet marked
+    // for repair
+    FBtnRepair: TAuButton;
+    // in its place while the one selected file has a repair that can be undone
+    FBtnUndo: TAuButton;
     FInsTitle: TAuLabel;
     // a read-only memo like the Comment field
     FInsMemo: TAuMemo;
@@ -96,6 +101,9 @@ type
     procedure WebClick(Sender: TObject);
     procedure ClearClick(Sender: TObject);
     procedure SaveClick(Sender: TObject);
+    procedure RepairClick(Sender: TObject);
+    procedure UndoClick(Sender: TObject);
+    procedure ShowDamageNote(const ASel: TIntegerArray);
     procedure FormDrop(Sender: TObject; const FileNames: array of string);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure Layout;
@@ -381,6 +389,16 @@ begin
   FBtnCancel.ModalResult := mrCancel;
   FBtnSave := AddButton(Self, 'Save', 0, 0, 110, bkPrimary, @SaveClick);
   DefaultButton := FBtnSave;
+  FBtnRepair := AddButton(Self, CAP_REPAIR_TAG + '...', 0, 0, 140, bkNormal, @RepairClick);
+  FBtnRepair.Hint := HINT_REPAIR_TAG;
+  FBtnRepair.ShowHint := True;
+  FBtnRepair.Visible := False;
+  FBtnRepair.TabOrder := 29;
+  FBtnUndo := AddButton(Self, CAP_UNDO_REPAIR + '...', 0, 0, 140, bkNormal, @UndoClick);
+  FBtnUndo.Hint := HINT_UNDO_REPAIR;
+  FBtnUndo.ShowHint := True;
+  FBtnUndo.Visible := False;
+  FBtnUndo.TabOrder := 28;
   FBtnSave.TabOrder := 30;
   FBtnCancel.TabOrder := 31;
   Layout;
@@ -489,7 +507,14 @@ begin
   FCoverNote.SetBounds(S(CX), S(BY + 124), S(COVER_W), S(40));
 
   { the bottom: the status left, Cancel and Save right }
-  FStatus.SetBounds(S(24), S(Ht - 24 - 34), S(Math.Max(100, Wd - 2 * 110 - 10 - 72)), FStatus.Height);
+  if FBtnRepair.Visible or FBtnUndo.Visible then
+  begin
+    FStatus.SetBounds(S(24), S(Ht - 24 - 34), S(Math.Max(100, Wd - 2 * 110 - 140 - 20 - 72)), FStatus.Height);
+    FBtnRepair.SetBounds(S(Wd - 24 - 2 * 110 - 140 - 20), S(Ht - 24 - 34), S(140), FBtnRepair.Height);
+    FBtnUndo.SetBounds(FBtnRepair.Left, FBtnRepair.Top, FBtnRepair.Width, FBtnUndo.Height);
+  end
+  else
+    FStatus.SetBounds(S(24), S(Ht - 24 - 34), S(Math.Max(100, Wd - 2 * 110 - 10 - 72)), FStatus.Height);
   FBtnCancel.SetBounds(S(Wd - 24 - 2 * 110 - 10), S(Ht - 24 - 34), S(110), FBtnCancel.Height);
   FBtnSave.SetBounds(S(Wd - 24 - 110), S(Ht - 24 - 34), S(110), FBtnSave.Height);
 end;
@@ -605,7 +630,8 @@ begin
       FStatus.Caption := First^.FilePath;
       for F := Low(TTagField) to High(TTagField) do
       begin
-        FEdits[F].Enabled := not First^.ReadFailed;
+        FEdits[F].Enabled := not (First^.ReadFailed or First^.UndoRepair or
+          (First^.TagDamaged and not First^.RepairTag));
         FEdits[F].Placeholder := '';
         SetFieldText(F, Value(First, F));
       end;
@@ -653,7 +679,7 @@ begin
     begin
       if Length(First^.CoverData) = 0 then
       begin
-        Meta := ReadTrackMetadata(First^.FilePath, True);
+        Meta := ReadTrackMetadata(First^.FilePath, True, False, False, First^.RepairTag);
         First^.CoverData := Meta.CoverData;
         Meta.CoverData := nil;
       end;
@@ -661,9 +687,161 @@ begin
     end
     else
       ShowCoverBytes(nil);
+    ShowDamageNote(Sel);
   finally
     FUpdating := False;
   end;
+end;
+
+{ The selected files with a damaged tag: the status line says so and the
+  Repair button is there; once they are marked the line says that Save
+  repairs them. }
+procedure TPropertiesForm.ShowDamageNote(const ASel: TIntegerArray);
+var
+  I, Damaged, Pending: Integer;
+  D: PTagEditNodeData;
+  WasVisible, CanUndo: Boolean;
+begin
+  Damaged := 0;
+  Pending := 0;
+  for I := 0 to High(ASel) do
+  begin
+    D := Item(ASel[I]);
+    if (D = nil) or (not D^.TagDamaged) then Continue;
+    if D^.RepairTag then Inc(Pending) else Inc(Damaged);
+  end;
+  if Damaged > 0 then
+  begin
+    if Length(ASel) = 1 then FStatus.Caption := LBL_TAG_DAMAGED_ONE
+    else FStatus.Caption := Format(FMT_TAG_DAMAGED_MANY, [Damaged]);
+  end
+  else if Pending > 0 then
+  begin
+    if Pending = 1 then FStatus.Caption := LBL_TAG_REPAIR_PENDING
+    else FStatus.Caption := Format(FMT_TAG_REPAIR_PENDING_MANY, [Pending]);
+  end;
+  { one file, not damaged: a repair of it that can be undone }
+  CanUndo := False;
+  if (Length(ASel) = 1) and (Damaged = 0) and (Pending = 0) then
+  begin
+    D := Item(ASel[0]);
+    if (D <> nil) and not D^.ReadFailed then
+    begin
+      if not D^.BackupChecked then
+      begin
+        D^.BackupChecked := True;
+        D^.BackupFile := FindTagBackup(D^.FilePath, AppTagBackupDir, D^.BackupWhen);
+      end;
+      if D^.UndoRepair then FStatus.Caption := LBL_UNDO_REPAIR_PENDING
+      else CanUndo := D^.BackupFile <> '';
+    end;
+  end;
+  WasVisible := FBtnRepair.Visible or FBtnUndo.Visible;
+  FBtnRepair.Visible := Damaged > 0;
+  FBtnUndo.Visible := CanUndo;
+  if WasVisible <> (FBtnRepair.Visible or FBtnUndo.Visible) then Layout;
+end;
+
+{ The question, then the file is marked: Save puts the old tag back. The
+  fields are closed meanwhile - nothing typed would be written. }
+procedure TPropertiesForm.UndoClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+  D: PTagEditNodeData;
+begin
+  Sel := FList.SelectedRows;
+  if Length(Sel) <> 1 then Exit;
+  D := Item(Sel[0]);
+  if (D = nil) or (D^.BackupFile = '') or D^.UndoRepair then Exit;
+  if ALMessageDlg(CAP_UNDO_REPAIR, Format(FMT_UNDO_REPAIR_INFO, [ExtractFileName(D^.FilePath), D^.BackupWhen]) +
+    LineEnding + LineEnding + MSG_UNDO_REPAIR_TEXT + LineEnding + LineEnding + MSG_UNDO_REPAIR_QUESTION,
+    [mbYes, mbNo], mbNo, mkQuestion) <> mrYes then Exit;
+  D^.UndoRepair := True;
+  { what was typed is not written: back to the values as read }
+  D^.Current := D^.Original;
+  D^.IsModified := False;
+  D^.CoverModified := False;
+  FList.Invalidate;
+  SyncUIToSelection;
+end;
+
+{ What a repair of the selected damaged tags would keep, then the question;
+  on Yes the records get the values of a repairing read and are marked - the
+  files are written by Save. }
+procedure TPropertiesForm.RepairClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+  I, N, Fields, Rescued, Sizes: Integer;
+  Bytes: Int64;
+  D, R: PTagEditNodeData;
+  Reader: TTagReader;
+  T: TID3Tags;
+  Msg, FirstName: string;
+begin
+  Sel := FList.SelectedRows;
+  N := 0;
+  Fields := 0;
+  Rescued := 0;
+  Sizes := 0;
+  Bytes := 0;
+  FirstName := '';
+  Screen.Cursor := crHourGlass;
+  try
+    for I := 0 to High(Sel) do
+    begin
+      D := Item(Sel[I]);
+      if (D = nil) or (not D^.TagDamaged) or D^.RepairTag then Continue;
+      Reader := GetFileTagsObject(D^.FilePath, False, True);
+      try
+        if (Reader <> nil) and (Reader.Tags is TID3Tags) and TID3Tags(Reader.Tags).Recovered then
+        begin
+          T := TID3Tags(Reader.Tags);
+          Inc(N);
+          if N = 1 then FirstName := ExtractFileName(D^.FilePath);
+          Inc(Fields, T.Count);
+          Inc(Rescued, T.RecoverRescued);
+          Inc(Bytes, T.RecoverDiscarded);
+          if T.RecoverPlainSizes then Inc(Sizes);
+        end;
+      finally
+        Reader.Free;
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+  if N = 0 then Exit;
+
+  if N = 1 then Msg := Format(FMT_REPAIR_ONE, [FirstName])
+  else Msg := Format(FMT_REPAIR_MANY, [N]);
+  Msg := Msg + LineEnding + LineEnding + Format(FMT_REPAIR_FIELDS, [Fields]);
+  if N > Sizes then
+    Msg := Msg + LineEnding + Format(FMT_REPAIR_RESCUED, [Rescued]) + LineEnding +
+      Format(FMT_REPAIR_DISCARDED, [Bytes]);
+  if (N = 1) and (Sizes = 1) then Msg := Msg + LineEnding + LineEnding + MSG_REPAIR_SIZES
+  else if Sizes > 0 then Msg := Msg + LineEnding + Format(FMT_REPAIR_SIZES_MANY, [Sizes]);
+  Msg := Msg + LineEnding + LineEnding + MSG_REPAIR_COPY + LineEnding + LineEnding;
+  if N = 1 then Msg := Msg + MSG_REPAIR_QUESTION_ONE else Msg := Msg + MSG_REPAIR_QUESTION_MANY;
+  if ALMessageDlg(CAP_REPAIR_TAG, Msg, [mbYes, mbNo], mbYes, mkQuestion) <> mrYes then Exit;
+
+  Screen.Cursor := crHourGlass;
+  try
+    for I := 0 to High(Sel) do
+    begin
+      D := Item(Sel[I]);
+      if (D = nil) or (not D^.TagDamaged) or D^.RepairTag then Continue;
+      R := ReadTagRecord(D^.FilePath, True);
+      try
+        if R^.RepairTag and not R^.ReadFailed then D^ := R^;
+      finally
+        Dispose(R);
+      end;
+    end;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+  FList.Invalidate;
+  SyncUIToSelection;
 end;
 
 { an edit of the user goes into every selected file }
@@ -1112,7 +1290,7 @@ end;
 
 procedure TPropertiesForm.SaveClick(Sender: TObject);
 var
-  J, Skipped: Integer;
+  J, Skipped, Damaged: Integer;
   D: PTagEditNodeData;
   Job: PMetadataJob;
   Batch: TList;
@@ -1124,6 +1302,7 @@ begin
   FBtnSave.Enabled := False;
   FBtnCancel.Enabled := False;
   Skipped := 0;
+  Damaged := 0;
   Batch := TList.Create;
   try
     for J := 0 to FItems.Count - 1 do
@@ -1135,7 +1314,29 @@ begin
         Inc(Skipped);
         Continue;
       end;
-      if not (D^.IsModified or D^.CoverModified) then Continue;
+      { a damaged tag is only written when its repair was chosen }
+      if D^.TagDamaged and not D^.RepairTag then
+      begin
+        if D^.IsModified or D^.CoverModified then Inc(Damaged);
+        Continue;
+      end;
+      { the undo of a repair: only the old tag is written }
+      if D^.UndoRepair then
+      begin
+        Folder := ExtractFileDir(D^.FilePath);
+        InvalidateThumb(D^.Original.Artist, D^.Original.AlbumArtist, D^.Original.Album, Folder);
+        New(Job);
+        Job^ := Default(TMetadataJob);
+        Job^.FilePath := D^.FilePath;
+        Job^.AlbumName := D^.Original.Album;
+        Job^.ActionType := matTagEditor;
+        Job^.TagEditor.Current := D^.Original;
+        Job^.TagEditor.Original := D^.Original;
+        Job^.TagEditor.RestoreTagFrom := D^.BackupFile;
+        Batch.Add(Job);
+        Continue;
+      end;
+      if not (D^.IsModified or D^.CoverModified or D^.RepairTag) then Continue;
       AlbumChanged := (D^.Current.Album <> D^.Original.Album) or
         (D^.Current.AlbumArtist <> D^.Original.AlbumArtist) or (D^.Current.Artist <> D^.Original.Artist);
       if D^.CoverModified or AlbumChanged then
@@ -1154,6 +1355,7 @@ begin
       Job^.TagEditor.IsModified := D^.IsModified;
       Job^.TagEditor.CoverModified := D^.CoverModified;
       Job^.TagEditor.HasCover := D^.HasCover;
+      Job^.TagEditor.RepairTag := D^.RepairTag;
       if D^.CoverModified and D^.HasCover then
       begin
         Job^.TagEditor.CoverData := D^.CoverData;
@@ -1163,6 +1365,7 @@ begin
       Batch.Add(Job);
     end;
     if Skipped > 0 then AddLog(SafeFormat(FMT_LOG_TAGEDIT_SKIPPED, [Skipped]), False, True);
+    if Damaged > 0 then AddLog(SafeFormat(FMT_LOG_TAGEDIT_DAMAGED, [Damaged]), False, True);
     if Batch.Count > 0 then
     begin
       if AppStateManager <> nil then AppStateManager.EnqueueMetadataBatch(Batch)

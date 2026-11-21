@@ -216,10 +216,18 @@ type
     FEnlarged: Boolean;
     FDragging: Boolean;
     FDragY: Integer;
+    { the lower edge was only taken because a finger reaches further than
+      the mouse (TOUCH_EDGE_REACH), where it went down, and whether it was
+      moved: a tap there is a click on what is under the finger }
+    FDragWide, FDragMoved: Boolean;
+    FDragStartY: Integer;
     FOnToggle, FOnStep: TNotifyEvent;
     FOnDragBy: TNotifyEvent;
     function DotAt(X, Y: Integer): Integer;
+    function OnGrip(Y: Integer; ATouch: Boolean): Boolean;
+    procedure ClickAt(X, Y: Integer);
   protected
+    function TouchDragAt(X, Y: Integer): Boolean; override;
     procedure DoPaint(G: TGfx); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -1855,18 +1863,45 @@ begin
   G.FillRound(ClientWidth / 2 - S(18), ClientHeight - S(4), S(36), S(2), S(1), clTextFaint);
 end;
 
-procedure TMdPicture.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+{ Y is on the lower edge that is dragged; for a finger the edge reaches
+  TOUCH_EDGE_REACH further up }
+function TMdPicture.OnGrip(Y: Integer; ATouch: Boolean): Boolean;
 var
-  D: Integer;
+  H: Integer;
+begin
+  H := S(PIC_GRIP_H) + S(2);
+  if ATouch then Inc(H, S(TOUCH_EDGE_REACH));
+  Result := (Y >= ClientHeight - H) and not FEnlarged;
+end;
+
+{ a finger on the lower edge drags it: no pan gesture there }
+function TMdPicture.TouchDragAt(X, Y: Integer): Boolean;
+begin
+  Result := OnGrip(Y, True);
+end;
+
+procedure TMdPicture.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
   if Button <> mbLeft then Exit;
-  if (Y >= ClientHeight - S(PIC_GRIP_H) - S(2)) and not FEnlarged then
+  FDragWide := False;
+  FDragMoved := False;
+  if OnGrip(Y, False) or (MouseFromTouch and OnGrip(Y, True)) then
   begin
+    FDragWide := not OnGrip(Y, False);
     FDragging := True;
     FDragY := Mouse.CursorPos.Y;
+    FDragStartY := FDragY;
     Exit;
   end;
+  ClickAt(X, Y);
+end;
+
+{ a click on the picture: a dot shows that picture, anywhere else enlarges }
+procedure TMdPicture.ClickAt(X, Y: Integer);
+var
+  D: Integer;
+begin
   D := DotAt(X, Y);
   if D >= 0 then
   begin
@@ -1885,12 +1920,15 @@ begin
   if FDragging then
   begin
     NowY := Mouse.CursorPos.Y;
+    if Abs(NowY - FDragStartY) > S(4) then FDragMoved := True;
+    { a finger that has not moved yet may still be a tap }
+    if FDragWide and not FDragMoved then Exit;
     DragDelta := NowY - FDragY;
     FDragY := NowY;
     if (DragDelta <> 0) and Assigned(FOnDragBy) then FOnDragBy(Self);
     Exit;
   end;
-  if (Y >= ClientHeight - S(PIC_GRIP_H) - S(2)) and not FEnlarged then Cursor := crVSplit
+  if OnGrip(Y, False) then Cursor := crVSplit
   else if (DotAt(X, Y) >= 0) or PtInRect(ImageRect, Point(X, Y)) then Cursor := crHandPoint
   else Cursor := crDefault;
 end;
@@ -1904,6 +1942,13 @@ end;
 procedure TMdPicture.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseUp(Button, Shift, X, Y);
+  if FDragging and FDragWide and (not FDragMoved) and (Button = mbLeft) then
+  begin
+    { a tap above the edge: the click it would have been }
+    FDragging := False;
+    ClickAt(X, Y);
+    Exit;
+  end;
   FDragging := False;
 end;
 

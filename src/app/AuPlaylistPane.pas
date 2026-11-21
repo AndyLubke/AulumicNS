@@ -331,8 +331,12 @@ type
     FGrip: Integer;                   // the column whose edge is dragged, -1 = none
     FGripX, FGripW, FGripMax: Integer;
     FGripLeft, FGripLeftW: Integer;   // the column left of the dragged line, when it has a width of its own
+    { the edge was only taken because a finger reaches further than the
+      mouse (TOUCH_EDGE_REACH), and whether it was moved: a tap there is a
+      click on the column }
+    FGripWide, FGripMoved: Boolean;
     function Rects(out AX0: Integer): TPlColRects;
-    function ColAt(X: Integer; out AGrip: Integer): Integer;
+    function ColAt(X: Integer; out AGrip: Integer; AReach: Integer = 0): Integer;
   protected
     procedure DoPaint(G: TGfx); override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -361,18 +365,26 @@ begin
 end;
 
 { the column at X (-1: none) and, in AGrip, the column whose left edge is
-  near enough to drag (-1: none) }
-function TPlColumnHeader.ColAt(X: Integer; out AGrip: Integer): Integer;
+  near enough to drag (-1: none): within AReach pixels, the nearest one
+  (0 = the reach of the mouse) }
+function TPlColumnHeader.ColAt(X: Integer; out AGrip: Integer; AReach: Integer): Integer;
 var
   R: TPlColRects;
-  I, X0: Integer;
+  I, X0, D, Best: Integer;
 begin
   Result := -1;
   AGrip := -1;
+  if AReach <= 0 then AReach := S(COL_GRIP_W);
+  Best := AReach + 1;
   R := Rects(X0);
   for I := 0 to High(R) do
   begin
-    if (R[I].Col in COL_RESIZABLE) and (Abs(X - (X0 + R[I].X)) <= S(COL_GRIP_W)) then AGrip := Ord(R[I].Col);
+    D := Abs(X - (X0 + R[I].X));
+    if (R[I].Col in COL_RESIZABLE) and (D <= AReach) and (D < Best) then
+    begin
+      AGrip := Ord(R[I].Col);
+      Best := D;
+    end;
     if (X >= X0 + R[I].X) and (X < X0 + R[I].X + R[I].W) then Result := Ord(R[I].Col);
   end;
 end;
@@ -424,6 +436,9 @@ begin
   begin
     { the left edge follows the pointer: to the left is wider }
     D := Round((X - FGripX) / UIScale);          // to the right: the left side grows
+    if Abs(X - FGripX) > S(4) then FGripMoved := True;
+    { a finger that has not moved yet may still be a tap }
+    if FGripWide and not FGripMoved then Exit;
     if FGripLeft >= 0 then
     begin
       if COL_MIN_W - FGripLeftW > FGripW - COL_MIN_W then Exit;
@@ -460,6 +475,14 @@ begin
   end;
   if Button <> mbLeft then Exit;
   Col := ColAt(X, Grip);
+  FGripWide := False;
+  FGripMoved := False;
+  if (Grip < 0) and MouseFromTouch then
+  begin
+    { a finger takes the edge from further away }
+    ColAt(X, Grip, S(TOUCH_EDGE_REACH));
+    FGripWide := Grip >= 0;
+  end;
   if Grip >= 0 then
   begin
     { from the width as it is shown (it may be squeezed), and at most as
@@ -498,6 +521,13 @@ begin
   if FGrip >= 0 then
   begin
     FGrip := -1;
+    if FGripWide and not FGripMoved then
+    begin
+      { a tap beside an edge: a click on the column under the finger }
+      Col := ColAt(X, Grip);
+      if Col >= 0 then FPane.SortByColumn(TPlColumn(Col));
+      Exit;
+    end;
     FPane.NotifyView;
     Exit;
   end;

@@ -55,6 +55,14 @@ type
     HasCover           : Boolean;
     CoverData          : TBytes;
     CoverMimeType      : string;
+    // The ID3v2 tag is damaged and shall be repaired: it is read with a
+    // repairing read, a copy of the old tag is kept, and the file is saved
+    // even when no field was changed
+    RepairTag          : Boolean;
+    // Undo of a repair: the copy of the old tag (a file of
+    // uMetadataCustodian.SaveTagBackup) that is written back in place of the
+    // tag; no field of this record is written then
+    RestoreTagFrom     : string;
   end;
 
   PMetadataJob = ^TMetadataJob;

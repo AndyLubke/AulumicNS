@@ -69,7 +69,7 @@ function TDummyReader.LoadFromFile(const AFileName: Tfilename): boolean;
 begin
   inherited LoadFromFile(AFileName);
   Result := False;
-  // ---> AUDIT FIX 4.3: Free existing fTags if reader is reused
+  // Free existing fTags if reader is reused
   if Assigned(fTags) then
     FreeAndNil(fTags);
   fTags := TDummyTags.Create;

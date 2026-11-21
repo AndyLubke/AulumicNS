@@ -38,6 +38,10 @@ type
     // error. The tag editor never saves a file whose read failed, because its
     // fields would be empty and saving would clear the real tags.
     ReadOk      : boolean;
+    // The ID3v2 tag has damaged data behind its readable fields: it cannot be
+    // saved until it is repaired (ARepair of ReadTrackMetadata reads it as
+    // the repair would save it)
+    TagDamaged  : boolean;
     AllTags     : string;
     // All text frames, one per line, for display in the tag editor Inspector.
     // Only filled when ReadTrackMetadata is called with IncludeAllTags = True;
@@ -61,7 +65,7 @@ type
 // scans and playback keep the one-line comment)
 function ReadTrackMetadata(const FileName: string;
   ExtractPicture: boolean = True; IncludeAllTags: boolean = False;
-  KeepCommentLineBreaks: boolean = False): TAudioMetadata;
+  KeepCommentLineBreaks: boolean = False; ARepair: boolean = False): TAudioMetadata;
 
 // For playlist imports of tracks that are not in the library: the
 // file is checked only once (by the tag reader itself), not twice, which
@@ -361,13 +365,14 @@ end;
 
 function ReadMetadataInternal(const FileName: string; ExtractPicture,
   IncludeAllTags, KeepCommentLineBreaks, ACheckExists: boolean;
-  ATextOnly: boolean = False): TAudioMetadata; forward;
+  ATextOnly: boolean = False; ARepair: boolean = False): TAudioMetadata; forward;
 
 function ReadTrackMetadata(const FileName: string; ExtractPicture: boolean = True;
-  IncludeAllTags: boolean = False; KeepCommentLineBreaks: boolean = False): TAudioMetadata;
+  IncludeAllTags: boolean = False; KeepCommentLineBreaks: boolean = False;
+  ARepair: boolean = False): TAudioMetadata;
 begin
   Result := ReadMetadataInternal(FileName, ExtractPicture, IncludeAllTags,
-    KeepCommentLineBreaks, True);
+    KeepCommentLineBreaks, True, False, ARepair);
 end;
 
 function ReadTrackTextTags(const FileName: string): TAudioMetadata;
@@ -385,7 +390,7 @@ end;
 
 function ReadMetadataInternal(const FileName: string; ExtractPicture,
   IncludeAllTags, KeepCommentLineBreaks, ACheckExists: boolean;
-  ATextOnly: boolean = False): TAudioMetadata;
+  ATextOnly: boolean = False; ARepair: boolean = False): TAudioMetadata;
 var
   TagReader  : TTagReader;
   CommonTags : TCommonTags;
@@ -409,7 +414,7 @@ begin
     TagReader := nil;
     try
       // ATextOnly: the pictures are not loaded at all
-      TagReader := GetFileTagsObject(FileName, ATextOnly);
+      TagReader := GetFileTagsObject(FileName, ATextOnly, ARepair);
       if not Assigned(TagReader) then
         Exit;
 
@@ -587,6 +592,9 @@ begin
       end;
 
       Result.ReadOk := not TagReader.LoadFailed;
+      if TagReader.Tags is TID3Tags then
+        Result.TagDamaged := TID3Tags(TagReader.Tags).HasUnreadableData or
+          TID3Tags(TagReader.Tags).Recovered;
 
       // Clear temporary CommonTags strings before TagReader.Free
       CommonTags := Default(TCommonTags);

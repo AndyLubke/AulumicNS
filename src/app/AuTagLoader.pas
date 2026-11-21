@@ -39,14 +39,26 @@ type
     Original      : TAudioTagValues;
     { the tag could not be read: shown, never changed or saved }
     ReadFailed    : Boolean;
+    { the ID3v2 tag has damaged data: not saved until RepairTag is set (the
+      values are then those of a repairing read) }
+    TagDamaged    : Boolean;
+    RepairTag     : Boolean;
+    { a repair of this file can be undone: the copy of its old tag and when
+      it was made (looked up by Properties when the file is shown), and
+      whether the undo was chosen - Save then puts the old tag back }
+    BackupChecked : Boolean;
+    BackupFile    : string;
+    BackupWhen    : string;
+    UndoRepair    : Boolean;
   end;
 
 { True with the records of APaths in AData (free them with DisposeTagData) }
 function LoadTagsForEditor(APaths: TStrings; out AData: TList): Boolean;
 procedure DisposeTagData(var AData: TList);
 { the record of one existing file (tags, whether it has a cover); a file whose
-  tag cannot be read is marked ReadFailed }
-function ReadTagRecord(const APath: string): PTagEditNodeData;
+  tag cannot be read is marked ReadFailed. ARepair: a damaged tag is read as
+  its repair would save it (with the fields behind the damage). }
+function ReadTagRecord(const APath: string; ARepair: Boolean = False): PTagEditNodeData;
 { Wakes the drives of APaths on a worker
   thread; when that takes a moment, a small "Waiting for drive..." window with
   Cancel (the program takes no other input meanwhile). False = cancelled;
@@ -288,7 +300,7 @@ begin
   end;
 end;
 
-function ReadTagRecord(const APath: string): PTagEditNodeData;
+function ReadTagRecord(const APath: string; ARepair: Boolean): PTagEditNodeData;
 var
   D: PTagEditNodeData;
   Reader: TTagReader;
@@ -300,8 +312,10 @@ begin
   Result := D;
   try
     { the comment keeps its line breaks in the editor }
-    Meta := ReadTrackMetadata(APath, True, False, True);
+    Meta := ReadTrackMetadata(APath, True, False, True, ARepair);
     SetLength(Meta.CoverData, 0);
+    D^.TagDamaged := Meta.TagDamaged;
+    D^.RepairTag := ARepair and Meta.TagDamaged;
     D^.Current.Title := Meta.Title;
     D^.Current.Album := Meta.Album;
     D^.Current.Artist := NormalizeSemicolons(Meta.Artist);
@@ -322,7 +336,7 @@ begin
     end;
     Reader := nil;
     try
-      Reader := GetFileTagsObject(APath);
+      Reader := GetFileTagsObject(APath, False, ARepair);
       if Reader <> nil then
       begin
         D^.HasCover := (Reader.Tags <> nil) and (Reader.Tags.ImageCount > 0);

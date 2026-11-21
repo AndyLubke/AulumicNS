@@ -94,6 +94,10 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
+        <Filename Value="TestTagRoundTrip.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
         <Filename Value="TestPlaylistPane.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>

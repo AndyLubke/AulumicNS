@@ -34,16 +34,21 @@ interface
 uses
   Windows, Classes, SysUtils, StrUtils, Controls, Forms, AuControls, AuMenus, AuAnim;
 
-{ runs every check over the main window (APlaylist, ATree), Preferences, the
+type
+  { shows or hides something the probe wants to look at }
+  TProbeSwitch = procedure(AOn: Boolean) of object;
+
+{ runs every check over the main window (APlaylist, ATree, and ATiles once
+  AShowTiles has put the album tiles in the tree's place), Preferences, the
   help and a booklet (APdf; '' = none), writes the report to AReport and
   returns the number of failures }
-function RunTouchProbe(AMain: TCustomForm; APlaylist, ATree: TAuControl;
-  const APdf, AReport: string): Integer;
+function RunTouchProbe(AMain: TCustomForm; APlaylist, ATree, ATiles: TAuControl;
+  AShowTiles: TProbeSwitch; const APdf, AReport: string): Integer;
 
 implementation
 
 uses
-  AuTheme, AuForms, AuPrefs, AuHelp, AuBooklet;
+  AuTheme, AuForms, AuPrefs, AuHelp, AuBooklet, AuPlaylistPane, uAppConsts;
 
 {$PACKRECORDS C}
 type
@@ -317,6 +322,8 @@ type
     { the mouse drags the splitter of APane 40 px wider and back (it paints
       the panes while it moves: they must still follow) }
     procedure SplitterCheck(APane: TControl);
+    procedure ColumnEdgeCheck(APlaylist: TAuControl; ALibPane: TControl);
+    procedure PictureEdgeCheck(AHelp: TWinControl);
     { a menu of 80 items (as the playlist selector with many playlists): it
       fits the screen and the wheel scrolls it down to its last item }
     procedure LongMenuCheck(AMain: TCustomForm);
@@ -923,6 +930,166 @@ begin
   Check('splitter: dragging widens the library pane', Abs(B - A - D) <= 2,
     Format('%d -> %d px (dragged %d; limits %d .. %d)', [A, B, D, Sp.MinSize, Sp.MaxSize]));
   Check('splitter: dragging back narrows it again', Abs(C - A) <= 2, Format('%d -> %d px', [B, C]));
+
+  { with a finger the splitter reaches further than it is drawn: 8 px
+    beside it, on the pane to its right and on the one to its left }
+  P0 := Sp.ClientToScreen(Point(Sp.ClientWidth + Round(8 * K), Sp.ClientHeight div 2));
+  A := APane.Width;
+  if not Swipe(P0, Point(P0.X + D, P0.Y)) then
+  begin
+    Check('splitter: a finger beside it drags it', False, FError);
+    Exit;
+  end;
+  B := APane.Width;
+  Check('splitter: a finger beside it (right) widens the pane', Abs(B - A - D) <= 3,
+    Format('%d -> %d px (dragged %d); %s', [A, B, D, MsgSummary]));
+  P0 := Sp.ClientToScreen(Point(-Round(8 * K), Sp.ClientHeight div 2));
+  if not Swipe(P0, Point(P0.X - D, P0.Y)) then
+  begin
+    Check('splitter: a finger beside it drags it', False, FError);
+    Exit;
+  end;
+  C := APane.Width;
+  Check('splitter: a finger beside it (left) narrows it again', Abs(C - A) <= 3,
+    Format('%d -> %d px; %s', [B, C, MsgSummary]));
+  { a tap there is no drag }
+  P0 := Sp.ClientToScreen(Point(Sp.ClientWidth + Round(8 * K), Sp.ClientHeight div 2));
+  Swipe(P0, Point(P0.X + 1, P0.Y));
+  Check('splitter: a tap beside it resizes nothing', APane.Width = C, Format('%d -> %d px', [C, APane.Width]));
+  { the mouse has to hit the splitter itself: a click beside it }
+  Click(P0);
+  Check('splitter: a mouse click beside it resizes nothing', (APane.Width = C) and not Sp.Dragging,
+    Format('%d -> %d px', [C, APane.Width]));
+  { further away than the reach a finger does not take it }
+  P0 := Sp.ClientToScreen(Point(Sp.ClientWidth + Round(40 * K), Sp.ClientHeight div 2));
+  Swipe(P0, Point(P0.X + D, P0.Y));
+  Check('splitter: a finger 40 px away does not drag it', APane.Width = C, Format('%d -> %d px', [C, APane.Width]));
+end;
+
+{ The flat playlist: a finger beside the left edge of the Album column drags
+  that edge (the column gets narrower by what the finger moved). }
+procedure TProbe.ColumnEdgeCheck(APlaylist: TAuControl; ALibPane: TControl);
+const
+  WHAT = 'flat playlist: a finger beside a column edge drags it';
+var
+  C: TWinControl;
+  Pane: TPlaylistPane;
+  Head: TAuControl;
+  R: TPlColRects;
+  I, Idx, X0, D, W0, W1, LibW: Integer;
+  Which: TPlColumn;
+  K: Double;
+  P0: TPoint;
+begin
+  C := APlaylist.Parent;
+  while (C <> nil) and not (C is TPlaylistPane) do C := C.Parent;
+  if C = nil then
+  begin
+    Check(WHAT, False, 'no playlist pane found');
+    Exit;
+  end;
+  Pane := TPlaylistPane(C);
+  { room for the columns: the library pane narrow meanwhile }
+  LibW := 0;
+  if ALibPane <> nil then
+  begin
+    LibW := ALibPane.Width;
+    K := WindowDpi(Pane.Handle) / 96;
+    if K <= 0 then K := 1;
+    ALibPane.Width := Round(280 * K);
+  end;
+  Pane.SetView(gmFlat, '', '', '', False);
+  Pane.Rebuild;
+  Pump(700);
+  try
+    Head := FindOfClass(Pane, 'TPlColumnHeader');
+    R := Pane.ColumnRects(Pane.List.ContentWidth);
+    { the first column behind the first whose left edge can be dragged }
+    Idx := -1;
+    for I := High(R) downto 1 do
+      if R[I].Col in [pcArtist, pcAlbum, pcAlbumArtist, pcYear, pcGenre, pcFormat] then Idx := I;
+    if (Head = nil) or (Idx < 0) then
+    begin
+      Check(WHAT, False, Format('heading row found: %s; columns shown: %d (list %d px wide)',
+        [BoolToStr(Head <> nil, True), Length(R), Pane.List.ContentWidth]));
+      Exit;
+    end;
+    Which := R[Idx].Col;
+    K := WindowDpi(Head.Handle) / 96;
+    if K <= 0 then K := 1;
+    D := Round(30 * K);
+    X0 := Pane.List.Left + Pane.List.ContentLeft;
+    W0 := R[Idx].W;
+    { 9 px right of the edge: outside the reach of the mouse (5 px) }
+    P0 := Head.ClientToScreen(Point(X0 + R[Idx].X + Round(9 * K), Head.ClientHeight div 2));
+    if Covered(Head, P0) or not Swipe(P0, Point(P0.X + D, P0.Y)) then
+    begin
+      Check(WHAT, False, FError);
+      Exit;
+    end;
+    R := Pane.ColumnRects(Pane.List.ContentWidth);
+    W1 := W0;
+    for I := 0 to High(R) do
+      if R[I].Col = Which then W1 := R[I].W;
+    { by about what the finger moved; the columns are fitted to the room, so
+      not to the pixel }
+    Check(WHAT, (W0 - W1 >= D div 2) and (W0 - W1 <= 2 * D),
+      Format('column %d: %d -> %d px (dragged %d); %s', [Ord(Which), W0, W1, D, MsgSummary]));
+    { the mouse at the same distance takes no edge }
+    R := Pane.ColumnRects(Pane.List.ContentWidth);
+    for I := 0 to High(R) do
+      if R[I].Col = Which then Idx := I;
+    P0 := Head.ClientToScreen(Point(X0 + R[Idx].X + Round(9 * K), Head.ClientHeight div 2));
+    Drag(P0, Point(P0.X + D, P0.Y));
+    R := Pane.ColumnRects(Pane.List.ContentWidth);
+    W0 := W1;
+    for I := 0 to High(R) do
+      if R[I].Col = Which then W0 := R[I].W;
+    Check('flat playlist: the mouse beside a column edge drags nothing', W0 = W1, Format('%d -> %d px', [W1, W0]));
+  finally
+    Pane.SetView(gmAlbum, '', '', '', False);
+    Pane.Rebuild;
+    if (ALibPane <> nil) and (LibW > 0) then ALibPane.Width := LibW;
+    Pump(500);
+  end;
+end;
+
+{ The help: a finger a little above the lower edge of the picture panel
+  drags that edge (a pan gesture would scroll instead). }
+procedure TProbe.PictureEdgeCheck(AHelp: TWinControl);
+const
+  WHAT = 'help: a finger on the picture''s lower edge makes the panel lower';
+var
+  Pic: TAuControl;
+  K: Double;
+  A, B, C, D: Integer;
+  P0: TPoint;
+begin
+  Pic := FindOfClass(AHelp, 'TMdPicture');
+  if (Pic = nil) or (not Pic.Visible) or (Pic.Height < 100) then
+  begin
+    Check(WHAT, False, 'no picture panel');
+    Exit;
+  end;
+  K := WindowDpi(Pic.Handle) / 96;
+  if K <= 0 then K := 1;
+  D := Round(60 * K);
+  A := Pic.Height;
+  { 14 px above the edge: outside the reach of the mouse (8 px) }
+  P0 := Pic.ClientToScreen(Point(Pic.ClientWidth div 4, Pic.ClientHeight - Round(14 * K)));
+  if Covered(Pic, P0) or not Swipe(P0, Point(P0.X, P0.Y - D)) then
+  begin
+    Check(WHAT, False, FError);
+    Exit;
+  end;
+  Pump(600);
+  B := Pic.Height;
+  Check(WHAT, B <= A - D div 2, Format('%d -> %d px (dragged %d up); %s', [A, B, D, MsgSummary]));
+  P0 := Pic.ClientToScreen(Point(Pic.ClientWidth div 4, Pic.ClientHeight - Round(14 * K)));
+  Swipe(P0, Point(P0.X, P0.Y + D));
+  Pump(600);
+  C := Pic.Height;
+  Check('help: and dragged down it gets higher again', C >= B + D div 2, Format('%d -> %d px', [B, C]));
 end;
 
 procedure TProbe.LongMenuCheck(AMain: TCustomForm);
@@ -977,7 +1144,8 @@ begin
 end;
 
 { every check, in order (RunTouchProbe catches what they raise) }
-procedure ProbeAll(P: TProbe; AMain: TCustomForm; APlaylist, ATree: TAuControl; const APdf: string);
+procedure ProbeAll(P: TProbe; AMain: TCustomForm; APlaylist, ATree, ATiles: TAuControl;
+  AShowTiles: TProbeSwitch; const APdf: string);
 var
   F: TAuForm;
   B: TCustomForm;
@@ -998,6 +1166,31 @@ begin
   P.GlideCheck('library tree: the wheel glides to the same place', ATree);
   P.SplitterCheck(ATree.Parent);
   P.LongMenuCheck(AMain);
+  { on top again: closing the menu may have handed the foreground to
+    another program }
+  PlaceOnTop(AMain, 0, 0);
+  P.Pump(400);
+  P.ColumnEdgeCheck(APlaylist, ATree.Parent);
+  PlaceOnTop(AMain, 0, 0);
+  P.Pump(400);
+
+  { the album tiles in the tree's place (made-up albums: more than fit) }
+  if Assigned(AShowTiles) and (ATiles <> nil) then
+  begin
+    P.Line('');
+    P.Line('--- main window, the library pane as album tiles');
+    AShowTiles(True);
+    try
+      P.Pump(800);
+      P.ViewChecks('album tiles', ATiles);
+      P.SwipeCheck('album tiles: a sideways drag does not scroll', ATiles, 0.25, 0.5, 0.75, 0.52,
+        EXPECT_SAME);
+      P.GlideCheck('album tiles: the wheel glides to the same place', ATiles);
+    finally
+      AShowTiles(False);
+      P.Pump(400);
+    end;
+  end;
 
   P.Line('');
   P.Line('--- Preferences (Output page, 900 x 420 as on a small screen: the page scrolls;');
@@ -1028,6 +1221,7 @@ begin
     PlaceOnTop(F, 900, 650);
     P.Pump(1200);
     P.ViewChecks('help', FindOfClass(F, 'TMdView'));
+    P.PictureEdgeCheck(F);
   finally
     F.Free;
   end;
@@ -1072,8 +1266,8 @@ begin
   end;
 end;
 
-function RunTouchProbe(AMain: TCustomForm; APlaylist, ATree: TAuControl;
-  const APdf, AReport: string): Integer;
+function RunTouchProbe(AMain: TCustomForm; APlaylist, ATree, ATiles: TAuControl;
+  AShowTiles: TProbeSwitch; const APdf, AReport: string): Integer;
 var
   P: TProbe;
   Cursor0: TPoint;
@@ -1089,7 +1283,7 @@ begin
     if not Assigned(P.FInj.FInject) then P.Check('touch injection', False, P.FError);
     { an exception ends the probe as a failure (no error dialog to wait on) }
     try
-      ProbeAll(P, AMain, APlaylist, ATree, APdf);
+      ProbeAll(P, AMain, APlaylist, ATree, ATiles, AShowTiles, APdf);
     except
       on E: Exception do P.Check('the probe', False, 'stopped by ' + E.ClassName + ': ' + E.Message);
     end;

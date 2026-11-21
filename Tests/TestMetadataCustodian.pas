@@ -16,6 +16,10 @@ unit TestMetadataCustodian;
   The custodian shows a dialog when a file could not be written; a console
   test must not wait for it, so the tests set Application.Terminated (only
   the custodian looks at it).
+  A damaged ID3 tag: a normal job leaves the file alone, a job with RepairTag
+  writes the fields in front of and behind the damage and keeps a copy of
+  the old tag; a job with RestoreTagFrom puts that copy back, and the file is
+  byte for byte what it was before the repair.
   =============================================================================}
 
 interface
@@ -28,7 +32,8 @@ type
   private
     FDir: string;
     procedure WriteTags(const APath: string; const AOrig, ACur: TAudioTagValues);
-    procedure RunJob(Job: PMetadataJob);
+    // AMayFail: a refused file is no failure of the test; True = written
+    function RunJob(Job: PMetadataJob; AMayFail: Boolean = False): Boolean;
     function TagsOf(const APath: string): TAudioTagValues;
   protected
     procedure SetUp; override;
@@ -42,12 +47,14 @@ type
     procedure DffTagIsReplacedNotAdded;
     procedure ReplayGainTagsAreWritten;
     procedure TrackOnlyReplayGainRemovesTheAlbumValues;
+    procedure DamagedTagIsRepairedWithACopy;
+    procedure RepairIsUndone;
   end;
 
 implementation
 
 uses
-  Forms, ALMetadata, AuLog, uMetadataCustodian, AudioTag, baseTag, file_dff, TestHelpers;
+  Forms, ALMetadata, AuLog, uMetadataCustodian, uAppConsts, AudioTag, baseTag, file_dff, TestHelpers;
 
 { ---- the audio bytes of the test files ---- }
 
@@ -203,7 +210,7 @@ begin
 end;
 
 { the custodian takes the job over }
-procedure TTestMetadataCustodian.RunJob(Job: PMetadataJob);
+function TTestMetadataCustodian.RunJob(Job: PMetadataJob; AMayFail: Boolean): Boolean;
 var
   C: TMetadataCustodian;
   L: TList;
@@ -238,11 +245,253 @@ begin
     C.StrangleAndStop;
     C.Free;
   end;
-  if Failed then
+  Result := not Failed;
+  if Failed and not AMayFail then
   begin
     for I := LogStart to AppLog.Lines.Count - 1 do
       if Pos('[Metadata]', AppLog.Lines[I]) > 0 then WriteLn(ErrOutput, AppLog.Lines[I]);
     Fail('The file was not updated (the log above says why)');
+  end;
+end;
+
+{ an ID3v2.3 text frame (Latin-1) }
+function TextFrame(const AID, AText: AnsiString): AnsiString;
+var
+  N: Integer;
+begin
+  N := Length(AText) + 1;
+  Result := AID + AnsiChar(N shr 24) + AnsiChar((N shr 16) and $FF) + AnsiChar((N shr 8) and $FF) +
+    AnsiChar(N and $FF) + #0#0 + #0 + AText;
+end;
+
+{ A WAV file with an ID3v2.3 tag at its end: a title, damaged bytes, then
+  album and artist. The result is the tag. }
+function WriteDamagedWav(const P: string): AnsiString;
+const
+  GARBAGE = #1#2#3#4#5#6#7#8#9#10#11#12;
+var
+  Tag, Chunk: AnsiString;
+  B: TBytes;
+  N: Integer;
+begin
+  WriteTestWav(P);
+  Tag := TextFrame('TIT2', 'Old Title') + GARBAGE + TextFrame('TALB', 'The Album') +
+    TextFrame('TPE1', 'The Artist') + StringOfChar(#0, 40);
+  N := Length(Tag);
+  Tag := 'ID3'#3#0#0 + AnsiChar((N shr 21) and $7F) + AnsiChar((N shr 14) and $7F) +
+    AnsiChar((N shr 7) and $7F) + AnsiChar(N and $7F) + Tag;
+  N := Length(Tag);
+  Chunk := 'id3 ' + AnsiChar(N and $FF) + AnsiChar((N shr 8) and $FF) + AnsiChar((N shr 16) and $FF) +
+    AnsiChar(N shr 24) + Tag;
+  if Odd(N) then Chunk := Chunk + #0;
+  B := ReadAll(P);
+  N := Length(B);
+  SetLength(B, N + Length(Chunk));
+  Move(Chunk[1], B[N], Length(Chunk));
+  N := Length(B) - 8;
+  B[4] := N and $FF; B[5] := (N shr 8) and $FF; B[6] := (N shr 16) and $FF; B[7] := N shr 24;
+  WriteFileBytes(P, B);
+  Result := Tag;
+end;
+
+procedure TTestMetadataCustodian.RepairIsUndone;
+var
+  P, OldDir, Copy1, Found, FoundWhen: string;
+  Before: TBytes;
+  M: TAudioMetadata;
+  Job: PMetadataJob;
+
+  function NewJob: PMetadataJob;
+  begin
+    New(Result);
+    Result^ := Default(TMetadataJob);
+    Result^.FilePath := P;
+    Result^.ActionType := matTagEditor;
+  end;
+
+begin
+  P := FDir + 'track.wav';
+  WriteDamagedWav(P);
+  Before := ReadAll(P);
+  OldDir := AppTagBackupDir;
+  AppTagBackupDir := FDir + 'TagBackups' + PathDelim;
+  try
+    AssertEquals('No copy yet', '', FindTagBackup(P, AppTagBackupDir, FoundWhen));
+    // the repair (no field changed)
+    Job := NewJob;
+    Job^.TagEditor.RepairTag := True;
+    AssertTrue('Repaired', RunJob(Job));
+    AssertFalse('Healthy now', ReadTrackMetadata(P, False, False, True).TagDamaged);
+    Copy1 := FindTagBackup(P, AppTagBackupDir, FoundWhen);
+    AssertTrue('The copy is found for the file', Copy1 <> '');
+    AssertTrue('With the time it was made: ' + FoundWhen, Length(FoundWhen) = 19);
+    AssertEquals('Not for another file', '', FindTagBackup(FDir + 'other.wav', AppTagBackupDir, FoundWhen));
+    AssertEquals('The path in another case is the same file', Copy1,
+      FindTagBackup(UpperCase(P), AppTagBackupDir, FoundWhen));
+
+    // a tag edit in between: lost by the undo, as the question says
+    M := ReadTrackMetadata(P, False, False, True);
+    Job := NewJob;
+    Job^.TagEditor.Original.Title := M.Title;
+    Job^.TagEditor.Current.Title := 'Edited Later';
+    Job^.TagEditor.IsModified := True;
+    AssertTrue('Edited', RunJob(Job));
+    AssertEquals('The edit', 'Edited Later', ReadTrackMetadata(P, False, False, True).Title);
+
+    // the undo
+    Job := NewJob;
+    Job^.TagEditor.RestoreTagFrom := Copy1;
+    AssertTrue('Put back', RunJob(Job));
+    AssertTrue('The file is byte for byte what it was', SameBytes(Before, ReadAll(P)));
+    M := ReadTrackMetadata(P, False, False, True);
+    AssertTrue('With its damage', M.TagDamaged);
+    AssertEquals('And its old title', 'Old Title', M.Title);
+    AssertTrue('The copy is kept', FileExists(Copy1));
+
+    // a copy that is no tag, and one that is gone: nothing is written
+    Job := NewJob;
+    Job^.TagEditor.RestoreTagFrom := P;           // a WAV file is no tag
+    AssertFalse('A file that is no tag is refused', RunJob(Job, True));
+    Job := NewJob;
+    Job^.TagEditor.RestoreTagFrom := FDir + 'gone.id3';
+    AssertFalse('A missing copy is refused', RunJob(Job, True));
+    AssertTrue('The file is untouched', SameBytes(Before, ReadAll(P)));
+
+    // repaired again: the newest copy is the one found
+    Job := NewJob;
+    Job^.TagEditor.RepairTag := True;
+    AssertTrue('Repaired again', RunJob(Job));
+    Found := FindTagBackup(P, AppTagBackupDir, FoundWhen);
+    AssertTrue('A copy is found', Found <> '');
+    DeleteFile(Found);
+    Found := FindTagBackup(P, AppTagBackupDir, FoundWhen);
+    AssertTrue('Without the newest the one before it (or none when both were made in the same second)',
+      (Found = '') or FileExists(Found));
+  finally
+    AppTagBackupDir := OldDir;
+  end;
+end;
+
+procedure TTestMetadataCustodian.DamagedTagIsRepairedWithACopy;
+var
+  P, OldDir, Index: string;
+  Tag: AnsiString;
+  B, Audio, Before: TBytes;
+  M: TAudioMetadata;
+  Orig, Cur: TAudioTagValues;
+  Job: PMetadataJob;
+  SR: TSearchRec;
+  Copies: Integer;
+  CopyName: string;
+  SL: TStringList;
+begin
+  P := FDir + 'track.wav';
+  Tag := WriteDamagedWav(P);
+  Audio := WavAudio(P);
+  Before := ReadAll(P);
+
+  M := ReadTrackMetadata(P, False, False, True);
+  AssertTrue('The damage is seen', M.TagDamaged);
+  AssertEquals('The title in front of it', 'Old Title', M.Title);
+  AssertEquals('Nothing from behind it', '', M.Album);
+  M := ReadTrackMetadata(P, False, False, True, True);
+  AssertEquals('A repairing read has the album', 'The Album', M.Album);
+  AssertEquals('And the artist', 'The Artist', M.Artist);
+
+  OldDir := AppTagBackupDir;
+  AppTagBackupDir := FDir + 'TagBackups' + PathDelim;
+  try
+    // a normal job: refused, the file stays
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Title := 'New Title';
+    New(Job);
+    Job^ := Default(TMetadataJob);
+    Job^.FilePath := P;
+    Job^.ActionType := matTagEditor;
+    Job^.TagEditor.Original := Orig;
+    Job^.TagEditor.Current := Cur;
+    Job^.TagEditor.IsModified := True;
+    AssertFalse('A normal save is refused', RunJob(Job, True));
+    AssertTrue('The file is as it was', SameBytes(Before, ReadAll(P)));
+    AssertFalse('No copy was made', DirectoryExists(AppTagBackupDir));
+
+    // the repair, with a changed title
+    M := ReadTrackMetadata(P, False, False, True, True);
+    Orig := Default(TAudioTagValues);
+    Orig.Title := M.Title;
+    Orig.Album := M.Album;
+    Orig.Artist := M.Artist;
+    Cur := Orig;
+    Cur.Title := 'New Title';
+    New(Job);
+    Job^ := Default(TMetadataJob);
+    Job^.FilePath := P;
+    Job^.ActionType := matTagEditor;
+    Job^.TagEditor.Original := Orig;
+    Job^.TagEditor.Current := Cur;
+    Job^.TagEditor.IsModified := True;
+    Job^.TagEditor.RepairTag := True;
+    AssertTrue('The repair is written', RunJob(Job));
+
+    M := ReadTrackMetadata(P, False, False, True);
+    AssertFalse('No damage any more', M.TagDamaged);
+    AssertEquals('The new title', 'New Title', M.Title);
+    AssertEquals('The album from behind the damage', 'The Album', M.Album);
+    AssertEquals('The artist', 'The Artist', M.Artist);
+    AssertTrue('The audio is unchanged', SameBytes(Audio, WavAudio(P)));
+
+    // the copy of the old tag and its line in the list
+    Copies := 0;
+    CopyName := '';
+    if FindFirst(AppTagBackupDir + '*.id3', faAnyFile, SR) = 0 then
+    begin
+      repeat
+        Inc(Copies);
+        CopyName := SR.Name;
+      until FindNext(SR) <> 0;
+      FindClose(SR);
+    end;
+    AssertEquals('One copy', 1, Copies);
+    AssertTrue('Named after the file: ' + CopyName, Pos('track.wav.', CopyName) = 1);
+    B := ReadAll(AppTagBackupDir + CopyName);
+    AssertEquals('The old tag, whole', Length(Tag), Length(B));
+    AssertTrue('Byte for byte', CompareMem(@B[0], @Tag[1], Length(Tag)));
+    SL := TStringList.Create;
+    try
+      SL.LoadFromFile(AppTagBackupDir + 'index.txt');
+      Index := SL.Text;
+    finally
+      SL.Free;
+    end;
+    AssertTrue('The list names the copy', Pos(CopyName, Index) > 0);
+    AssertTrue('And the file it belongs to', Pos(P, Index) > 0);
+
+    // a job with RepairTag on a healthy file: a normal save, no copy more
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Title := 'Third Title';
+    New(Job);
+    Job^ := Default(TMetadataJob);
+    Job^.FilePath := P;
+    Job^.ActionType := matTagEditor;
+    Job^.TagEditor.Original := Orig;
+    Job^.TagEditor.Current := Cur;
+    Job^.TagEditor.IsModified := True;
+    Job^.TagEditor.RepairTag := True;
+    AssertTrue('Written', RunJob(Job));
+    AssertEquals('The title', 'Third Title', TagsOf(P).Title);
+    Copies := 0;
+    if FindFirst(AppTagBackupDir + '*.id3', faAnyFile, SR) = 0 then
+    begin
+      repeat
+        Inc(Copies);
+      until FindNext(SR) <> 0;
+      FindClose(SR);
+    end;
+    AssertEquals('Still one copy', 1, Copies);
+  finally
+    AppTagBackupDir := OldDir;
   end;
 end;
 

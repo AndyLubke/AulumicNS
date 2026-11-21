@@ -165,15 +165,15 @@ type
   private
     FFileName: string;
   protected
-    // ---> AUDIT FIX: Human-readable reason why the last UpdateFile failed
+    // Human-readable reason why the last UpdateFile failed
     // ('' after success), so callers can report skipped files.
     FLastUpdateError: string;
-    // ---> AUDIT FIX: True when the file could not be read when this reader was
+    // True when the file could not be read when this reader was
     // created (LoadFromFile returned False). UpdateFile then refuses to save:
     // the tag in memory is empty or incomplete, and saving would replace the
     // existing tag (including pictures) by it.
     FLoadFailed: boolean;
-    // ---> AulumicNS: read with TagReadTextOnly: the pictures were left in
+    // read with TagReadTextOnly: the pictures were left in
     // the file, the tag in memory is incomplete. UpdateFile refuses to save.
     FTextOnly: boolean;
   protected
@@ -200,15 +200,19 @@ type
     property TextOnly: boolean read FTextOnly;
   end;
 
-// ---> AulumicNS: True while a reader is created that shall read the text
+// True while a reader is created that shall read the text
 // fields only: embedded pictures are skipped, not loaded (a cover of several
 // MB for a reader that only wants the album name or the ReplayGain values).
 // Set through audiotag.GetFileTagsObject(FileName, True), never directly.
 // Per thread. FLAC (picture blocks) and ID3v2 (APIC / PIC frames: WAV, DSF,
-// DFF, MP3) follow it; the other formats load their pictures as before.
+// DFF, MP3) follow it; the other formats always load their pictures.
 // Such a reader cannot save (TTagReader.TextOnly).
 threadvar
   TagReadTextOnly: boolean;
+  // True while a reader is created that shall repair a damaged ID3v2 tag:
+  // reading goes on behind damaged bytes (see TID3Tags.Recovered), and such a
+  // reader may save. Set through audiotag.GetFileTagsObject, never directly.
+  TagReadRecover: boolean;
 
 function GetTagByID(const Tags: TcommonTags; Field: TIDFields): string; inline;
 procedure SetTagByID(var Tags: TcommonTags; Field: TIDFields; const Value: string); inline;
@@ -218,7 +222,7 @@ implementation
 
 uses
   fpjson{$IFDEF WINDOWS}, Windows{$ENDIF},
-  AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 operator = (const t1, t2: TCommonTags) b: boolean;
 begin
@@ -296,7 +300,7 @@ begin
   FFrameRef := AValue;
 end;
 
-// ---> AUDIT FIX 4.3: Free the existing FImage stream before assigning AValue
+// Free the existing FImage stream before assigning AValue
 procedure TImageElement.SetImage(AValue: TStream);
 begin
   if FImage = AValue then
@@ -348,7 +352,7 @@ begin
   inherited Create;
   FFileName := FileName;
   FTextOnly := TagReadTextOnly;
-  // ---> AUDIT FIX: Remember whether the existing tag could be read
+  // Remember whether the existing tag could be read
   if FileExists(LongPath(FileName)) then
     FLoadFailed := not LoadFromFile(FileName)
   else
@@ -409,7 +413,7 @@ begin
 end;
 
 // =============================================================================
-// ---> AUDIT FIX 2.5: DATA-SAFE ATOMIC FILE UPDATER
+// DATA-SAFE ATOMIC FILE UPDATER
 // Uses MoveFileExW(MOVEFILE_REPLACE_EXISTING or MOVEFILE_WRITE_THROUGH) on
 // Windows so the original file is replaced atomically without a Delete-then-Rename
 // gap! Retries if a background scanner briefly holds the file open.
@@ -417,7 +421,7 @@ end;
 function TTagReader.UpdateFile: boolean;
 {$IFDEF WINDOWS}
 const
-  // ---> FIXED: Explicitly declare Win32 MoveFileExW flags missing from FPC's Windows unit
+  // Explicitly declare Win32 MoveFileExW flags missing from FPC's Windows unit
   MOVEFILE_REPLACE_EXISTING = $00000001;
   MOVEFILE_WRITE_THROUGH    = $00000008;
   // FILE_SHARE_READ or FILE_SHARE_WRITE or FILE_SHARE_DELETE
@@ -429,7 +433,7 @@ const
   AL_ERROR_INVALID_FUNCTION  = 1;
   AL_ERROR_NOT_SUPPORTED     = 50;
   AL_ERROR_INVALID_PARAMETER = 87;
-  // ---> AUDIT FIX: A virus scanner or the search indexer often opens a freshly
+  // A virus scanner or the search indexer often opens a freshly
   // written file for a moment (longer for multi-GB DSF files). Retry such
   // transient sharing errors for up to ~3 s instead of giving up at once.
   TRANSIENT_RETRIES         = 30;
@@ -437,14 +441,14 @@ const
 {$ENDIF}
 var
   SaveFile: string;
-  // ---> AulumicNS: the \\?\ forms of FileName and SaveFile for the file
+  // the \\?\ forms of FileName and SaveFile for the file
   // calls (a path of 260 characters and more; the temporary name is longer
   // than the file's). SaveToFile takes SaveFile and does the same itself.
   LName, LSave: string;
-  // ---> AUDIT FIX: True once the original file was deleted by the fallback.
+  // True once the original file was deleted by the fallback.
   // From then on the temporary file may be the only copy and is never deleted.
   OriginalDeleted: boolean;
-  // ---> AUDIT FIX: The Delete + Rename fallback is only allowed when replacing
+  // The Delete + Rename fallback is only allowed when replacing
   // is not supported at all, never after 'file in use' errors
   AllowFallback: boolean;
   {$IFDEF WINDOWS}
@@ -471,14 +475,14 @@ begin
   OriginalDeleted  := False;
   AllowFallback    := False;
 
-  // ---> AUDIT FIX: Never save when the existing tag could not be read: the tag
+  // Never save when the existing tag could not be read: the tag
   // in memory would replace the complete existing tag (fields and pictures)
   if FLoadFailed then
   begin
     FLastUpdateError := 'the existing tag could not be read, so saving would lose it';
     Exit(False);
   end;
-  // ---> AulumicNS: a reader without the pictures would save a tag without them
+  // a reader without the pictures would save a tag without them
   if FTextOnly then
   begin
     FLastUpdateError := 'the tag was read without its pictures, so saving would lose them';
@@ -498,7 +502,7 @@ begin
       WideSave   := UTF8Decode(LSave);
       WideTarget := UTF8Decode(LName);
 
-      // ---> AUDIT FIX: MOVEFILE_WRITE_THROUGH only makes the rename durable, not
+      // MOVEFILE_WRITE_THROUGH only makes the rename durable, not
       // the new file's contents. Flush the rebuilt file to disk first so a power
       // loss can never leave the audio file replaced by an unwritten one.
       // Full sharing, so a scanner that has the file open does not block us.
@@ -550,7 +554,7 @@ begin
         begin
           FLastUpdateError := Format('the original file could not be replaced; ' +
                               'it may be in use by another program (Windows error %d)', [Err]);
-          // ---> AUDIT FIX: Only fall back to Delete + Rename when the file system
+          // Only fall back to Delete + Rename when the file system
           // does not support replacing. After 'in use' errors the original is
           // kept: deleting a file another program holds open can leave it
           // 'delete pending' (FAT / exFAT / network), so the rename fails and

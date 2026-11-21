@@ -65,7 +65,7 @@ type
 
     //Alub added:
     procedure LoadFromImageStream(ImageStream: TMemoryStream; MIMEType: string; PictureType: Byte; IsV22: Boolean);
-    // ---> AulumicTag: Splits a TXXX / TXX frame into its description and value
+    // Splits a TXXX / TXX frame into its description and value
     // (AsString returns both glued together). False when the frame has no
     // valid encoding byte or no description terminator.
     function SplitTextPair(out ADesc, AValue: string): boolean;
@@ -94,15 +94,32 @@ type
   private
     fPadding: Integer;
     fTotalSize: DWORD;
-    // ---> AUDIT FIX: Set when ReadFromStream skipped an oversized frame, or when
+    // Set when ReadFromStream skipped an oversized frame, or when
     // WriteToStream had to drop a frame. Savers refuse to rewrite the file in
     // either case so frames are never silently lost.
     fSkippedFrames: boolean;
     fWriteDroppedFrames: boolean;
-    // ---> AUDIT FIX: Set when reading stopped at damaged data inside the tag
-    // (not at normal zero padding). Everything after that point was not loaded
-    // and is discarded when the tag is saved; callers may report this.
+    // Set when reading stopped at damaged data inside the tag (not at normal
+    // zero padding). Everything after that point was not loaded, so the
+    // savers refuse to rewrite the file.
     fUnreadableData: boolean;
+    // A repairing read (basetag.TagReadRecover). Damage does not end it: the
+    // next place from which frames line up to the end of the tag is searched,
+    // and reading goes on there. fUnreadableData stays False, so the tag can
+    // be saved without the damaged bytes.
+    fRecover: boolean;
+    fRecovered: boolean;
+    fRecoverKept: Integer;
+    fRecoverDiscarded: Int64;
+    fRecoverRaw: TBytes;
+    // The frame sizes of an ID3v2.4 tag are read as plain numbers (some
+    // programs wrote them so; the format wants 7 bits per byte)
+    fPlainSizes: boolean;
+    // A whole tag (header and all) that WriteToStream writes in place of the
+    // frames: an old tag put back as it was
+    fRawForWrite: TBytes;
+    function GetRecoverRescued: Integer;
+    function GetHasRawForWrite: boolean;
     procedure DecodeFrameToImage(Frame: TID3Frame; Image: TImageElement);
     function GetBestMatch(Index1, Index2: integer; NewFrame: boolean): string;
     function GetRealSize: DWord;
@@ -120,6 +137,22 @@ type
     property HasSkippedFrames: boolean read fSkippedFrames;
     property LastWriteDroppedFrames: boolean read fWriteDroppedFrames;
     property HasUnreadableData: boolean read fUnreadableData;
+    // After a repairing read: True when the tag was damaged. RecoverKept
+    // frames stood in front of the damage, RecoverRescued behind it,
+    // RecoverDiscarded bytes could not be read, RecoverRaw is the tag as it
+    // stands in the file, RecoverPlainSizes says that the frame sizes were
+    // written in the wrong form (nothing is lost then).
+    property Recovered: boolean read fRecovered;
+    property RecoverKept: Integer read fRecoverKept;
+    property RecoverRescued: Integer read GetRecoverRescued;
+    property RecoverDiscarded: Int64 read fRecoverDiscarded;
+    property RecoverRaw: TBytes read fRecoverRaw;
+    property RecoverPlainSizes: boolean read fPlainSizes;
+    // Lets the next save write ATag, a whole ID3v2 tag as it once stood in a
+    // file, in place of the frames in memory. False (and nothing is set)
+    // when ATag is not one tag from its header to its end.
+    function SetRawForWrite(const ATag: TBytes): boolean;
+    property HasRawForWrite: boolean read GetHasRawForWrite;
     function GetCommonTags: TCommonTags; override;
     procedure SetCommonTags(const CommonTags: TCommonTags); override;
     function ReadFromStream(AStream: TStream; ExtInfo: pointer = nil): boolean; override;
@@ -159,8 +192,8 @@ const
   TAG_VERSION_2_3   = 3;
   TAG_VERSION_2_4   = 4;
   ID3V2_FRAME_COUNT = 18;
-  // ---> MODIFIED: Restored 32 MB image ceiling; frames larger than this are
-  // cleanly Seek()-skipped during ReadFromStream so subsequent text tags are never lost!
+  // Frames larger than these are
+  // passed over by ReadFromStream, so the text frames behind them are still read
   MAX_ID3_FRAME_SIZE      = 32 * 1024 * 1024; // 32 MB max for APIC/PIC frames
   MAX_ID3_TEXT_FRAME_SIZE = 2 * 1024 * 1024;  // 2 MB max for non-image frames
   MAX_ID3_TAG_SYNCSAFE    = $0FFFFFFF;        // 256 MB - 1 (28-bit synchsafe limit)
@@ -188,10 +221,10 @@ const
     ('TPE2', 'TP2')
   );
 
-// ---> AUDIT FIX C7: Spec-compliant UTF-16 TXXX frames carry a separate BOM for
+// Spec-compliant UTF-16 TXXX frames carry a separate BOM for
 // the description and the value. Remove any BOM code units ($FEFF, or a
 // byte-swapped $FFFE) left inside the decoded string so callers such as
-// ExtractReplayGain see exactly the same text as before.
+// ExtractReplayGain see the plain text.
 procedure StripEmbeddedBOMs(var W: UnicodeString);
 var
   I, J: Integer;
@@ -209,8 +242,42 @@ begin
     SetLength(W, J);
 end;
 
-// Custom Text Decoder with strict buffer-length clamping
-function CustomDecodeID3Text(Encoding: byte; const Buffer: rawbytestring; StartIdx, Len: integer): string;
+// The values of a text frame as one text: a text frame may hold several
+// values with a zero character between them (ID3v2.4). They are joined with
+// '; '; zeros at the start and the end (terminators) and empty values give no
+// separator.
+function JoinTextValues(const S: string): string;
+var
+  I, First, Last: Integer;
+  Pending: Boolean;
+begin
+  Result := '';
+  First  := 1;
+  Last   := Length(S);
+  while (First <= Last) and (S[First] = #0) do Inc(First);
+  while (Last >= First) and (S[Last] = #0) do Dec(Last);
+  Pending := False;
+  for I := First to Last do
+  begin
+    if S[I] = #0 then
+      Pending := True
+    else
+    begin
+      if Pending then
+      begin
+        Result  := TrimRight(Result) + '; ';
+        Pending := False;
+      end;
+      Result := Result + S[I];
+    end;
+  end;
+end;
+
+// Custom Text Decoder with strict buffer-length clamping. AMulti: the text may
+// hold several values (see JoinTextValues); without it zero characters are
+// only removed.
+function CustomDecodeID3Text(Encoding: byte; const Buffer: rawbytestring; StartIdx, Len: integer;
+  AMulti: boolean = False): string;
 var
   S8: UTF8String;
   WStr: UnicodeString;
@@ -279,6 +346,9 @@ begin
         end;
     end;
 
+    if AMulti then
+      Result := JoinTextValues(Result);
+
     // Eliminate all #0 characters which cause Windows UI controls to truncate text
     Result := Trim(StringReplace(Result, #0, '', [rfReplaceAll]));
   except
@@ -293,6 +363,37 @@ begin
   Result := GetFrameValue(ID3V2_KNOWNFRAME[Index1, NewFrame]);
   if Result = '' then
     Result := GetFrameValue(ID3V2_KNOWNFRAME[Index2, NewFrame]);
+end;
+
+function TID3Tags.GetHasRawForWrite: boolean;
+begin
+  Result := Length(fRawForWrite) > 0;
+end;
+
+function TID3Tags.SetRawForWrite(const ATag: TBytes): boolean;
+var
+  TagBytes: Int64;
+begin
+  Result := False;
+  if (Length(ATag) < 10) or (Int64(Length(ATag)) > Int64(MAX_ID3_TAG_SYNCSAFE) + 10) then
+    Exit;
+  if (ATag[0] <> Ord('I')) or (ATag[1] <> Ord('D')) or (ATag[2] <> Ord('3')) then
+    Exit;
+  if ((ATag[6] or ATag[7] or ATag[8] or ATag[9]) and $80) <> 0 then
+    Exit;
+  TagBytes := (Int64(ATag[6]) shl 21) or (Int64(ATag[7]) shl 14) or (Int64(ATag[8]) shl 7) or ATag[9];
+  if TagBytes + 10 <> Length(ATag) then
+    Exit;
+  fRawForWrite := Copy(ATag, 0, Length(ATag));
+  Result := True;
+end;
+
+function TID3Tags.GetRecoverRescued: Integer;
+begin
+  if fRecovered and (not fPlainSizes) then
+    Result := Count - fRecoverKept
+  else
+    Result := 0;
 end;
 
 function TID3Tags.GetRealSize: DWord;
@@ -460,16 +561,16 @@ begin
     if not IsValid(ID) then
       Exit;
     Flags := Header.Flags;
-    if Version >= TAG_VERSION_2_4 then
+    if (Version >= TAG_VERSION_2_4) and (not fPlainSizes) then
       DataSize := Integer(SyncSafe_Decode(Header.Size))
     else
       DataSize := Integer(BEtoN(Header.Size));
   end;
 
-  // ---> FIXED: Only reject negative, zero, or past-EOF sizes here!
-  // If a frame is valid on disk (<= MaxEndPos) but larger than our RAM cap,
-  // ReadFromStream will Seek() past it so subsequent text frames are still read!
-  if (DataSize <= 0) or ((AStream.Position + DataSize) > MaxEndPos) then
+  // Only negative and past-the-end sizes are rejected here. A frame larger
+  // than the memory cap is passed over by ReadFromStream, and so is an empty
+  // frame (size 0, written by some programs): the frames behind it are read.
+  if (DataSize < 0) or ((AStream.Position + DataSize) > MaxEndPos) then
     Exit;
 
   Result := True;
@@ -656,6 +757,11 @@ begin
   Result              := 0;
   fWriteDroppedFrames := False;
   Include             := nil;
+  if Length(fRawForWrite) > 0 then
+  begin
+    AStream.WriteBuffer(fRawForWrite[0], Length(fRawForWrite));
+    Exit(DWord(Length(fRawForWrite) - 10));
+  end;
   if Version = 0 then
     Version := TAG_VERSION_2_3;
 
@@ -668,7 +774,7 @@ begin
   header.Flags := 0;
   tmpSize      := 0;
 
-  // ---> AUDIT FIX: Decide once which frames are written, so the header size and
+  // Decide once which frames are written, so the header size and
   // the frames actually written can never disagree. Frames that cannot fit in
   // v2.2 (16 MB) or the 256 MB synchsafe header are skipped and flagged.
   SetLength(Include, Count);
@@ -769,7 +875,7 @@ var
     end;
   end;
 
-  // ---> AUDIT FIX: Skips the ID3v2.3 / v2.4 extended header, so reading starts
+  // Skips the ID3v2.3 / v2.4 extended header, so reading starts
   // at the first frame. v2.3: the size field excludes itself; v2.4: it is
   // synchsafe and includes itself. False when the size is invalid.
   function SkipExtendedHeader: boolean;
@@ -794,12 +900,124 @@ var
     Result := True;
   end;
 
+  // True when frames line up from APos to the end of the tag: header after
+  // header, then nothing but zero padding (at least one frame). With
+  // AAllowDamage two frames in a row are enough when damage follows them: a
+  // single frame between two damaged places is not told from chance.
+  function ChainFrom(APos: Int64; AAllowDamage: boolean = False): boolean;
+  var
+    SavedPos, P: Int64;
+    ChainID: string;
+    ChainSize, ChainFlags, N: Integer;
+  begin
+    Result   := False;
+    SavedPos := AStream.Position;
+    try
+      P := APos;
+      N := 0;
+      while P < TagEndPos do
+      begin
+        AStream.Position := P;
+        if not ReadTagHeader(AStream, TagEndPos, ChainID, ChainSize, ChainFlags) then
+        begin
+          if HasNonZeroBytes(P, TagEndPos) then
+            Exit(AAllowDamage and (N >= 2));
+          Break;
+        end;
+        P := AStream.Position + ChainSize;
+        Inc(N);
+      end;
+      Result := N > 0;
+    finally
+      AStream.Position := SavedPos;
+    end;
+  end;
+
+  // The next place behind AFrom where frames line up to the end of the tag
+  function FindNextFrame(AFrom: Int64; out APos: Int64): boolean;
+  var
+    P: Int64;
+    B: byte;
+  begin
+    Result := False;
+    APos   := 0;
+    P      := AFrom + 1;
+    while P + FrameHeadSize <= TagEndPos do
+    begin
+      AStream.Position := P;
+      B := 0;
+      if AStream.Read(B, 1) < 1 then
+        Break;
+      // a frame ID begins with a capital letter or a digit
+      if (AnsiChar(B) in ['A'..'Z', '0'..'9']) and ChainFrom(P, True) then
+      begin
+        APos   := P;
+        Result := True;
+        Break;
+      end;
+      Inc(P);
+    end;
+  end;
+
+  // The end of the data from AFrom on: behind the last byte that is not zero
+  // (what follows is padding)
+  function DataEnd(AFrom: Int64): Int64;
+  var
+    Buf: array[0..4095] of byte;
+    Got, K: Integer;
+    P: Int64;
+  begin
+    Result := AFrom;
+    P      := AFrom;
+    AStream.Position := AFrom;
+    while P < TagEndPos do
+    begin
+      Got := SizeOf(Buf);
+      if TagEndPos - P < Got then
+        Got := Integer(TagEndPos - P);
+      Got := AStream.Read(Buf[0], Got);
+      if Got <= 0 then
+        Break;
+      for K := 0 to Got - 1 do
+        if Buf[K] <> 0 then
+          Result := P + K + 1;
+      Inc(P, Got);
+    end;
+  end;
+
+  // Damage at AFrom during a repairing read. True when reading goes on (the
+  // stream stands at the next frame); False when nothing more can be read.
+  function RecoverAt(AFrom: Int64): boolean;
+  var
+    Next: Int64;
+  begin
+    if not fRecovered then
+      fRecoverKept := Count;
+    fRecovered := True;
+    Result     := FindNextFrame(AFrom, Next);
+    if Result then
+    begin
+      Inc(fRecoverDiscarded, Next - AFrom);
+      Dec(fPadding, Integer(Next - AFrom));
+      AStream.Position := Next;
+    end
+    else
+      Inc(fRecoverDiscarded, DataEnd(AFrom) - AFrom);
+  end;
+
 begin
   Clear;
-  Result          := False;
-  FromV1          := False;
-  fSkippedFrames  := False;
-  fUnreadableData := False;
+  Result            := False;
+  FromV1            := False;
+  fSkippedFrames    := False;
+  fUnreadableData   := False;
+  fRecover          := TagReadRecover;
+  fRecovered        := False;
+  fRecoverKept      := 0;
+  fRecoverDiscarded := 0;
+  fRecoverRaw       := nil;
+  fPlainSizes       := False;
+  fRawForWrite      := nil;
 
   if (not Assigned(AStream)) or ((AStream.Size - AStream.Position) < SizeOf(header)) then
     Exit;
@@ -829,7 +1047,7 @@ begin
   else
     FrameHeadSize := 6;
 
-  // ---> AUDIT FIX: Tag header flags. The tag is always rewritten without them:
+  // Tag header flags. The tag is always rewritten without them:
   // - Unsynchronisation ($80) in v2.2 / v2.3: the frame data is stored with
   //   inserted $00 bytes; writing it back as-is would damage pictures, so
   //   such a tag is never saved (v2.4 marks this per frame; those frame flags
@@ -852,6 +1070,19 @@ begin
     end;
   end;
 
+  // A repairing read of an ID3v2.4 tag whose frames do not line up: when they
+  // do with their sizes read as plain numbers, the tag is read that way (a
+  // save writes the sizes in the right form)
+  if fRecover and (not Stop) and (Version = TAG_VERSION_2_4) and (fTotalSize > 0) and
+     (not ChainFrom(AStream.Position)) then
+  begin
+    fPlainSizes := True;
+    if ChainFrom(AStream.Position) then
+      fRecovered := True
+    else
+      fPlainSizes := False;
+  end;
+
   if (Version in [TAG_VERSION_2_2..TAG_VERSION_2_4]) and (fTotalSize > 0) then
   begin
     while (AStream.Position < TagEndPos) and (not Stop) do
@@ -861,12 +1092,28 @@ begin
       begin
         // End of the frames: normal when only zero padding follows, damage otherwise
         if HasNonZeroBytes(FramePos, TagEndPos) then
-          fUnreadableData := True;
+        begin
+          if fRecover then
+          begin
+            if RecoverAt(FramePos) then
+              Continue;
+          end
+          else
+            fUnreadableData := True;
+        end;
         Stop := True;
         Continue;
       end;
 
-      // ---> FIXED: If a frame is larger than our RAM cap (e.g. a >32 MB APIC
+      // An empty frame holds nothing: it is left out (a save does not write
+      // it again) and reading goes on with the frame behind it
+      if HeaderInfo.DataSize = 0 then
+      begin
+        Dec(fPadding, FrameHeadSize);
+        Continue;
+      end;
+
+      // If a frame is larger than our RAM cap (e.g. a >32 MB APIC
       // or a >2 MB binary GEOB frame), Seek() past it and continue reading
       // the remaining text frames instead of aborting the tag scan!
       if (HeaderInfo.ID = 'APIC') or (HeaderInfo.ID = 'PIC') then
@@ -874,7 +1121,7 @@ begin
       else
         MaxFrameCap := MAX_ID3_TEXT_FRAME_SIZE;
 
-      // ---> AulumicNS: text only (basetag.TagReadTextOnly): pictures are
+      // text only (basetag.TagReadTextOnly): pictures are
       // passed over like a frame that is too large
       if (HeaderInfo.DataSize > MaxFrameCap) or
          (TagReadTextOnly and ((HeaderInfo.ID = 'APIC') or (HeaderInfo.ID = 'PIC'))) then
@@ -923,8 +1170,16 @@ begin
       begin
         // A frame with a valid header whose content could not be decoded
         FreeAndNil(Frame);
-        fUnreadableData := True;
-        Stop := True;
+        if fRecover then
+        begin
+          if not RecoverAt(FramePos) then
+            Stop := True;
+        end
+        else
+        begin
+          fUnreadableData := True;
+          Stop := True;
+        end;
       end;
     end;
   end;
@@ -932,11 +1187,14 @@ begin
   if fPadding < 0 then
     fPadding := 0;
 
-  // ---> AUDIT FIX: Damaged data and NOTHING could be read: saving would replace
-  // the whole tag by the edited fields only, so never save. (Damaged data after
-  // readable frames still saves and is reported, as before.)
-  if fUnreadableData and (Count = 0) then
-    fSkippedFrames := True;
+  // The tag as it stands in the file, for a copy before it is repaired
+  if fRecovered and (TagEndPos > TagStartPos) then
+  begin
+    SetLength(fRecoverRaw, TagEndPos - TagStartPos);
+    AStream.Position := TagStartPos;
+    AStream.ReadBuffer(fRecoverRaw[0], Length(fRecoverRaw));
+  end;
+
 
   Result := Count > 0;
   if Result then
@@ -1115,7 +1373,10 @@ begin
     'T', 'W':
       begin
         Encoding := byte(Data[1]);
-        Result   := CustomDecodeID3Text(Encoding, Data, 2, Integer(fSize) - 1);
+        // A text frame may hold several values. A user text frame (description
+        // and value, see SplitTextPair) and a link frame hold one.
+        Result   := CustomDecodeID3Text(Encoding, Data, 2, Integer(fSize) - 1,
+          (ID[1] = 'T') and (ID <> 'TXXX') and (ID <> 'TXX'));
       end;
   else
     Result := '<unknown>';
@@ -1156,7 +1417,7 @@ begin
 
     if SepPos > 0 then
     begin
-      // ---> AUDIT FIX C7: ID3v2.2/2.3 TXXX = Encoding, Description, $00 $00, Value,
+      // ID3v2.2/2.3 TXXX = Encoding, Description, $00 $00, Value,
       // where Description and Value are each a complete UTF-16 string with its own BOM.
       wdesc  := Copy(wvalue, 1, SepPos - 1);
       wval   := Copy(wvalue, SepPos + 1, MaxInt);
@@ -1276,7 +1537,7 @@ var
   B: Byte;
   MaxImgBytes: Int64;
 begin
-  // ---> FIXED: Silently ignore oversized images instead of raising an Exception!
+  // Silently ignore oversized images instead of raising an Exception!
   if IsV22 then
     MaxImgBytes := MAX_ID3_V22_FRAME_SIZE - 64
   else

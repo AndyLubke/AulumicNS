@@ -59,6 +59,10 @@ type
     FSortDesc: Boolean;
     FEmptyText: string;
     FResizeCol, FResizeStartX, FResizeStartW, FHoverHeader, FDownRow: Integer;
+    { the edge was only taken because a finger reaches further than the
+      mouse (TOUCH_EDGE_REACH), and whether it was moved: a tap there is a
+      click on the column heading }
+    FResizeWide, FResizeMoved: Boolean;
     FAutoFit, FFitPending: Boolean;
     FOnHeaderContext: TAuRowPointEvent;
     FDownOnSelected: Boolean;
@@ -85,7 +89,7 @@ type
     function TotalWidth: Integer;
     function ViewW: Integer;
     function ViewH: Integer;
-    function ColAt(X: Integer; out Edge: Boolean): Integer;
+    function ColAt(X: Integer; out Edge: Boolean; AReach: Integer = 0): Integer;
     function NextVisible(C: Integer): Integer;
     procedure UpdateScrollBars;
     procedure SelectRange(A, B: Integer; Add: Boolean);
@@ -646,28 +650,41 @@ begin
   if Result > High(FCols) then Result := -1;
 end;
 
-function TAuListView.ColAt(X: Integer; out Edge: Boolean): Integer;
+{ The column at X (-1 = none). Edge: X is near enough to the right edge of
+  that column to drag it - within AReach pixels, the nearest edge (0 = the
+  reach of the mouse). }
+function TAuListView.ColAt(X: Integer; out Edge: Boolean; AReach: Integer): Integer;
 var
-  C, FW, CX, W: Integer;
+  C, FW, CX, W, D, Best, BestCol, Hit: Integer;
 begin
   Edge := False;
+  if AReach <= 0 then AReach := S(4);
   FW := FlexWidth;
   CX := S(8) - FScrollX;
+  Best := AReach + 1;
+  BestCol := -1;
+  Hit := -1;
   for C := 0 to High(FCols) do
   begin
     W := ColWidthPx(C, FW);
     if W = 0 then Continue;
     { every right edge can be dragged; in AutoFit lists not the last one,
       which is the edge of the list itself }
-    if (Abs(X - (CX + W)) <= S(4)) and not (FAutoFit and (NextVisible(C) < 0)) then
+    D := Abs(X - (CX + W));
+    if (D <= AReach) and (D < Best) and not (FAutoFit and (NextVisible(C) < 0)) then
     begin
-      Edge := True;
-      Exit(C);
+      Best := D;
+      BestCol := C;
     end;
-    if (X >= CX) and (X < CX + W) then Exit(C);
+    if (Hit < 0) and (X >= CX) and (X < CX + W) then Hit := C;
     Inc(CX, W);
   end;
-  Result := -1;
+  if BestCol >= 0 then
+  begin
+    Edge := True;
+    Exit(BestCol);
+  end;
+  Result := Hit;
 end;
 
 procedure TAuListView.DoPaint(G: TGfx);
@@ -853,6 +870,14 @@ begin
   if (Y < HeaderH) and (Button = mbLeft) then
   begin
     C := ColAt(X, Edge);
+    FResizeWide := False;
+    FResizeMoved := False;
+    if (not Edge) and MouseFromTouch then
+    begin
+      { a finger takes the edge from further away }
+      C := ColAt(X, Edge, S(TOUCH_EDGE_REACH));
+      FResizeWide := Edge;
+    end;
     if Edge then
     begin
       FResizeCol := C;
@@ -931,6 +956,13 @@ begin
   begin
     FResizeCol := -1;
     Invalidate;
+    if FResizeWide and not FResizeMoved then
+    begin
+      { a tap beside an edge: a click on the column under the finger }
+      C := ColAt(X, Edge);
+      if (C >= 0) and Assigned(FOnHeaderClick) then FOnHeaderClick(Self, C);
+      Exit;
+    end;
     if Assigned(FOnColumnsChanged) then FOnColumnsChanged(Self);
     Exit;
   end;
@@ -972,6 +1004,9 @@ begin
   end;
   if FResizeCol >= 0 then
   begin
+    if Abs(X - FResizeStartX) > S(4) then FResizeMoved := True;
+    { a finger that has not moved yet may still be a tap }
+    if FResizeWide and not FResizeMoved then Exit;
     { the dragged edge follows the mouse: only the column left of it changes,
       the columns to the right move along with the edge }
     W := Round((FResizeStartW + X - FResizeStartX) / UIScale);

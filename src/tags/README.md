@@ -14,14 +14,16 @@ describes the changes.
 |wav | read and save ID3v2 tags in the RIFF `id3 ` chunk (classic RIFF up to 4 GB) |
 |flac | read and save Vorbis comments and pictures |
 |dsf (DSD) | read and save the ID3v2 tag at the end of the file (new in AulumicTag) |
+|dff (DSDIFF) | read and save the ID3v2 tag in the `ID3 ` chunk (new in AulumicTag) |
 |mp3 | read ID3v1 and ID3v2 (any version), save ID3v2 |
 |mp4 (m4a, aac) | read and save atom tags for m4a, only durations for aac |
 |wma | read and save ASF tags |
 |ogg / opus | read and save Vorbis comments |
 |ape (Monkey's Audio) | read APE, ID3v1 or ID3v2 tags, save APE tags |
 
-Aulumic itself uses the WAV, FLAC and DSF readers. The other formats are
-inherited from OvoTag and are essentially unchanged.
+Aulumic itself uses the WAV, FLAC, DSF and DFF readers, and only these are
+compiled into it (`registerallreader.pas`). The other formats are inherited
+from OvoTag, essentially unchanged and not tested with Aulumic.
 
 ## Changes compared to OvoTag
 
@@ -34,6 +36,12 @@ Data safety (saving):
   FLAC pictures, unsupported ID3v2 header flags). Saving would otherwise
   replace fields and pictures that were not read. The reason is available in
   `LastUpdateError`.
+- A damaged ID3v2 tag can be repaired on request: a repairing read
+  (`GetFileTagsObject(FileName, False, True)`) finds the frames behind the
+  damaged bytes, reads frame sizes written in the wrong form, and hands out
+  the tag as it stood in the file so the caller can keep a copy.
+- A save changes only the fields that were set: FLAC comments that were not
+  edited are written back byte for byte, ID3v2 frames keep their data.
 - Oversized frames and pictures are handled with size limits instead of
   failing or allocating unbounded memory.
 
@@ -46,7 +54,8 @@ New and extended formats:
 - FLAC: robust metadata block parsing (also with a prepended ID3 tag) and
   writing of picture blocks.
 - ID3v2: correct UTF-16 / BOM and TXXX handling, picture (APIC) reading and
-  writing, extended header support.
+  writing, extended header support, text frames with several values, empty
+  frames.
 
 Robustness:
 - Bounds checks on all lengths and offsets read from files, and exception

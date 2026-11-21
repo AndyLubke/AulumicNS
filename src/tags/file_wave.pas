@@ -66,10 +66,10 @@ type
     fFileSize: int64;
     fmt: FmtHeader;
     DataPos: int64;
-    // ---> AUDIT FIX 1.2: Widened SampleNumber to Int64 for clamped data size calculations
+    // Int64: the size of the data chunk, clamped to the length of the file
     SampleNumber: int64;
     FPointerToID3: int64;
-    // ---> AUDIT FIX: True when the 'id3 ' chunk exceeded MAX_WAV_ID3_SIZE and was
+    // True when the 'id3 ' chunk exceeded MAX_WAV_ID3_SIZE and was
     // only partially loaded; SaveToFile then refuses to rewrite the file.
     FTagTruncated: boolean;
   protected
@@ -85,13 +85,13 @@ type
 implementation
 
 uses
-  CommonFunctions, AuAudioTypes;   // ---> AulumicNS: LongPath (paths of 260 characters and more)
+  CommonFunctions, AuAudioTypes;   // LongPath (paths of 260 characters and more)
 
 const
   MAX_WAV_ID3_SIZE  = 64 * 1024 * 1024; // 64 MB safety cap for embedded ID3 chunk
   MAX_RIFF_WAV_SIZE = Int64($FFFFFFFF); // 32-bit classic RIFF size ceiling
 
-// ---> AUDIT FIX 2.1: Validates that a 4-byte RIFF FourCC contains printable ASCII
+// Validates that a 4-byte RIFF FourCC contains printable ASCII
 function IsValidRiffChunkID(const AName: array of AnsiChar): boolean;
 var
   I: Integer;
@@ -159,7 +159,7 @@ var
   FmtReadBytes: Int64;
   TagCopySize: Int64;
 
-  // ---> AUDIT FIX 2.1: Case-insensitive chunk finder with printable FourCC
+  // Case-insensitive chunk finder with printable FourCC
   // validation and missing-pad-byte recovery on odd-sized chunks!
   function FindChunkCI(const aChunk: string): boolean;
   var
@@ -252,7 +252,7 @@ begin
       if FindChunkCI('data') then
       begin
         DataPos := fStream.Position;
-        // ---> AUDIT FIX 1.2: Clamp SampleNumber if header size is $FFFFFFFF or exceeds file length
+        // Clamp SampleNumber if header size is $FFFFFFFF or exceeds file length
         if (Chunk.ChunkSize = $FFFFFFFF) or ((DataPos + Int64(Chunk.ChunkSize)) > fFileSize) then
           SampleNumber := fFileSize - DataPos
         else
@@ -260,7 +260,7 @@ begin
       end;
 
       fMediaProperty.ChannelMode := DecodeChannelNumber(fmt.ChannelNumber);
-      // ---> AUDIT FIX 1.3: Compute BitRate in 64-bit Int64 to avoid 32-bit overflow
+      // Compute BitRate in 64-bit Int64 to avoid 32-bit overflow
       if fmt.BytesPerSecond > 0 then
         fMediaProperty.BitRate := (Int64(fmt.BytesPerSecond) * 8) div 1000
       else
@@ -331,15 +331,15 @@ begin
   MemoryStream := nil;
   SawDataChunk := False;
 
-  // ---> AUDIT FIX: Never rewrite a tag that was only partially loaded
+  // Never rewrite a tag that was only partially loaded
   // (oversized frames skipped, or the 'id3 ' chunk exceeded the 64 MB read cap)
-  if FTagTruncated or (Assigned(fTags) and fTags.HasSkippedFrames) then
+  if FTagTruncated or (Assigned(fTags) and (fTags.HasSkippedFrames or fTags.HasUnreadableData)) then
     Exit(False);
 
   try
     try
       SourceStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
-      // ---> AUDIT FIX 1.1: Refuse to rewrite WAV files larger than the 4 GB RIFF limit
+      // Refuse to rewrite WAV files larger than the 4 GB RIFF limit
       if (SourceStream.Size < SizeOf(WAVHeader)) or (SourceStream.Size > (MAX_RIFF_WAV_SIZE + 8)) then
         Exit(False);
 
@@ -352,7 +352,7 @@ begin
       DestStream   := TFileStream.Create(LongPath(AFileName), fmCreate or fmOpenReadWrite);
       MemoryStream := TMemoryStream.Create;
 
-      // ---> AUDIT FIX 2.2: Bound chunk parsing to the declared RIFF payload
+      // Bound chunk parsing to the declared RIFF payload
       RiffLimit := Int64(WaveH.FileSize) + 8;
       if (RiffLimit < SizeOf(WAVHeader)) or (RiffLimit > SourceStream.Size) then
         RiffLimit := SourceStream.Size;
@@ -366,7 +366,7 @@ begin
         if SourceStream.Read(Chunk, SizeOf(ChunkHeader)) < SizeOf(ChunkHeader) then
           Break;
 
-        // ---> AUDIT FIX 2.1: Abort immediately if chunk ID is not printable ASCII
+        // Abort immediately if chunk ID is not printable ASCII
         // (protects against missing pad bytes or corrupt chunk headers!)
         if (not IsValidRiffChunkID(Chunk.ChunkName)) or (Chunk.ChunkSize = $FFFFFFFF) then
           Exit(False);
@@ -385,7 +385,7 @@ begin
         else
           ChunkCopyBytes := Int64(Chunk.ChunkSize);
 
-        // ---> AUDIT FIX 2.1: Check if an odd-sized chunk actually has a pad byte in the source file
+        // Check if an odd-sized chunk actually has a pad byte in the source file
         HasPadByteInSource := False;
         if (ChunkCopyBytes mod 2) <> 0 then
         begin
@@ -415,7 +415,7 @@ begin
         begin
           if SameText(ChunkStr, 'data') then
           begin
-            // ---> AUDIT FIX: A 0-byte 'data' chunk is a placeholder written by
+            // A 0-byte 'data' chunk is a placeholder written by
             // interrupted/streaming recorders (the audio follows it). Rewriting
             // would discard that audio, so refuse.
             if ChunkCopyBytes = 0 then
@@ -439,11 +439,11 @@ begin
         end;
       end;
 
-      // ---> AUDIT FIX 2.1: Never overwrite a WAV file if the 'data' chunk was not preserved!
+      // Never overwrite a WAV file if the 'data' chunk was not preserved!
       if not SawDataChunk then
         Exit(False);
 
-      // ---> AUDIT FIX: Bytes after the declared RIFF form (e.g. a trailing ID3v1
+      // Bytes after the declared RIFF form (e.g. a trailing ID3v1
       // 'TAG' block or chunks appended without updating the RIFF size) are kept
       // and copied unchanged after the new RIFF form instead of being dropped.
       TrailStart := SourceStream.Position;
@@ -451,7 +451,7 @@ begin
         TrailStart := RiffLimit;
 
       // 2. Serialize and append the updated ID3v2 tag chunk at the end
-      if Assigned(fTags) and (fTags.Count > 0) then
+      if Assigned(fTags) and ((fTags.Count > 0) or fTags.HasRawForWrite) then
       begin
         fTags.Padding := 0;
         fTags.WriteToStream(MemoryStream);
@@ -478,7 +478,7 @@ begin
         end;
       end;
 
-      // ---> AUDIT FIX 1.1: Refuse to commit if the new file exceeds the 4 GB RIFF ceiling
+      // Refuse to commit if the new file exceeds the 4 GB RIFF ceiling
       if (DestStream.Size < SizeOf(WAVHeader)) or ((DestStream.Size - 8) > MAX_RIFF_WAV_SIZE) then
         Exit(False);
 
