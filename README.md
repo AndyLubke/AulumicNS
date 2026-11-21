@@ -28,6 +28,21 @@ Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It ne
 
 ![The library as album tiles](help/shots/11-library-tiles.png)
 
+## What it doesn't do
+
+Aulumic does one thing: it plays your own lossless music files, unchanged, on Windows. Some things are left out on purpose, others follow from how the program is built.
+
+- **Lossy formats (MP3, AAC, Ogg Vorbis, Opus):** not played. Aulumic uses no external DLLs, so every format needs its own decoder inside the program, and the work went into the lossless ones.
+- **Other lossless formats (ALAC, AIFF, APE, WavPack) and CUE sheets:** not at present. FLAC and WAV are the PCM formats.
+- **SACD ISO images:** not played. DSD plays from DSF and DFF files.
+- **Streaming services (Qobuz, Tidal, Spotify) and internet radio:** no. The services only open their catalogues to programs with a contract, and Aulumic plays files, not streams.
+- **Network playback (UPnP / DLNA) and remote control apps:** no. The music has to be in folders the PC can reach; a network share or NAS is fine.
+- **More than two channels:** mono and stereo only.
+- **Shared mode and plugins:** Aulumic takes the audio device exclusively, which is what makes bit-perfect playback possible, so other programs are silent on that device while it plays. There are no VST plugins and no room correction.
+- **Linux and macOS:** Windows 10 and 11 only. The output and the whole user interface are built on Windows itself.
+
+Wishes are welcome under **Discussions**; the Support section below says what to expect.
+
 ## Download
 
 Take `AulumicNS-<version>-win64.zip` from the **Releases** page of this repository, unpack it into a folder of your choice and start `AulumicNS.exe`.

@@ -44,6 +44,8 @@ program AudioSim;
                              into 0..20 kHz (fold=<rate>)
     tonebench <rate>         the tone control inlined against one call per
                              filter
+    tonecheck <rate>         how clean the tone control is: its own error on
+                             sines, silence after music, the time of five bands
     waitdevice               shows when a WASAPI endpoint is listed (device=)
 
   Options (--name=value):
@@ -1799,6 +1801,144 @@ begin
   end;
 end;
 
+{ tonecheck <rate>: how clean the tone control is at that rate, with all five
+  bands working (a narrow and a wide middle band among them). A sine goes
+  through it; what comes out is that sine at another level and phase, and
+  everything else is the filters' own error - rounding noise and distortion.
+  Printed per test tone: the level change against the curve the Tone Control
+  window draws (curve_err_db), and the error relative to the tone (err_db)
+  and to full scale (err_dbfs). Then silence after music: what is left at the
+  output, and that it takes no longer than music (denormals). Then the time
+  of five bands in stereo. }
+procedure ToneCheck(ARate: Integer);
+const
+  HZ: TToneInts = (80, 400, 1000, 6000, 12000);
+  DB: TToneInts = (60, -40, 30, -50, 60);
+  WD: TToneInts = (0, TONE_WIDTH_NARROW, TONE_WIDTH_NORMAL, TONE_WIDTH_WIDE, 0);
+  TONES: array[0..3] of Integer = (40, 1000, 5000, 15000);
+  FULL = 2147483648.0;
+
+  procedure Setup(ATone: TToneControl);
+  begin
+    ATone.SetSampleRate(ARate);
+    ATone.SetBandFrequencies(HZ);
+    ATone.SetBandWidths(WD);
+    ATone.SetBandGains(DB);
+    ATone.SetDirectMode(False);
+  end;
+
+  procedure OneTone(AFreq: Integer; AAmp: Double; const ALabel: string);
+  var
+    Tone: TToneControl;
+    Curve: TToneCurve;
+    N, I: Integer;
+    W, X, Y, Sn, Cs, SumS, SumC, SumY, A, B, Dc, OutAmp, Res, E: Double;
+    Out_: array of Double;
+  begin
+    if AFreq * 2 >= ARate then Exit;
+    Tone := TToneControl.Create;
+    try
+      Setup(Tone);
+      W := 2.0 * Pi * AFreq / ARate;
+      { three seconds to settle, then one second (whole periods) measured }
+      for I := 0 to 3 * ARate - 1 do
+      begin
+        X := AAmp * Sin(W * (I mod ARate));
+        Tone.ProcessSampleL(X);
+      end;
+      N := ARate;
+      Out_ := nil;
+      SetLength(Out_, N);
+      SumS := 0; SumC := 0; SumY := 0;
+      for I := 0 to N - 1 do
+      begin
+        SinCos(W * I, Sn, Cs);
+        Y := Tone.ProcessSampleL(AAmp * Sn);
+        Out_[I] := Y;
+        SumS := SumS + Y * Sn;
+        SumC := SumC + Y * Cs;
+        SumY := SumY + Y;
+      end;
+      A := 2.0 * SumS / N;
+      B := 2.0 * SumC / N;
+      Dc := SumY / N;
+      OutAmp := Sqrt(A * A + B * B);
+      Res := 0;
+      for I := 0 to N - 1 do
+      begin
+        SinCos(W * I, Sn, Cs);
+        E := Out_[I] - A * Sn - B * Cs - Dc;
+        Res := Res + E * E;
+      end;
+      Res := Sqrt(Res / N);
+      Curve := Default(TToneCurve);
+      Curve.Rate := ARate;
+      Curve.Hz := HZ;
+      Curve.Tenths := DB;
+      Curve.Width := WD;
+      WriteLn(Format('TONE rate=%d hz=%d level=%s gain_db=%s curve_err_db=%s err_db=%s err_dbfs=%s dc_dbfs=%s',
+        [ARate, AFreq, ALabel, Fx(20.0 * Log10(OutAmp / AAmp), '0.0000'),
+         Fx(20.0 * Log10(OutAmp / AAmp) - ToneResponseDB(Curve, AFreq), '0.000000'),
+         Fx(20.0 * Log10(Max(Res, 1e-300) / (OutAmp / Sqrt(2.0))), '0.0'),
+         Fx(20.0 * Log10(Max(Res, 1e-300) / FULL), '0.0'),
+         Fx(20.0 * Log10(Max(Abs(Dc), 1e-300) / FULL), '0.0')]));
+    finally
+      Tone.Free;
+    end;
+  end;
+
+var
+  Tone: TToneControl;
+  I, K, Frames: Integer;
+  Seed: Cardinal;
+  Buf: array of Double;
+  T0, TMusic, TSilence: Int64;
+  Sum, Last: Double;
+begin
+  if ARate < 8000 then ARate := 705600;
+  for K := 0 to High(TONES) do
+  begin
+    OneTone(TONES[K], FULL * 0.25, '-12dBFS');
+    OneTone(TONES[K], 256.0, '1LSB24');
+  end;
+
+  { music, then silence: the time of each, and what the output still holds }
+  Frames := ARate * 4;
+  Buf := nil;
+  SetLength(Buf, 8192);
+  Seed := 1;
+  for I := 0 to High(Buf) do
+  begin
+    Seed := Cardinal((QWord(Seed) * 1664525 + 1013904223) and $FFFFFFFF);
+    Buf[I] := (Integer(Seed shr 8) - 8388608) * 64.0;
+  end;
+  Tone := TToneControl.Create;
+  try
+    Setup(Tone);
+    Sum := 0;
+    T0 := NowUs;
+    for I := 0 to Frames - 1 do
+    begin
+      Sum := Sum + Tone.ProcessSampleL(Buf[I and 8191]);
+      Sum := Sum + Tone.ProcessSampleR(Buf[(I + 4096) and 8191]);
+    end;
+    TMusic := NowUs - T0;
+    Last := 0;
+    T0 := NowUs;
+    for I := 0 to Frames - 1 do
+    begin
+      Last := Tone.ProcessSampleL(0.0);
+      Sum := Sum + Last + Tone.ProcessSampleR(0.0);
+    end;
+    TSilence := NowUs - T0;
+    WriteLn(Format('RESULT mode=tonecheck rate=%d bands=5 music_ms_per_s=%s silence_ms_per_s=%s cpu_pct=%s ' +
+      'silence_left_dbfs=%s check=%s',
+      [ARate, Fx(TMusic / 1000 / 4, '0.00'), Fx(TSilence / 1000 / 4, '0.00'), Fx(TMusic / 10000 / 4, '0.00'),
+       Fx(20.0 * Log10(Max(Abs(Last), 1e-300) / FULL), '0.0'), Fx(Abs(Sum), '0')]));
+  finally
+    Tone.Free;
+  end;
+end;
 { rgbench <album folder> [--threads=1,2,4]: the program's ReplayGain scan
   (TReplayGainThread, as the ReplayGain window starts it) on the music files
   of the folder as one album, once per thread count: the time, the speed-up
@@ -1928,6 +2068,7 @@ begin
       else if Mode = 'spectrum' then Spectrum(F)
       else if Mode = 'waitdevice' then WaitDevice
       else if Mode = 'tonebench' then ToneBench(StrToIntDef(F, 705600))
+  else if Mode = 'tonecheck' then ToneCheck(StrToIntDef(F, 705600))
       else if Mode = 'rgbench' then RgBench(F)
       else WriteLn('unknown mode ', Mode);
     except
