@@ -54,6 +54,9 @@ type
     procedure StatePutBackInTheMiddleOfAGlide;
     procedure AResetEndsAGlide;
     procedure TheCurveIsWhatTheFiltersDo;
+    procedure AWidthMakesAMiddleBandNarrowerOrWider;
+    procedure AShelfHasNoWidth;
+    procedure AWidthChangedWhilePlayingGlides;
   end;
 
 implementation
@@ -709,6 +712,93 @@ begin
   Curve := TestCurve(0, 0, 0);
   AssertEquals('Flat', 0.0, ToneResponseDB(Curve, 1000), 0.0);
   AssertEquals('Above half the rate: nothing', 0.0, ToneResponseDB(Curve, 30000), 0.0);
+end;
+
+{ at the band's frequency every width gives the gain that is set; an octave
+  away the narrow band does least and the wide one most. The normal width is
+  the curve without a width. }
+procedure TTestToneGlide.AWidthMakesAMiddleBandNarrowerOrWider;
+var
+  Plain, Normal, Narrow, Wide: TToneCurve;
+  F: Double;
+begin
+  Plain := TestCurve(0, 60, 0);
+  Normal := Plain;  Normal.Width[2] := TONE_WIDTH_NORMAL;
+  Narrow := Plain;  Narrow.Width[2] := TONE_WIDTH_NARROW;
+  Wide := Plain;    Wide.Width[2] := TONE_WIDTH_WIDE;
+  AssertEquals('centre, narrow', 6.0, ToneResponseDB(Narrow, 1000), 0.01);
+  AssertEquals('centre, normal', 6.0, ToneResponseDB(Normal, 1000), 0.01);
+  AssertEquals('centre, wide', 6.0, ToneResponseDB(Wide, 1000), 0.01);
+  F := 250;
+  while F <= 4000 do
+  begin
+    if Abs(F - 1000) > 1 then
+    begin
+      AssertTrue(Format('narrow below normal at %.0f Hz', [F]), ToneResponseDB(Narrow, F) < ToneResponseDB(Normal, F) - 0.3);
+      AssertTrue(Format('wide above normal at %.0f Hz', [F]), ToneResponseDB(Wide, F) > ToneResponseDB(Normal, F) + 0.3);
+    end;
+    AssertEquals(Format('normal is the plain curve at %.0f Hz', [F]), ToneResponseDB(Plain, F), ToneResponseDB(Normal, F));
+    F := F * 2;
+  end;
+  { half the gain in dB lies at the edges of the band: half an octave from
+    the centre for the narrow band, one and a half for the wide one }
+  AssertEquals('narrow: one octave wide', 3.0, ToneResponseDB(Narrow, 1000 * Sqrt(2.0)), 0.15);
+  AssertEquals('wide: three octaves wide', 3.0, ToneResponseDB(Wide, 1000 * Power(2.0, 1.5)), 0.15);
+  { a width that is no choice is the normal one }
+  Narrow.Width[2] := 7;
+  AssertEquals(ToneResponseDB(Plain, 500), ToneResponseDB(Narrow, 500));
+end;
+
+procedure TTestToneGlide.AShelfHasNoWidth;
+var
+  Plain, Set_: TToneCurve;
+begin
+  Plain := TestCurve(60, 0, -40);
+  Set_ := Plain;
+  Set_.Width[0] := TONE_WIDTH_NARROW;
+  Set_.Width[4] := TONE_WIDTH_WIDE;
+  AssertEquals(ToneResponseDB(Plain, 80), ToneResponseDB(Set_, 80));
+  AssertEquals(ToneResponseDB(Plain, 300), ToneResponseDB(Set_, 300));
+  AssertEquals(ToneResponseDB(Plain, 9000), ToneResponseDB(Set_, 9000));
+end;
+
+{ a width changed while samples run: a glide without a step, and at its end
+  the filters of a tone control that had this width from the start }
+procedure TTestToneGlide.AWidthChangedWhilePlayingGlides;
+const
+  WIDE: TToneInts = (0, 0, TONE_WIDTH_WIDE, 0, 0);
+var
+  Tone, Fresh: TToneControl;
+  A, B, Before: TDoubles;
+  I: Integer;
+  Worst: Double;
+begin
+  Tone := NewTone(0, 80, 0);
+  Fresh := NewTone(0, 80, 0);
+  try
+    Fresh.SetBandWidths(WIDE);
+    Before := Feed(Tone, 500, 0, 4800, 512);
+    Tone.SetBandWidths(WIDE);
+    AssertTrue('On its way', Tone.Gliding);
+    A := Feed(Tone, 500, 4800, 4800, 512);
+    AssertFalse('Arrived', Tone.Gliding);
+    AssertTrue('No step on the way', Roughness(Joined(Before, A)) < G_AMP * 0.05);
+    Feed(Fresh, 500, 0, 9600, 512);
+    Feed(Tone, 500, 9600, 96000, 512);
+    Feed(Fresh, 500, 9600, 96000, 512);
+    A := Feed(Tone, 500, 105600, 480, 512);
+    B := Feed(Fresh, 500, 105600, 480, 512);
+    Worst := 0.0;
+    for I := 0 to High(A) do
+      if Abs(A[I] - B[I]) > Worst then Worst := Abs(A[I] - B[I]);
+    AssertTrue(Format('Difference %.6g of %.0f', [Worst, G_AMP]), Worst < G_AMP * 1e-9);
+    { the same width again: nothing to do }
+    Tone.SetBandWidths(WIDE);
+    AssertFalse('No glide for the same setting', Tone.Gliding);
+  finally
+    Tone.Free;
+    Fresh.Free;
+  end;
 end;
 
 initialization

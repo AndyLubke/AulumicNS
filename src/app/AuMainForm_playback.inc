@@ -972,6 +972,8 @@ begin
   begin
     FTone := TAuToneForm.CreateTone(Self);
     FTone.OnChange := @ToneChanged;
+    FTone.OnPresetsChange := @TonePresetsChanged;
+    FTone.SetPresets(AppSettings.Data.TonePresets);
     if AppSettings.Data.ToneWinLeft <> VAL_UNINITIALIZED_POS then
     begin
       { where it was, but wholly on a monitor that is there now (with the
@@ -1003,6 +1005,9 @@ begin
   T.MidHz := A.ToneMidHz;
   T.HighMidHz := A.ToneHighMidHz;
   T.TrebleHz := A.ToneTrebleHz;
+  T.LowMidWidth := A.ToneLowMidWidth;
+  T.MidWidth := A.ToneMidWidth;
+  T.HighMidWidth := A.ToneHighMidWidth;
   FTone.SetValues(T);
   FTone.SetDsdNote(FIsCurrentDoP);
   Si := FPlayback.GetSignalInfo;
@@ -1010,6 +1015,12 @@ begin
     FTone.SetCurveRate(Si.OutRate);
   FTone.Show;
   UpdateToneHeadroom;
+end;
+
+{ a preset was saved, renamed or deleted in the Tone Control }
+procedure TMainForm.TonePresetsChanged(Sender: TObject);
+begin
+  AppSettings.Data.TonePresets := FTone.Presets;
 end;
 
 procedure TMainForm.ToneChanged(Sender: TObject);
@@ -1028,6 +1039,9 @@ begin
   AppSettings.Data.Audio.ToneMidHz := T.MidHz;
   AppSettings.Data.Audio.ToneHighMidHz := T.HighMidHz;
   AppSettings.Data.Audio.ToneTrebleHz := T.TrebleHz;
+  AppSettings.Data.Audio.ToneLowMidWidth := T.LowMidWidth;
+  AppSettings.Data.Audio.ToneMidWidth := T.MidWidth;
+  AppSettings.Data.Audio.ToneHighMidWidth := T.HighMidWidth;
   if FPlayback <> nil then
   begin
     FPlayback.SetToneControl(T);

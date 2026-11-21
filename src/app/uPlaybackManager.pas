@@ -73,6 +73,9 @@ type
     ToneMidHz               : Integer; // e.g., 220
     ToneHighMidHz               : Integer;
     ToneTrebleHz            : Integer; // e.g., 8000
+    ToneLowMidWidth         : Integer; // TONE_WIDTH_*: how wide a middle band works
+    ToneMidWidth            : Integer;
+    ToneHighMidWidth        : Integer;
   end;
 
   PQueueItem = ^TQueueItem;
@@ -1153,6 +1156,9 @@ begin
   FConfig.ToneMidHz    := State.MidHz;
   FConfig.ToneHighMidHz    := State.HighMidHz;
   FConfig.ToneTrebleHz := State.TrebleHz;
+  FConfig.ToneLowMidWidth  := State.LowMidWidth;
+  FConfig.ToneMidWidth     := State.MidWidth;
+  FConfig.ToneHighMidWidth := State.HighMidWidth;
 
   if Assigned(FAudioEngine) then
     FAudioEngine.SetToneControl(State);
@@ -1877,6 +1883,9 @@ begin
   ToneCfg.MidHz      := FConfig.ToneMidHz;
   ToneCfg.HighMidHz      := FConfig.ToneHighMidHz;
   ToneCfg.TrebleHz   := FConfig.ToneTrebleHz;
+  ToneCfg.LowMidWidth  := FConfig.ToneLowMidWidth;
+  ToneCfg.MidWidth     := FConfig.ToneMidWidth;
+  ToneCfg.HighMidWidth := FConfig.ToneHighMidWidth;
 
   FAudioEngine.SetToneControl(ToneCfg);
 

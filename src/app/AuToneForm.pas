@@ -26,8 +26,8 @@ unit AuToneForm;
 interface
 
 uses
-  Classes, SysUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuControls, AuForms, ALAudioTypes, uToneControl;
+  Classes, SysUtils, Math, Controls, Forms, Dialogs, LCLType,
+  AuGfx, AuTheme, AuIcons, AuControls, AuMenus, AuForms, AuExtra, AuDialogs, ALAudioTypes, uToneControl, uTonePresets;
 
 const
   ToneMaxDb = 100;                        // tenths: +-10.0 dB
@@ -103,22 +103,46 @@ type
     FCurve: TAuToneCurve;
     FSliders: array[0..TONE_BANDS - 1] of TAuToneSlider;
     FFreqs: array[0..TONE_BANDS - 1] of TAuCombo;
+    FWidths: array[0..TONE_BANDS - 1] of TAuDropButton;   // the three middle bands; nil for the shelves
+    FWidthRow: array[0..TONE_BANDS - 1] of Integer;       // the row of WidthNames each shows
+    FWidthMenu: TAuMenu;
     FValues: array[0..TONE_BANDS - 1] of TAuLabel;
     FHeadNote: TAuLabel;         // what the automatic headroom takes off now
     FHeadTenths: Integer;
-    FFlat: TAuButton;
+    FPreset: TAuDropButton;      // the preset in use; its menu chooses, saves, renames, deletes
+    FPresetMenu: TAuMenu;
+    FPresets: TTonePresets;
+    FOnPresetsChange: TNotifyEvent;
     FUpdating: Boolean;
     FDsd: Boolean;               // DSD goes out as DSD: nothing here applies
     FOnChange: TNotifyEvent;
     procedure Changed(Sender: TObject);
     procedure FreqChanged(Sender: TObject);
-    procedure FlatClick(Sender: TObject);
+    procedure SetFlat;
+    procedure SetWidthRow(B, ARow: Integer);
+    procedure WidthClick(Sender: TObject);
+    procedure WidthPick(Sender: TObject);
+    procedure PresetClick(Sender: TObject);
+    procedure PresetPick(Sender: TObject);
+    procedure PresetSave(Sender: TObject);
+    procedure PresetRename(Sender: TObject);
+    procedure PresetDelete(Sender: TObject);
+    procedure PresetsChanged;
+    function AskPresetName(const ATitle: string; var AName: string; ARenamed: Integer): Boolean;
     procedure UpdateLabels;
   protected
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     constructor CreateTone(AOwner: TComponent);
+    destructor Destroy; override;
     procedure SetValues(const C: TToneState);
+    { the saved presets (a copy each way); OnPresetsChange after the list was
+      changed in the window }
+    procedure SetPresets(const L: TTonePresets);
+    function Presets: TTonePresets;
+    { what the preset button shows for the bands as they are: the name of the
+      preset they match, "Flat" with all bands at 0 dB, else "Custom" }
+    function PresetText: string;
     function Values: TToneState;
     { a DSD stream sent as DSD (DoP / native): the tone control cannot apply.
       The title says so, the switch, the sliders
@@ -130,6 +154,7 @@ type
       negative): shown under the curve, nothing at 0 }
     procedure SetHeadroom(ADb: Double);
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    property OnPresetsChange: TNotifyEvent read FOnPresetsChange write FOnPresetsChange;
   end;
 
 function DbText(Tenths: Integer): string;
@@ -334,9 +359,10 @@ begin
   N := FCurve;
   N.Hz := ToneFreqsOf(C);
   N.Tenths := ToneGainsOf(C);
+  N.Width := ToneWidthsOf(C);
   Same := ALive = FLive;
   for B := 0 to TONE_BANDS - 1 do
-    Same := Same and (N.Hz[B] = FCurve.Hz[B]) and (N.Tenths[B] = FCurve.Tenths[B]);
+    Same := Same and (N.Hz[B] = FCurve.Hz[B]) and (N.Tenths[B] = FCurve.Tenths[B]) and (N.Width[B] = FCurve.Width[B]);
   if Same then Exit;
   FCurve := N;
   FLive := ALive;
@@ -451,11 +477,18 @@ const
   BandNames: array[0..TONE_BANDS - 1] of string = ('Bass', 'Low mid', 'Mid', 'High mid', 'Treble');
   ColW = 104;                           // a band's column
   FW = 2 * 16 + TONE_BANDS * ColW;
-  FH = 580;
-  CurveY = 78;
+  FH = 486;
+  TopY = 14;                            // the preset and the switch
+  CurveY = 60;
   CurveH = 104;
   NoteY = CurveY + CurveH + 6;          // the headroom line
   BandsY = NoteY + 26;                  // the band names; all below follows
+  PresetW = 250;                        // the preset button
+  SwitchW = 190;                        // the most the switch with its caption takes, at the right
+  { the rows of the width drop-down, and the width each stands for }
+  WidthNames: array[0..2] of string = ('Narrow', 'Normal', 'Wide');
+  WidthOfRow: array[0..2] of Integer = (TONE_WIDTH_NARROW, TONE_WIDTH_NORMAL, TONE_WIDTH_WIDE);
+  WidthDefRow = 1;
 
 function FreqItems(Band: Integer): TStringArray;
 var
@@ -475,7 +508,17 @@ begin
   CreateAu(AOwner, 'Tone Control', FW, FH);
   HelpKeyword := 'Tone Control';
   IsDialog := True;
-  FEnable := AddSwitch(Self, 'Disabled', 'Bypassed: playback stays bit-perfect', 20, 14, FW - 40, False);
+  { top line: the preset at the left, the switch at the right }
+  FPreset := TAuDropButton.Create(Self);
+  FPreset.Parent := Body;
+  FPreset.SetBounds(S(20), S(TopY), S(PresetW), S(32));
+  FPreset.Hint := 'Choose a preset, or save the bands as one.';
+  FPreset.ShowHint := True;
+  FPreset.OnClick := @PresetClick;
+  FPresetMenu := TAuMenu.Create;
+  FWidthMenu := TAuMenu.Create;
+  FEnable := AddSwitch(Self, 'Disabled', '', FW - 20 - SwitchW, TopY, SwitchW, False);
+  FEnable.SetBounds(S(FW - 20 - SwitchW), S(TopY), S(SwitchW), S(32));
   FEnable.OnChange := @Changed;
   FCurve := TAuToneCurve.Create(Self);
   FCurve.Parent := Body;
@@ -490,34 +533,90 @@ begin
     L.HAlign := 1;
     FFreqs[B] := AddCombo(Self, X + 4, BandsY + 26, ColW - 8, FreqItems(B), ToneBandDefRow[B]);
     FFreqs[B].OnChange := @FreqChanged;
+    FWidthRow[B] := WidthDefRow;
+    { the width of a middle band: its name alone, as a caption of the
+      frequency above it (a shelf has none) }
+    if (B > 0) and (B < TONE_BANDS - 1) then
+    begin
+      FWidths[B] := TAuDropButton.Create(Self);
+      FWidths[B].Parent := Body;
+      FWidths[B].Flat := True;
+      FWidths[B].Dim := True;
+      FWidths[B].TextSize := 12;
+      FWidths[B].Tag := B;
+      FWidths[B].Hint := 'How wide the band works around its frequency.';
+      FWidths[B].ShowHint := True;
+      FWidths[B].OnClick := @WidthClick;
+      SetWidthRow(B, WidthDefRow);
+    end;
     FSliders[B] := TAuToneSlider.Create(Self);
     FSliders[B].Parent := Body;
-    FSliders[B].SetBounds(S(X + (ColW - 60) div 2), S(BandsY + 72), S(60), S(190));
+    FSliders[B].SetBounds(S(X + (ColW - 60) div 2), S(BandsY + 92), S(60), S(190));
     FSliders[B].OnChange := @Changed;
-    FValues[B] := AddLabel(Self, '0.0 dB', X, BandsY + 266, ColW, False);
+    FValues[B] := AddLabel(Self, '0.0 dB', X, BandsY + 286, ColW, False);
     FValues[B].HAlign := 1;
   end;
-  FFlat := AddButton(Self, 'Flat', FW - 20 - 110, FH - 52, 110, bkNormal, @FlatClick);
-  FFlat.Hint := 'Set all bands to 0 dB.';
-  FFlat.ShowHint := True;
-  FEnable.TabOrder := 0;
+  FPreset.TabOrder := 0;
+  FEnable.TabOrder := 1;
   for B := 0 to TONE_BANDS - 1 do
   begin
-    FFreqs[B].TabOrder := 1 + 2 * B;
-    FSliders[B].TabOrder := 2 + 2 * B;
+    FFreqs[B].TabOrder := 2 + 3 * B;
+    if FWidths[B] <> nil then FWidths[B].TabOrder := 3 + 3 * B;
+    FSliders[B].TabOrder := 4 + 3 * B;
   end;
-  FFlat.TabOrder := 1 + 2 * TONE_BANDS;
   ActiveControl := FSliders[0];
   UpdateLabels;
 end;
 
+{ the width button of band B shows row ARow, as wide as its text and centred
+  in the band's column }
+procedure TAuToneForm.SetWidthRow(B, ARow: Integer);
+var
+  W: Integer;
+begin
+  ARow := EnsureRange(ARow, 0, High(WidthNames));
+  FWidthRow[B] := ARow;
+  if FWidths[B] = nil then Exit;
+  FWidths[B].Caption := WidthNames[ARow];
+  W := FWidths[B].PreferredWidth;
+  FWidths[B].SetBounds(S(16 + B * ColW) + (S(ColW) - W) div 2, S(BandsY + 60), W, S(26));
+end;
+
+procedure TAuToneForm.WidthClick(Sender: TObject);
+var
+  B, I: Integer;
+  It: TAuMenuItem;
+begin
+  B := TControl(Sender).Tag;
+  if (B < 0) or (B >= TONE_BANDS) then Exit;
+  FWidthMenu.Clear;
+  for I := 0 to High(WidthNames) do
+  begin
+    It := FWidthMenu.Add(WidthNames[I], @WidthPick, icNone, '', B * 8 + I);
+    It.Checked := I = FWidthRow[B];
+  end;
+  FWidthMenu.PopupBelow(FWidths[B]);
+end;
+
+procedure TAuToneForm.WidthPick(Sender: TObject);
+var
+  T: PtrInt;
+begin
+  T := TAuMenuItem(Sender).Tag;
+  if (T < 0) or (T div 8 >= TONE_BANDS) or (T mod 8 > High(WidthNames)) then Exit;
+  if FWidthRow[T div 8] = T mod 8 then Exit;
+  SetWidthRow(T div 8, T mod 8);
+  Changed(nil);
+end;
+
 procedure TAuToneForm.SetValues(const C: TToneState);
 var
-  Hz, Db: TToneInts;
+  Hz, Db, Wd: TToneInts;
   B, I, Row: Integer;
 begin
   Hz := ToneFreqsOf(C);
   Db := ToneGainsOf(C);
+  Wd := ToneWidthsOf(C);
   FUpdating := True;
   try
     FEnable.Checked := not C.DirectMode;
@@ -528,6 +627,13 @@ begin
       for I := 0 to 4 do
         if ToneBandHz[B, I] = Hz[B] then Row := I;
       FFreqs[B].ItemIndex := Row;
+      if FWidths[B] <> nil then
+      begin
+        Row := WidthDefRow;
+        for I := 0 to High(WidthOfRow) do
+          if WidthOfRow[I] = Wd[B] then Row := I;
+        SetWidthRow(B, Row);
+      end;
     end;
     { an overlapping pair (bass at or above the low mid): the low mid moves up }
     if ToneBandHz[0, FFreqs[0].ItemIndex] >= ToneBandHz[1, FFreqs[1].ItemIndex] then FFreqs[1].ItemIndex := 1;
@@ -539,7 +645,7 @@ end;
 
 function TAuToneForm.Values: TToneState;
 var
-  Hz, Db: TToneInts;
+  Hz, Db, Wd: TToneInts;
   B: Integer;
 begin
   Result := Default(TToneState);
@@ -548,14 +654,17 @@ begin
   begin
     Db[B] := FSliders[B].Value;
     Hz[B] := ToneBandHz[B, EnsureRange(FFreqs[B].ItemIndex, 0, 4)];
+    Wd[B] := TONE_WIDTH_NORMAL;
+    if FWidths[B] <> nil then Wd[B] := WidthOfRow[EnsureRange(FWidthRow[B], 0, High(WidthOfRow))];
   end;
+  SetToneWidths(Result, Wd);
   SetToneGains(Result, Db);
   SetToneFreqs(Result, Hz);
 end;
 
 procedure TAuToneForm.UpdateLabels;
 var
-  B: Integer;
+  B, W: Integer;
   On: Boolean;
 begin
   On := FEnable.Checked and not FDsd;
@@ -564,20 +673,21 @@ begin
   begin
     Caption := 'Tone Control (disabled for DSD)';
     FEnable.Caption := 'Disabled for DSD';
-    FEnable.Description := 'DSD goes to the DAC unchanged';
   end
   else if On then
   begin
     Caption := 'Tone Control';
     FEnable.Caption := 'Enabled';
-    FEnable.Description := 'Shapes the sound; 0 dB = unchanged';
   end
   else
   begin
     Caption := 'Tone Control';
     FEnable.Caption := 'Disabled';
-    FEnable.Description := 'Bypassed: playback stays bit-perfect';
   end;
+  { the switch is as wide as its caption needs, so the caption stands next
+    to it; its right edge stays }
+  W := Min(S(SwitchW), Ceil(TextWidth(FEnable.Caption, UIFont(13))) + S(12 + 36 + 6 + 2));
+  FEnable.SetBounds(S(FW - 20) - W, S(TopY), W, S(32));
   FEnable.Invalidate;
   for B := 0 to TONE_BANDS - 1 do
   begin
@@ -585,9 +695,11 @@ begin
     FSliders[B].Enabled := On;
     FSliders[B].Invalidate;
     FFreqs[B].Enabled := On;
+    if FWidths[B] <> nil then FWidths[B].Enabled := On;
     if On then FValues[B].TextRole := crText else FValues[B].TextRole := crTextFaint;
   end;
-  FFlat.Enabled := On;
+  FPreset.Enabled := On;
+  FPreset.Caption := PresetText;
   FCurve.SetCurve(Values, On);
 end;
 
@@ -658,7 +770,8 @@ begin
   Changed(Sender);
 end;
 
-procedure TAuToneForm.FlatClick(Sender: TObject);
+{ all bands to 0 dB; frequencies and widths stay }
+procedure TAuToneForm.SetFlat;
 var
   B: Integer;
 begin
@@ -669,6 +782,179 @@ begin
     FUpdating := False;
   end;
   Changed(nil);
+end;
+
+{ ---- presets ---- }
+
+const
+  CAP_PRESET_SAVE   = 'Save as preset';
+  CAP_PRESET_RENAME = 'Rename preset';
+  CAP_PRESET_DELETE = 'Delete preset';
+  MSG_PRESET_NAME   = 'Name of the preset:';
+  MSG_PRESET_RESERVED = '"%s" is a name the Tone Control uses itself. Choose another name.';
+  MSG_PRESET_REPLACE  = 'A preset named "%s" already exists. Do you want to replace it?';
+  MSG_PRESET_TAKEN    = 'Another preset is already named "%s". Choose another name.';
+  MSG_PRESET_FULL     = 'No more than %d presets can be kept. Delete one first.';
+  MSG_PRESET_IS_FLAT  = 'All bands are at 0 dB: that is Flat, which is always in the list.';
+  MSG_PRESET_DELETE   = 'Are you sure you want to delete the preset "%s"?';
+
+destructor TAuToneForm.Destroy;
+begin
+  FreeAndNil(FPresetMenu);
+  FreeAndNil(FWidthMenu);
+  inherited Destroy;
+end;
+
+procedure TAuToneForm.SetPresets(const L: TTonePresets);
+begin
+  FPresets := Copy(L);
+  if FPreset <> nil then FPreset.Caption := PresetText;
+end;
+
+function TAuToneForm.Presets: TTonePresets;
+begin
+  Result := Copy(FPresets);
+end;
+
+function TAuToneForm.PresetText: string;
+var
+  V: TToneState;
+  I: Integer;
+begin
+  V := Values;
+  I := MatchTonePreset(FPresets, V);
+  if I >= 0 then Result := FPresets[I].Name
+  else if not ToneAnyGain(V) then Result := TONE_PRESET_FLAT
+  else Result := TONE_PRESET_CUSTOM;
+end;
+
+procedure TAuToneForm.PresetsChanged;
+begin
+  FPreset.Caption := PresetText;
+  if Assigned(FOnPresetsChange) then FOnPresetsChange(Self);
+end;
+
+{ the menu: Flat, the saved presets (the one in use ticked), then what can be
+  done with them. Rename and Delete work on the preset in use. }
+procedure TAuToneForm.PresetClick(Sender: TObject);
+var
+  V: TToneState;
+  I, Cur: Integer;
+  It: TAuMenuItem;
+begin
+  V := Values;
+  Cur := MatchTonePreset(FPresets, V);
+  FPresetMenu.Clear;
+  FPresetMenu.MinWidth := FPreset.Width;
+  It := FPresetMenu.Add(TONE_PRESET_FLAT, @PresetPick, icNone, '', -1);
+  It.Checked := not ToneAnyGain(V);
+  for I := 0 to High(FPresets) do
+  begin
+    It := FPresetMenu.Add(FPresets[I].Name, @PresetPick, icNone, '', I);
+    It.Checked := I = Cur;
+  end;
+  FPresetMenu.AddSeparator;
+  FPresetMenu.Add(CAP_PRESET_SAVE + '...', @PresetSave);
+  It := FPresetMenu.Add('Rename...', @PresetRename);
+  It.Enabled := Cur >= 0;
+  It := FPresetMenu.Add('Delete...', @PresetDelete);
+  It.Enabled := Cur >= 0;
+  FPresetMenu.PopupBelow(FPreset);
+end;
+
+{ a preset sets the gains and the frequencies of the bands; the switch stays }
+procedure TAuToneForm.PresetPick(Sender: TObject);
+var
+  I: Integer;
+  V: TToneState;
+begin
+  I := TAuMenuItem(Sender).Tag;
+  if I < 0 then
+  begin
+    SetFlat;
+    Exit;
+  end;
+  if I > High(FPresets) then Exit;
+  V := Values;
+  ApplyTonePreset(FPresets[I], V);
+  SetValues(V);
+  if Assigned(FOnChange) then FOnChange(Self);
+end;
+
+{ asks until the name can be used or the dialog is cancelled. ARenamed: the
+  preset that gets the name (its own name is no clash), -1 for a new one -
+  then a name that exists may be replaced after a question. }
+function TAuToneForm.AskPresetName(const ATitle: string; var AName: string; ARenamed: Integer): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  repeat
+    if not AuInput(ATitle, MSG_PRESET_NAME, AName) then Exit;
+    AName := CleanPresetName(AName);
+    if AName = '' then Exit;
+    if not TonePresetNameAllowed(AName) then
+    begin
+      ALMessageDlg(ATitle, Format(MSG_PRESET_RESERVED, [AName]), mkInfo);
+      Continue;
+    end;
+    I := FindTonePreset(FPresets, AName);
+    if (I < 0) or (I = ARenamed) then Break;
+    if ARenamed >= 0 then
+    begin
+      ALMessageDlg(ATitle, Format(MSG_PRESET_TAKEN, [FPresets[I].Name]), mkInfo);
+      Continue;
+    end;
+    if ALMessageDlg(ATitle, Format(MSG_PRESET_REPLACE, [FPresets[I].Name]), [mbYes, mbNo], mbYes, mkQuestion) = mrYes then Break;
+  until False;
+  Result := True;
+end;
+
+procedure TAuToneForm.PresetSave(Sender: TObject);
+var
+  V: TToneState;
+  AName: string;
+  I: Integer;
+begin
+  V := Values;
+  if not ToneAnyGain(V) then
+  begin
+    ALMessageDlg(CAP_PRESET_SAVE, MSG_PRESET_IS_FLAT, mkInfo);
+    Exit;
+  end;
+  AName := '';
+  I := MatchTonePreset(FPresets, V);
+  if I >= 0 then AName := FPresets[I].Name;
+  if not AskPresetName(CAP_PRESET_SAVE, AName, -1) then Exit;
+  if PutTonePreset(FPresets, TonePresetOf(AName, V)) < 0 then
+  begin
+    ALMessageDlg(CAP_PRESET_SAVE, Format(MSG_PRESET_FULL, [TONE_PRESET_MAX]), mkInfo);
+    Exit;
+  end;
+  PresetsChanged;
+end;
+
+procedure TAuToneForm.PresetRename(Sender: TObject);
+var
+  I: Integer;
+  AName: string;
+begin
+  I := MatchTonePreset(FPresets, Values);
+  if I < 0 then Exit;
+  AName := FPresets[I].Name;
+  if not AskPresetName(CAP_PRESET_RENAME, AName, I) then Exit;
+  if RenameTonePreset(FPresets, I, AName) then PresetsChanged;
+end;
+
+procedure TAuToneForm.PresetDelete(Sender: TObject);
+var
+  I: Integer;
+begin
+  I := MatchTonePreset(FPresets, Values);
+  if I < 0 then Exit;
+  if ALMessageDlg(CAP_PRESET_DELETE, Format(MSG_PRESET_DELETE, [FPresets[I].Name]), [mbYes, mbNo], mbNo, mkQuestion) <> mrYes then Exit;
+  DeleteTonePreset(FPresets, I);
+  PresetsChanged;
 end;
 
 procedure TAuToneForm.KeyDown(var Key: Word; Shift: TShiftState);

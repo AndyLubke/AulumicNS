@@ -481,6 +481,9 @@ begin
   FToneState.MidHz      := Config.ToneMidHz;
   FToneState.HighMidHz      := Config.ToneHighMidHz;
   FToneState.TrebleHz   := Config.ToneTrebleHz;
+  FToneState.LowMidWidth  := Config.ToneLowMidWidth;
+  FToneState.MidWidth     := Config.ToneMidWidth;
+  FToneState.HighMidWidth := Config.ToneHighMidWidth;
   FToneDirty            := True;
   FDitherSeed           := $A341316C;
 
@@ -1300,6 +1303,7 @@ begin
   end;
   FToneControl.SetDirectMode(LocalTone.DirectMode);
   FToneControl.SetBandFrequencies(ToneFreqsOf(LocalTone));
+  FToneControl.SetBandWidths(ToneWidthsOf(LocalTone));
   FToneControl.SetBandGains(ToneGainsOf(LocalTone));
 end;
 
@@ -1766,6 +1770,7 @@ begin
 
     FToneControl.SetDirectMode(LocalTone.DirectMode);
     FToneControl.SetBandFrequencies(ToneFreqsOf(LocalTone));
+    FToneControl.SetBandWidths(ToneWidthsOf(LocalTone));
     FToneControl.SetBandGains(ToneGainsOf(LocalTone));
   end;
 
@@ -2487,6 +2492,7 @@ begin
 
     FToneControl.SetDirectMode(LocalTone.DirectMode);
     FToneControl.SetBandFrequencies(ToneFreqsOf(LocalTone));
+    FToneControl.SetBandWidths(ToneWidthsOf(LocalTone));
     FToneControl.SetBandGains(ToneGainsOf(LocalTone));
   end;
 

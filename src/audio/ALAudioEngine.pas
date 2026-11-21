@@ -92,6 +92,9 @@ type
     FToneMidHz          : Integer;
     FToneHighMidHz          : Integer;
     FToneTrebleHz       : Integer;
+    FToneLowMidWidth    : Integer;   // TONE_WIDTH_*
+    FToneMidWidth       : Integer;
+    FToneHighMidWidth   : Integer;
 
     class var FLibraryChecked     : boolean;
     class var FResamplerAvailable : boolean;
@@ -312,6 +315,9 @@ begin
   FToneMidHz        := VAL_DEF_MIDHZ;
   FToneHighMidHz        := VAL_DEF_HIGHMIDHZ;
   FToneTrebleHz     := VAL_DEF_TREBLEHZ;
+  FToneLowMidWidth  := TONE_WIDTH_NORMAL;
+  FToneMidWidth     := TONE_WIDTH_NORMAL;
+  FToneHighMidWidth := TONE_WIDTH_NORMAL;
 end;
 
 destructor TAudioEngine.Destroy;
@@ -569,6 +575,9 @@ begin
   Config.ToneMidHz          := FToneMidHz;
   Config.ToneHighMidHz          := FToneHighMidHz;
   Config.ToneTrebleHz       := FToneTrebleHz;
+  Config.ToneLowMidWidth    := FToneLowMidWidth;
+  Config.ToneMidWidth       := FToneMidWidth;
+  Config.ToneHighMidWidth   := FToneHighMidWidth;
 
   Config.NotifyHandle       := FNotifyHandle;
   Config.StartVolume        := FVolume;
@@ -687,6 +696,9 @@ begin
   FToneMidHz    := State.MidHz;
   FToneHighMidHz    := State.HighMidHz;
   FToneTrebleHz := State.TrebleHz;
+  FToneLowMidWidth  := State.LowMidWidth;
+  FToneMidWidth     := State.MidWidth;
+  FToneHighMidWidth := State.HighMidWidth;
 
   if Assigned(FCurrentThread) then
     FCurrentThread.SetToneControl(State);

@@ -37,7 +37,7 @@ uses
   TestLibraryScanner, TestPlaylistRows, TestAutoPlaylist, TestPlaylistImport,
   TestPlaylistStore, TestReplayGainScan, TestReplayGainThread, TestMetadataCustodian, TestDemoLibrary,
   TestOutputRing, TestDsdToPcm, TestHangWatch, TestVolumePopup, TestLongPaths, TestToneControl, TestPlaylistPane, TestLibraryTiles,
-  TestImageLimit, TestImageFormats, TestHeadroom, TestTextTags, TestTagRoundTrip, TestInputBlock, TestSettings, TestMetaNames;
+  TestImageLimit, TestImageFormats, TestHeadroom, TestTextTags, TestTagRoundTrip, TestInputBlock, TestSettings, TestMetaNames, TestTonePresets;
 
 var
   Runner: TTestRunner;

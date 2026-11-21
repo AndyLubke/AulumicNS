@@ -527,16 +527,17 @@ The Inspector shows the technical details of the files; nothing can be changed h
 
 The Tone Control shapes the sound in five bands. Open it with Ctrl+T or the sliders icon next to the speaker icon.
 
-![The Tone Control](46-tone-control){1=82.5,9.6 2=4.2,40 3=6,71.8 4=73,89 5=88,21 6=22,36}
+![The Tone Control](46-tone-control){1=33,11.6 2=71,11.6 3=88,21.5 4=22,38.8 5=4.2,43.5 6=78.5,54.6 7=6,72}
 
-It is a five-band semi-parametric tone control (bass, low mid, mid, high mid and treble): each band has its own frequency and gain. Bass and treble are shelves: they raise or lower everything below or above their frequency. The three middle bands work around their frequency.
+It is a five-band semi-parametric tone control (bass, low mid, mid, high mid and treble): each band has its own frequency and gain. Bass and treble are shelves: they raise or lower everything below or above their frequency. The three middle bands work around their frequency, and how far around it can be set.
 
-- {1} **Enable:** Turns the tone control on or off. When it's off, it's out of the signal path completely.
-- {2} **Frequency:** The centre frequency of each band.
-- {3} **Gain:** Up to ±10.0 dB per band. Scroll the mouse wheel over a slider, or use the arrow keys when it has the focus. **Flat** {4} sets all bands to 0 dB.
-- {5} **The curve:** The graph above the bands shows what the five bands do together, from 20 Hz to 20 kHz. It's worked out from the filters that are really used, so the curve shows what is heard. A dot marks each band that is set. When the tone control is off, the curve is grey: it shows the settings, but they aren't applied.
-
-A boost raises the peaks of the music. With Headroom set to Automatic (Preferences > Volume), the level is lowered just enough to keep them from clipping, and a line under the curve {6} says by how much: "Level lowered by 1.4 dB to avoid clipping".
+- {1} **Presets:** Shows the preset in use: its name, "Flat" when all bands are at 0 dB, or "Custom" for a setting that isn't saved. Click it to choose a preset, or **Flat** to set all bands to 0 dB. **Save as preset...** keeps the gains, frequencies and widths of the bands under a name; **Rename...** and **Delete...** work on the preset in use. A setting with all bands at 0 dB is Flat and can't be saved as a preset. A preset doesn't switch the tone control on or off, and choosing one glides in like any other change.
+- {2} **Enable:** Turns the tone control on or off. When it's off, it's out of the signal path completely and playback stays bit-perfect.
+- {3} **The curve:** The graph above the bands shows what the five bands do together, from 20 Hz to 20 kHz. It's worked out from the filters that are really used, so the curve shows what is heard. A dot marks each band that is set. When the tone control is off, the curve is grey: it shows the settings, but they aren't applied.
+- {4} **Level line:** A boost raises the peaks of the music. With Headroom set to Automatic (Preferences > Volume), the level is lowered just enough to keep them from clipping, and this line says by how much: "Level lowered by 1.4 dB to avoid clipping".
+- {5} **Frequency:** The centre frequency of each band.
+- {6} **Width:** How wide a middle band works around its frequency; click the word under the frequency to change it. **Narrow** is about one octave, to correct one spot; **Normal** is about two octaves; **Wide** is about three, a gentle change of a whole region. At the band's own frequency the gain is the same for all three. Bass and treble are shelves and have no width.
+- {7} **Gain:** Up to ±10.0 dB per band; 0 dB leaves a band out. Scroll the mouse wheel over a slider, or use the arrow keys when it has the focus.
 
 A change glides in over a fraction of a second, also when the tone control is switched on or off, so there is never a click while the music plays.
 

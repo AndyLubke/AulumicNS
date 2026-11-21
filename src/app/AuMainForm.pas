@@ -46,7 +46,7 @@ uses
   uAudioUtils, uMetaUtils, uOSUtils, uLibraryTypes, uLibraryManager, uUserStatsManager,
   uLibraryWatcher, uEngineStateManager, uPlaylistStore, uPlaylistFile, uPlaylistRows,
   uPlaylistImport, uAutoPlaylist, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuReplayGainForm, AuVirtualFolderForm,
-  AuSignalPath, uCrashTracer, AuResample{$IFDEF DEBUG}, AuTouchProbe{$ENDIF};
+  AuSignalPath, uCrashTracer, AuResample, uTonePresets{$IFDEF DEBUG}, AuTouchProbe{$ENDIF};
 
 type
   { TMainForm }
@@ -225,6 +225,7 @@ type
     procedure ToggleMute;
     procedure ShowTone;
     procedure ToneChanged(Sender: TObject);
+    procedure TonePresetsChanged(Sender: TObject);
     procedure VolumeChanged(Sender: TObject; AVolume: Double);
     procedure VolumeMuted(Sender: TObject);
     procedure VolumePopupClosed(Sender: TObject);
@@ -2255,6 +2256,7 @@ var
   Meta: TAudioMetadata;
   Tone: TAuToneForm;
   Ts: TToneState;
+  Tp: TTonePresets;
   Dir, Card: string;
   WasOn: Boolean;
 begin
@@ -2551,6 +2553,13 @@ begin
           Ts.MidHz := 1000;
           Ts.HighMidHz := 4000;
           Ts.TrebleHz := 10000;
+          Ts.LowMidWidth := TONE_WIDTH_NARROW;
+          SetLength(Tp, 2);
+          Tp[0] := TonePresetOf('Late night', Ts);
+          Ts.BassDB := 40;
+          Tp[1] := TonePresetOf('Headphones', Ts);
+          Tone.SetPresets(Tp);
+          Ts.BassDB := 30;
           Tone.SetValues(Ts);
           Tone.SetHeadroom(-1.4);
           Result := Tone;

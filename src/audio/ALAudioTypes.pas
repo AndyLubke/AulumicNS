@@ -121,10 +121,20 @@ type
     MidHz       : Integer;
     HighMidHz   : Integer;
     TrebleHz    : Integer;
+    // How wide the three middle bands work around their frequency
+    // (TONE_WIDTH_*; 0 = normal, so a cleared record is the plain setting)
+    LowMidWidth : Integer;
+    MidWidth    : Integer;
+    HighMidWidth: Integer;
   end;
 
 const
   TONE_BANDS = 5;
+
+  TONE_WIDTH_NORMAL = 0;   // about two octaves
+  TONE_WIDTH_NARROW = 1;   // about one octave
+  TONE_WIDTH_WIDE   = 2;   // about three octaves
+  TONE_WIDTH_MAX    = 2;
 
 type
   TToneInts = array[0..TONE_BANDS - 1] of Integer;
@@ -133,6 +143,9 @@ function ToneGainsOf(const S: TToneState): TToneInts;
 function ToneFreqsOf(const S: TToneState): TToneInts;
 procedure SetToneGains(var S: TToneState; const A: TToneInts);
 procedure SetToneFreqs(var S: TToneState; const A: TToneInts);
+// the widths of the middle bands (the two shelves have none: always 0)
+function ToneWidthsOf(const S: TToneState): TToneInts;
+procedure SetToneWidths(var S: TToneState; const A: TToneInts);
 // at least one band is not at 0 dB
 function ToneAnyGain(const S: TToneState): Boolean;
 
@@ -163,6 +176,22 @@ begin
   inherited Create(Msg);
   ErrorType  := Err;
   FailedRate := Rate;
+end;
+
+function ToneWidthsOf(const S: TToneState): TToneInts;
+begin
+  Result[0] := TONE_WIDTH_NORMAL;
+  Result[1] := S.LowMidWidth;
+  Result[2] := S.MidWidth;
+  Result[3] := S.HighMidWidth;
+  Result[4] := TONE_WIDTH_NORMAL;
+end;
+
+procedure SetToneWidths(var S: TToneState; const A: TToneInts);
+begin
+  S.LowMidWidth  := A[1];
+  S.MidWidth     := A[2];
+  S.HighMidWidth := A[3];
 end;
 
 function ToneGainsOf(const S: TToneState): TToneInts;

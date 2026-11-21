@@ -6,6 +6,26 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.17 (21 November 2026)
+-------------------------------------------------------------------------------
+
+Tone Control
+  - Presets: the setting of the five bands can be saved under a name and
+    called up again from a new drop-down at the top of the Tone Control
+    window. It shows the preset in use, "Flat" or "Custom", and its menu
+    saves, renames and deletes presets. A preset does not switch the tone
+    control on or off. "Flat" in this menu replaces the Flat button.
+  - Width of the middle bands: low mid, mid and high mid can each work
+    narrow (about one octave, to correct one spot), normal (about two, as
+    before) or wide (about three, a gentle change of a whole region). The
+    curve shows the effect, a change glides in, and presets keep the width.
+  - A tidier window: the preset and the on / off switch share the top line.
+
+Fixes
+  - A window that opens maximized no longer shows up empty for a moment
+    before its content appears.
+
+
 Version 1.1.0.16 (21 November 2026)
 -------------------------------------------------------------------------------
 

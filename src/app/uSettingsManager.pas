@@ -13,7 +13,7 @@ unit uSettingsManager;
 interface
 
 uses
-  Classes, SysUtils, IniFiles, Forms, uPlaybackManager;
+  Classes, SysUtils, IniFiles, Forms, uPlaybackManager, uTonePresets;
 
 type
   TWorkAreas = array of TRect;
@@ -119,6 +119,7 @@ type
     WatchFolders        : boolean;
     PrefsPage           : integer;
     PrefsCards          : string;    // the cards of Preferences that are open (ids, comma separated)
+    TonePresets         : TTonePresets;  // the saved settings of the tone control
     LastAddDir          : string;    // the folder of the last "Add Files / Folder"
     RGScanThreads       : integer;   // ReplayGain scan: tracks measured at once (1 .. RG_MAX_THREADS)
     AlwaysSaveLog       : boolean;   // AulumicNSLog.txt at every exit (else only after errors)
@@ -137,6 +138,7 @@ type
     FIniFile: TMemIniFile;
     procedure AtomicSaveIniFile;
     procedure SanitizeValues;
+    procedure LoadTonePresets;
   public
     Data : TAppSettingsData;
 
@@ -163,6 +165,8 @@ const
   SEC_LIBRARY           = 'Library';
   SEC_UI                = 'UI';
   SEC_ADVANCED          = 'Advanced';
+  SEC_TONE_PRESETS      = 'TonePresets';   // Preset1 .. : one preset per key
+  KEY_TONE_PRESET       = 'Preset';
 
   KEY_MOD_VERSION       = 'ModificationVersion';
 
@@ -257,6 +261,9 @@ const
   KEY_TONE_HIGHMID        = 'ToneHighMid';
   KEY_TONE_LOWMIDHZ       = 'ToneLowMidHz';
   KEY_TONE_HIGHMIDHZ      = 'ToneHighMidHz';
+  KEY_TONE_LOWMIDWIDTH    = 'ToneLowMidWidth';
+  KEY_TONE_MIDWIDTH       = 'ToneMidWidth';
+  KEY_TONE_HIGHMIDWIDTH   = 'ToneHighMidWidth';
   KEY_TONE_WIN_LEFT       = 'ToneWinLeft';
   KEY_TONE_WIN_TOP        = 'ToneWinTop';
   KEY_COVER_WIN_W         = 'CoverWinWidth';
@@ -734,6 +741,9 @@ begin
   Data.Audio.ToneHighMidDB := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_HIGHMID,   0);
   Data.Audio.ToneLowMidHz  := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_LOWMIDHZ,  VAL_DEF_LOWMIDHZ);
   Data.Audio.ToneHighMidHz := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_HIGHMIDHZ, VAL_DEF_HIGHMIDHZ);
+  Data.Audio.ToneLowMidWidth  := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_LOWMIDWIDTH,  TONE_WIDTH_NORMAL);
+  Data.Audio.ToneMidWidth     := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_MIDWIDTH,     TONE_WIDTH_NORMAL);
+  Data.Audio.ToneHighMidWidth := FIniFile.ReadInteger(SEC_AUDIO, KEY_TONE_HIGHMIDWIDTH, TONE_WIDTH_NORMAL);
   // Settings written with three bands: the Mid band could be at 220 Hz ..
   // 3 kHz. Its setting moves to the band that has that frequency now, so it
   // sounds as it did (the filters are the same; a band at 0 dB is skipped).
@@ -795,6 +805,7 @@ begin
   Data.AlwaysSaveLog := FIniFile.ReadBool(SEC_ADVANCED, KEY_ALWAYS_SAVE_LOG, False);
   Data.PrefsPage    := FIniFile.ReadInteger(SEC_UI, KEY_PREFS_PAGE, 0);
   Data.PrefsCards   := FIniFile.ReadString(SEC_UI, KEY_PREFS_CARDS, '');
+  LoadTonePresets;
   Data.LastAddDir   := FIniFile.ReadString(SEC_UI, KEY_LAST_ADD_DIR, '');
   SyncOutputDevice;
 
@@ -810,6 +821,27 @@ begin
     Data.Audio.DeviceID := Data.AsioDriverID
   else
     Data.Audio.DeviceID := Data.WasapiDeviceID;
+end;
+
+{ Preset1, Preset2 ... until a number is missing; a line that is no preset is
+  passed over }
+procedure TAppSettings.LoadTonePresets;
+var
+  I: Integer;
+  P: TTonePreset;
+  Key: string;
+begin
+  Data.TonePresets := nil;
+  for I := 1 to TONE_PRESET_MAX do
+  begin
+    Key := KEY_TONE_PRESET + IntToStr(I);
+    if not FIniFile.ValueExists(SEC_TONE_PRESETS, Key) then Break;
+    if TonePresetFromText(FIniFile.ReadString(SEC_TONE_PRESETS, Key, ''), P) then
+    begin
+      SetLength(Data.TonePresets, Length(Data.TonePresets) + 1);
+      Data.TonePresets[High(Data.TonePresets)] := P;
+    end;
+  end;
 end;
 
 procedure TAppSettings.SanitizeValues;
@@ -847,8 +879,20 @@ const
   MAX_STORED_PIXELS = 20000;    // ... and no stored size is larger than this
   PREFS_PAGE_LAST = 8;          // the last page of Preferences (the dialog checks the number again)
 
+  { a preset's frequencies are choices of their bands, and the low mid stays
+    above the bass - as the tone control's own }
+  procedure CheckPresetFreqs(var P: TTonePreset);
+  begin
+    if not IsValidIntOption(P.Hz[0], TONE_BASS_HZ_OPTIONS) then P.Hz[0] := VAL_DEF_BASSHZ;
+    if not IsValidIntOption(P.Hz[1], TONE_LOWMID_HZ_OPTIONS) then P.Hz[1] := VAL_DEF_LOWMIDHZ;
+    if not IsValidIntOption(P.Hz[2], TONE_MID_HZ_OPTIONS) then P.Hz[2] := VAL_DEF_MIDHZ;
+    if not IsValidIntOption(P.Hz[3], TONE_HIGHMID_HZ_OPTIONS) then P.Hz[3] := VAL_DEF_HIGHMIDHZ;
+    if not IsValidIntOption(P.Hz[4], TONE_TREBLE_HZ_OPTIONS) then P.Hz[4] := VAL_DEF_TREBLEHZ;
+    if P.Hz[1] <= P.Hz[0] then P.Hz[1] := 300;
+  end;
+
 var
-  ToneW, ToneH: Integer;
+  ToneW, ToneH, I: Integer;
 
   procedure SaneToolSize(var W, H: Integer);
   begin
@@ -960,6 +1004,15 @@ begin
   if Data.Audio.ToneLowMidHz <= Data.Audio.ToneBassHz then
     Data.Audio.ToneLowMidHz := 300;
 
+  // (a width that is no choice is the normal one, not the nearest)
+  if (Data.Audio.ToneLowMidWidth < 0) or (Data.Audio.ToneLowMidWidth > TONE_WIDTH_MAX) then Data.Audio.ToneLowMidWidth := TONE_WIDTH_NORMAL;
+  if (Data.Audio.ToneMidWidth < 0) or (Data.Audio.ToneMidWidth > TONE_WIDTH_MAX) then Data.Audio.ToneMidWidth := TONE_WIDTH_NORMAL;
+  if (Data.Audio.ToneHighMidWidth < 0) or (Data.Audio.ToneHighMidWidth > TONE_WIDTH_MAX) then Data.Audio.ToneHighMidWidth := TONE_WIDTH_NORMAL;
+
+  SanitizeTonePresets(Data.TonePresets);
+  for I := 0 to High(Data.TonePresets) do
+    CheckPresetFreqs(Data.TonePresets[I]);
+
   if not IsValidIntOption(Data.Audio.PCMBufferMs, BUFFER_SIZE_OPTIONS) then
     Data.Audio.PCMBufferMs := VAL_DEF_PCMBUFFER;
 
@@ -988,6 +1041,8 @@ begin
 end;
 
 procedure TAppSettings.Save(AForm: TForm);
+var
+  I: Integer;
 begin
   FIniFile.Clear;
 
@@ -1086,6 +1141,11 @@ begin
   FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_HIGHMID,    Data.Audio.ToneHighMidDB);
   FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_LOWMIDHZ,   Data.Audio.ToneLowMidHz);
   FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_HIGHMIDHZ,  Data.Audio.ToneHighMidHz);
+  FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_LOWMIDWIDTH,  Data.Audio.ToneLowMidWidth);
+  FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_MIDWIDTH,     Data.Audio.ToneMidWidth);
+  FIniFile.WriteInteger(SEC_AUDIO, KEY_TONE_HIGHMIDWIDTH, Data.Audio.ToneHighMidWidth);
+  for I := 0 to High(Data.TonePresets) do
+    FIniFile.WriteString(SEC_TONE_PRESETS, KEY_TONE_PRESET + IntToStr(I + 1), TonePresetToText(Data.TonePresets[I]));
 
   FIniFile.WriteBool(SEC_LIBRARY, KEY_ACCORDION,       Data.AccordionEnabled);
   FIniFile.WriteInteger(SEC_LIBRARY, KEY_DBL_CLICK,    Data.DoubleClickAction);

@@ -42,7 +42,7 @@ type
   private
     FCaption: string;
     FIcon, FTextIcon: TAuIcon;
-    FFlat, FPressed, FDropped, FChevron: Boolean;
+    FFlat, FPressed, FDropped, FChevron, FDim: Boolean;
     FTextSize: Single;
     procedure SetCaption(const V: string);
     procedure SetIcon(V: TAuIcon);
@@ -64,6 +64,8 @@ type
     { no input box: a text button }
     property Flat: Boolean read FFlat write FFlat;
     property Chevron: Boolean read FChevron write FChevron;
+    { the caption in the dimmer text colour (a secondary choice under another control) }
+    property Dim: Boolean read FDim write FDim;
     property Dropped: Boolean read FDropped write SetDropped;
     property TextSize: Single read FTextSize write FTextSize;
   end;
@@ -154,7 +156,9 @@ var
   F: TGfxFont;
 begin
   G.FillRect(0, 0, Width, Height, EffBack);
-  if Enabled then Fg := clText else Fg := clTextFaint;
+  if not Enabled then Fg := clTextFaint
+  else if FDim then Fg := clTextDim
+  else Fg := clText;
   if FFlat then
   begin
     if FPressed or FDropped then G.FillRound(0, 0, Width, Height, S(7), clPressed)

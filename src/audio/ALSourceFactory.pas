@@ -90,6 +90,9 @@ type
     ToneMidHz         : integer;
     ToneHighMidHz         : integer;
     ToneTrebleHz      : integer;
+    ToneLowMidWidth   : integer;   // TONE_WIDTH_*
+    ToneMidWidth      : integer;
+    ToneHighMidWidth  : integer;
   end;
 
   // Everything needed to build the next track's source away from

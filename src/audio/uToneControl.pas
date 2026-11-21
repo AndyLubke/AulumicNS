@@ -9,8 +9,10 @@ unit uToneControl;
 //
 // The tone control: a hybrid 'Baxandall / semi parametric EQ' of five bands,
 // each with an adjustable frequency - bass (low shelf), low mid, mid, high mid
-// (peaking), treble (high shelf), in series in this order, all with
-// Q = 1 / sqrt 2. A band at 0 dB is skipped: it is not in the chain.
+// (peaking), treble (high shelf), in series in this order. The shelves have
+// Q = 1 / sqrt 2; a middle band has it too (about two octaves wide), or works
+// narrower (about one octave) or wider (about three) around its frequency.
+// A band at 0 dB is skipped: it is not in the chain.
 // ToneResponseDB gives the curve
 // the Tone Control window draws, from the same coefficients.
 // Strictly accepts Integers for thread-safe UI transport, converting to
@@ -19,7 +21,8 @@ unit uToneControl;
 // The glide. A setting changed while music plays does not
 // replace the coefficients in one step (a faint tick on loud music): every
 // band moves from where it is to the new setting in TONE_GLIDE_MS, its gain
-// in dB and its frequency in octaves along an eased line (a half cosine), and
+// in dB, its frequency in octaves and its width by its Q's ratio along an
+// eased line (a half cosine), and
 // the coefficients are set again TONE_GLIDE_STEPS_PER_S times a second on the
 // way. "Off" (direct mode) and 0 dB are a glide to 0 dB, after which the band
 // is bypassed; "on" is a glide from 0 dB. A change made before any
@@ -64,7 +67,7 @@ type
   TToneSnapshot = record
     L, R: array[0..TONE_BANDS - 1] of TBiquad;
     Active: array[0..TONE_BANDS - 1] of Boolean;
-    CurDB, CurHz, FromDB, FromHz: TToneBandValues;
+    CurDB, CurHz, CurQ, FromDB, FromHz, FromQ: TToneBandValues;
     GlideLen, GlidePos, StepLen, StepLeft: Integer;
   end;
 
@@ -72,7 +75,7 @@ type
   // them (the bands in their order; gains in tenths of a dB, as everywhere)
   TToneCurve = record
     Rate: Integer;
-    Hz, Tenths: TToneInts;
+    Hz, Tenths, Width: TToneInts;
   end;
 
   { TToneControl }
@@ -85,7 +88,7 @@ type
     FActive: array[0..TONE_BANDS - 1] of Boolean;
 
     // Frequencies and Gains stored as Integers (Matches Settings Payload)
-    FHzInt, FDBInt: TToneInts;
+    FHzInt, FDBInt, FWidthInt: TToneInts;
 
     // Independent stereo filters for series processing (the bands in order)
     FL, FR: array[0..TONE_BANDS - 1] of TBiquad;
@@ -96,13 +99,14 @@ type
     // every FStepLen frames (FStepLeft until the next time). FHot: samples
     // went through since the last reset, so a new setting must not arrive
     // as a step.
-    FCurDB, FCurHz, FFromDB, FFromHz: TToneBandValues;
+    FCurDB, FCurHz, FCurQ, FFromDB, FFromHz, FFromQ: TToneBandValues;
     FGlideLen, FGlidePos, FStepLen, FStepLeft: Integer;
     FHot: Boolean;
 
     function TargetDB(ABand: Integer): Double;
     function TargetHz(ABand: Integer): Double;
-    procedure SetBand(ABand: Integer; AHz, ADB: Double; AActive: Boolean);
+    function TargetQ(ABand: Integer): Double;
+    procedure SetBand(ABand: Integer; AHz, ADB, AQ: Double; AActive: Boolean);
     procedure Snap;
     procedure Retarget;
 
@@ -122,6 +126,8 @@ type
     // All five bands
     procedure SetBandFrequencies(const AHz: TToneInts);
     procedure SetBandGains(const ATenths: TToneInts);
+    // TONE_WIDTH_* per band; only the three middle bands have a width
+    procedure SetBandWidths(const AWidths: TToneInts);
 
     procedure SetDirectMode(AEnabled: Boolean);
 
@@ -165,6 +171,9 @@ uses uAppConsts;
 
 const
   DEFAULT_FILTER_Q     = 0.7071067811865475; // 1 / Sqrt(2) Butterworth Q
+  // A peaking band of N octaves has Q = Sqrt(2^N) / (2^N - 1)
+  NARROW_FILTER_Q      = 1.4142135623730951; // one octave
+  WIDE_FILTER_Q        = 0.4040610178208843; // three octaves
 
   // Safe bounds for tone control frequencies (Hz) and gains (0.1 dB units)
   TONE_MIN_FREQ_HZ     = 10;
@@ -293,6 +302,27 @@ begin
     Retarget;
 end;
 
+procedure TToneControl.SetBandWidths(const AWidths: TToneInts);
+var
+  B, V: Integer;
+  Changed: Boolean;
+begin
+  Changed := False;
+  for B := 0 to TONE_BANDS - 1 do
+  begin
+    V := AWidths[B];
+    if (V < 0) or (V > TONE_WIDTH_MAX) or (BAND_FILTER[B] <> ftPeaking) then
+      V := TONE_WIDTH_NORMAL;
+    if FWidthInt[B] <> V then
+    begin
+      FWidthInt[B] := V;
+      Changed      := True;
+    end;
+  end;
+  if Changed then
+    Retarget;
+end;
+
 procedure TToneControl.SetDirectMode(AEnabled: Boolean);
 begin
   if FDirectMode <> AEnabled then
@@ -327,10 +357,23 @@ begin
   Result := FHzInt[ABand];
 end;
 
-// Band ABand at AHz / ADB; a band that is switched off loses its memory
-procedure TToneControl.SetBand(ABand: Integer; AHz, ADB: Double; AActive: Boolean);
+// Always one of the three constants, so a band at its normal width gets the
+// coefficients it always had.
+function TToneControl.TargetQ(ABand: Integer): Double;
+begin
+  case FWidthInt[ABand] of
+    TONE_WIDTH_NARROW: Result := NARROW_FILTER_Q;
+    TONE_WIDTH_WIDE:   Result := WIDE_FILTER_Q;
+  else
+    Result := DEFAULT_FILTER_Q;
+  end;
+end;
+
+// Band ABand at AHz / ADB / AQ; a band that is switched off loses its memory
+procedure TToneControl.SetBand(ABand: Integer; AHz, ADB, AQ: Double; AActive: Boolean);
 begin
   FCurHz[ABand]  := AHz;
+  FCurQ[ABand]   := AQ;
   FCurDB[ABand]  := ADB;
   FActive[ABand] := AActive;
   if not AActive then
@@ -338,7 +381,7 @@ begin
     ResetState(FL[ABand]);
     ResetState(FR[ABand]);
   end;
-  CalcCoeffs(FL[ABand], FR[ABand], BAND_FILTER[ABand], AHz, ADB, DEFAULT_FILTER_Q, not AActive);
+  CalcCoeffs(FL[ABand], FR[ABand], BAND_FILTER[ABand], AHz, ADB, AQ, not AActive);
 end;
 
 // The settings at once: no glide (in work or new)
@@ -354,9 +397,10 @@ begin
   for B := 0 to TONE_BANDS - 1 do
   begin
     D := TargetDB(B);
-    SetBand(B, TargetHz(B), D, D <> 0.0);
+    SetBand(B, TargetHz(B), D, TargetQ(B), D <> 0.0);
     FFromDB[B] := FCurDB[B];
     FFromHz[B] := FCurHz[B];
+    FFromQ[B]  := FCurQ[B];
   end;
 end;
 
@@ -376,21 +420,22 @@ begin
   Moves := False;
   for B := 0 to TONE_BANDS - 1 do
     if (FCurDB[B] = 0.0) and (TargetDB(B) = 0.0) then
-      // off and staying off: only its frequency is noted
-      SetBand(B, TargetHz(B), 0.0, False)
+      // off and staying off: only its frequency and width are noted
+      SetBand(B, TargetHz(B), 0.0, TargetQ(B), False)
     else
     begin
-      if (FCurDB[B] <> TargetDB(B)) or (FCurHz[B] <> TargetHz(B)) then
+      if (FCurDB[B] <> TargetDB(B)) or (FCurHz[B] <> TargetHz(B)) or (FCurQ[B] <> TargetQ(B)) then
         Moves := True;
       // a band that comes on starts from 0 dB (unity) with an empty memory
       if FCurDB[B] = 0.0 then
-        SetBand(B, TargetHz(B), 0.0, True);
+        SetBand(B, TargetHz(B), 0.0, TargetQ(B), True);
     end;
 
   for B := 0 to TONE_BANDS - 1 do
   begin
     FFromDB[B] := FCurDB[B];
     FFromHz[B] := FCurHz[B];
+    FFromQ[B]  := FCurQ[B];
   end;
 
   if not Moves then
@@ -438,7 +483,7 @@ end;
 procedure TToneControl.Advance(AFrames: Integer);
 var
   B: Integer;
-  T, Hz: Double;
+  T, Hz, Q: Double;
 begin
   if (AFrames <= 0) or (not Gliding) then
     Exit;
@@ -457,7 +502,7 @@ begin
   T := 0.5 - 0.5 * Cos(Pi * FGlidePos / FGlideLen);
   for B := 0 to TONE_BANDS - 1 do
   begin
-    if (FFromDB[B] = TargetDB(B)) and (FFromHz[B] = TargetHz(B)) then
+    if (FFromDB[B] = TargetDB(B)) and (FFromHz[B] = TargetHz(B)) and (FFromQ[B] = TargetQ(B)) then
       Continue;                      // this band stays as it is
     if (FFromDB[B] = 0.0) and (TargetDB(B) = 0.0) then
       Continue;                      // off
@@ -465,7 +510,11 @@ begin
       Hz := FFromHz[B]
     else
       Hz := FFromHz[B] * Power(TargetHz(B) / FFromHz[B], T);
-    SetBand(B, Hz, FFromDB[B] + (TargetDB(B) - FFromDB[B]) * T, True);
+    if FFromQ[B] = TargetQ(B) then
+      Q := FFromQ[B]
+    else
+      Q := FFromQ[B] * Power(TargetQ(B) / FFromQ[B], T);
+    SetBand(B, Hz, FFromDB[B] + (TargetDB(B) - FFromDB[B]) * T, Q, True);
   end;
 end;
 
@@ -626,6 +675,8 @@ begin
   AState.Active   := FActive;
   AState.CurDB    := FCurDB;
   AState.CurHz    := FCurHz;
+  AState.CurQ     := FCurQ;
+  AState.FromQ    := FFromQ;
   AState.FromDB   := FFromDB;
   AState.FromHz   := FFromHz;
   AState.GlideLen := FGlideLen;
@@ -641,6 +692,8 @@ begin
   FActive   := AState.Active;
   FCurDB    := AState.CurDB;
   FCurHz    := AState.CurHz;
+  FCurQ     := AState.CurQ;
+  FFromQ    := AState.FromQ;
   FFromDB   := AState.FromDB;
   FFromHz   := AState.FromHz;
   FGlideLen := AState.GlideLen;
@@ -682,6 +735,7 @@ begin
   try
     Tone.SetSampleRate(ACurve.Rate);
     Tone.SetBandFrequencies(ACurve.Hz);
+    Tone.SetBandWidths(ACurve.Width);
     Tone.SetBandGains(ACurve.Tenths);
     Tone.SetDirectMode(False);
     W := 2.0 * Pi * AFreq / ACurve.Rate;

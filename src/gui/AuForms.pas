@@ -379,7 +379,13 @@ begin
     TheMessage.Result := 0;
     Exit;
   end;
-  if (TheMessage.Msg = WM_SHOWWINDOW) and (TheMessage.WParam <> 0) and (TheMessage.LParam = 0) and
+  { A window that opens maximized gets no WM_SHOWWINDOW before it is on the
+    screen, so the moment it is about to be shown is also taken from
+    WM_WINDOWPOSCHANGING: without that it would stand there unpainted until
+    the cloak came. }
+  if (((TheMessage.Msg = WM_SHOWWINDOW) and (TheMessage.WParam <> 0) and (TheMessage.LParam = 0)) or
+      ((TheMessage.Msg = WM_WINDOWPOSCHANGING) and (TheMessage.LParam <> 0) and
+       ((PWindowPos(TheMessage.LParam)^.flags and SWP_SHOWWINDOW) <> 0))) and
     HandleAllocated and not FCloakPending then
   begin
     SetWindowCloak(Handle, True);
