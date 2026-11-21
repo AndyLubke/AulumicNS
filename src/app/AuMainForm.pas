@@ -1945,6 +1945,7 @@ begin
     PutPart('banner', FBanner, 0.45, 0.65, 0.05, 0.5);
     PutControl('meter', FBanner.Meter);
     PutControl('search', FLib.Search);
+    PutControl('libview', FLib.BtnTiles);
     PutControl('tree', FLib.Tree);
     PutControl('selector', FPl.BtnPlaylist);
     PutControl('sortdir', FPl.BtnSortDir);

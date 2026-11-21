@@ -3,6 +3,7 @@
 01-dark-main|banner|5500|1031|2000|1042
 01-dark-main|meter|9765|1610|167|1969
 01-dark-main|search|1215|3081|2278|371
+01-dark-main|libview|2763|3085|242|394
 01-dark-main|tree|1631|6008|3202|5297
 01-dark-main|selector|5500|3081|4303|371
 01-dark-main|sortdir|7841|3085|258|394
@@ -16,6 +17,7 @@
 02-dark-playing|banner|5500|1031|2000|1042
 02-dark-playing|meter|9765|1610|167|1969
 02-dark-playing|search|1215|3081|2278|371
+02-dark-playing|libview|2763|3085|242|394
 02-dark-playing|tree|1631|6008|3202|5297
 02-dark-playing|selector|5500|3081|4303|371
 02-dark-playing|sortdir|7841|3085|258|394
@@ -29,6 +31,7 @@
 03-light-playing|banner|5500|1031|2000|1042
 03-light-playing|meter|9765|1610|167|1969
 03-light-playing|search|1215|3081|2278|371
+03-light-playing|libview|2763|3085|242|394
 03-light-playing|tree|1631|6008|3202|5297
 03-light-playing|selector|5500|3081|4303|371
 03-light-playing|sortdir|7841|3085|258|394
@@ -42,6 +45,7 @@
 04-light-small-banner|banner|5500|741|2000|571
 04-light-small-banner|meter|9765|1089|167|927
 04-light-small-banner|search|1215|2039|2278|371
+04-light-small-banner|libview|2763|2042|242|394
 04-light-small-banner|tree|1631|5486|3202|6340
 04-light-small-banner|selector|5500|2039|4303|371
 04-light-small-banner|sortdir|7841|2042|258|394
@@ -55,6 +59,7 @@
 05-dark-accent|banner|5500|1031|2000|1042
 05-dark-accent|meter|9765|1610|167|1969
 05-dark-accent|search|1215|3081|2278|371
+05-dark-accent|libview|2763|3085|242|394
 05-dark-accent|tree|1631|6008|3202|5297
 05-dark-accent|selector|5500|3081|4303|371
 05-dark-accent|sortdir|7841|3085|258|394
@@ -67,6 +72,7 @@
 06-dark-min-banner|preferences|8750|197|318|394
 06-dark-min-banner|banner|5500|583|2000|317
 06-dark-min-banner|search|1215|1459|2278|371
+06-dark-min-banner|libview|2763|1463|242|394
 06-dark-min-banner|tree|1631|5197|3202|6919
 06-dark-min-banner|selector|5500|1459|4303|371
 06-dark-min-banner|sortdir|7841|1463|258|394
@@ -80,6 +86,7 @@
 07-dark-min-banner-meter|banner|5500|649|2000|417
 07-dark-min-banner-meter|meter|9765|915|167|579
 07-dark-min-banner-meter|search|1215|1691|2278|371
+07-dark-min-banner-meter|libview|2763|1695|242|394
 07-dark-min-banner-meter|tree|1631|5313|3202|6687
 07-dark-min-banner-meter|selector|5500|1691|4303|371
 07-dark-min-banner-meter|sortdir|7841|1695|258|394
@@ -93,6 +100,7 @@
 08-library|banner|5500|1031|2000|1042
 08-library|meter|9765|1610|167|1969
 08-library|search|1215|3081|2278|371
+08-library|libview|2763|3085|242|394
 08-library|tree|1631|6008|3202|5297
 08-library|selector|5500|3081|4303|371
 08-library|sortdir|7841|3085|258|394
@@ -106,6 +114,7 @@
 09-library-search|banner|5500|1031|2000|1042
 09-library-search|meter|9765|1610|167|1969
 09-library-search|search|1215|3081|2278|371
+09-library-search|libview|2763|3085|242|394
 09-library-search|tree|1631|6008|3202|5297
 09-library-search|selector|5500|3081|4303|371
 09-library-search|sortdir|7841|3085|258|394
@@ -119,6 +128,7 @@
 10-library-playlist|banner|5500|1031|2000|1042
 10-library-playlist|meter|9765|1610|167|1969
 10-library-playlist|search|1215|3081|2278|371
+10-library-playlist|libview|2763|3085|242|394
 10-library-playlist|tree|1631|6008|3202|5297
 10-library-playlist|selector|5500|3081|4303|371
 10-library-playlist|sortdir|7841|3085|258|394
@@ -132,6 +142,7 @@
 11-library-tiles|banner|5500|1031|2000|1042
 11-library-tiles|meter|9765|1610|167|1969
 11-library-tiles|search|841|3081|1530|371
+11-library-tiles|libview|2763|3085|242|394
 11-library-tiles|selector|5500|3081|4303|371
 11-library-tiles|sortdir|7841|3085|258|394
 11-library-tiles|sort|8374|3081|808|371

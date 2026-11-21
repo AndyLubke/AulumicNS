@@ -32,7 +32,7 @@ The whole program is one file, `AulumicNS.exe`: no DLLs, no separate PDF viewer.
 
 1. **Add music:** Open Preferences (the gear in the title bar, or Ctrl+P). On the Library page, click **Add folder...** and choose the folder that holds the music. The scan starts right away; the page and the status line show its progress.
 2. **Choose the output:** Click the device name at the bottom right of the main window and pick the DAC. WASAPI devices and ASIO drivers share one list.
-3. **Play:** Double-click an album or a folder in the library on the left, or drag it onto the playlist on the right.
+3. **Play:** Double-click an album or a folder in the library on the left (in the tree, or an album tile), or drag it onto the playlist on the right.
 
 ## WASAPI or ASIO?
 
@@ -77,7 +77,7 @@ Both skip the Windows mixer, so neither changes the audio.
 
 # The main interface
 
-![The main window](02-dark-playing){1=mainmenu 2=preferences 3=banner 4=search 5=selector 6=sortdir 7=view 8=manager 9=tree 10=playlist 11=transport}
+![The main window](02-dark-playing){1=mainmenu 2=preferences 3=banner 4=search 5=libview 6=selector 7=sortdir 8=view 9=manager 10=tree 11=playlist 12=transport}
 
 From top to bottom; the numbers are those in the picture:
 
@@ -104,13 +104,19 @@ From top to bottom; the numbers are those in the picture:
 - **Output sample rate:** Click the output rate on the right of the banner to choose another resampling target rate.
 - **Sizes:** Drag the lower edge of the banner to make it smaller or larger, and the border between the library and the playlist to change their widths. Both follow the pointer during the drag. (With *Use the graphics card* switched off, only a line moves and the size changes on release.)
 
-{4} **Search bar:** Filters the library on title, artist, album artist, composer, performer, album, genre and folder. Accents are ignored (searching for *Dvorak* also finds *Dvořák*).
+{4} **Search bar:** Filters the library on title, artist, album artist, composer, performer, album, genre and folder. Accents are ignored (searching for *Dvorak* also finds *Dvořák*). The tree shows what was found; with the tiles shown, they show the albums found.
 
-**Refresh button:** Checks the library folders for changes and reloads the library view (F5).
+{5} **Tree or tiles:** The two buttons next to the search bar switch the library pane between the tree (the button with the lines) and album tiles (the button with the squares). Ctrl+G does the same, and so does **Library as tiles** in the View menu of the main menu.
 
-{5} **Playlist selector:** Switches between the playlists. Ordinary playlists come first, auto-playlists follow with a funnel icon. To create, rename or delete playlists, open the Playlist Manager.
+- **Narrow pane:** There is one button, which switches to and fro.
+- **Sort buttons:** With the tiles shown, their two sort buttons stand between the search bar and these buttons.
+- **More:** The tiles are described further down, under their picture.
 
-{6} **Sort:** Two buttons set the order of the albums in this playlist.
+**Rescan button:** The round arrow at the right of this row checks the library folders for new, changed and removed files (Ctrl+F5).
+
+{6} **Playlist selector:** Switches between the playlists. Ordinary playlists come first, auto-playlists follow with a funnel icon. To create, rename or delete playlists, open the Playlist Manager.
+
+{7} **Sort:** Two buttons set the order of the albums in this playlist.
 
 - **The button with the name:** Chooses the order: **Playlist order** (the order in which the music was put in), **Artist**, **Album**, **Year** (the oldest first) or **Added to library** (the newest first).
 - **The arrow button:** Reverses that order; the arrow points down while it is reversed.
@@ -118,14 +124,14 @@ From top to bottom; the numbers are those in the picture:
 - **While sorted or reversed:** Albums can't be dragged to another place, and added music finds its own place.
 - **Remembered:** Each playlist keeps its choice. The buttons aren't there in a flat list, which is sorted by its column headings.
 
-{7} **View & edit:** **View** changes how the playlist is grouped and shown; the pencil {8} opens the Playlist Manager. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list.
+{8} **View & edit:** **View** changes how the playlist is grouped and shown; the pencil {9} opens the Playlist Manager. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list.
 
-{9} **Library pane:** The music collection, grouped by folder, artist, album or genre. Right-click (or click the three dots on a row) for more options, such as playing or adding to a playlist (**Replace current playlist** empties the playlist first), **Auto-collapse other nodes**, Virtual Folders, ReplayGain or Properties. If a library folder sits on a drive that isn't connected, it's dimmed and marked **(not available)**; its tracks stay in the library.
+{10} **Library pane:** The music collection, grouped by folder, artist, album or genre, as a tree or as album tiles {5}. Right-click (or click the three dots on a row) for more options, such as playing or adding to a playlist (**Replace current playlist** empties the playlist first), **Auto-collapse other nodes**, Virtual Folders, ReplayGain or Properties. If a library folder sits on a drive that isn't connected, it's dimmed and marked **(not available)**; its tracks stay in the library.
 
 - **Position:** The library is as it was when Aulumic was closed: the same nodes open, the same selection and scroll position, and the tiles at the same place.
-- **Tree or tiles:** The two buttons between the search bar and the refresh button switch the pane between the tree and album tiles (also Ctrl+G, or **Library as tiles** in the View menu of the main menu). In a narrow pane there is one button, which switches to and fro. The tiles are described below, under their picture.
+- **Refresh:** F5 reads the selected folder again from the library and brings the playlist up to date.
 
-{10} **Playlist pane:** The tracks of the selected playlist, with the album covers in the album headers. Click the stars to rate a track or a whole album; click the cover in an album header to open the Cover Art Viewer. Right-click for more options: what can be done with the selected tracks comes first (Play, Rating, **Favourite** - five stars, Add to, Open folder, ReplayGain, Remove from playlist), then what concerns the whole playlist, then the Playlist Manager and Properties.
+{11} **Playlist pane:** The tracks of the selected playlist, with the album covers in the album headers. Click the stars to rate a track or a whole album; click the cover in an album header to open the Cover Art Viewer. Right-click for more options: what can be done with the selected tracks comes first (Play, Rating, **Favourite** - five stars, Add to, Open folder, ReplayGain, Remove from playlist), then what concerns the whole playlist, then the Playlist Manager and Properties.
 
 - **Album headers:** Under the stars a header shows how many tracks the album has and how long it plays, unless the header format shows these already or the pane is too narrow. While scrolling through a long album, its header stays at the top of the list, and it works there as usual: click the cover, the stars or the triangle. This can be switched off in Preferences > Playlists, or with **Keep album headers in view** in the View menu of the main menu.
 - **Flat list:** The view **Flat list** shows the tracks as a table: number, title, artist, album, rating and time.
@@ -141,7 +147,7 @@ Drag tracks or folders here from the library or from Windows Explorer; they are 
 
 **Remove dead items** (right-click menu) takes out the tracks whose files are gone. Tracks on a drive that isn't connected, or on a NAS that doesn't answer, are kept. Before anything is removed, Aulumic reports how many tracks it found and how many it keeps, and asks. While a drive wakes up, a small window with **Cancel** is shown.
 
-{11} **Transport controls:** Shuffle, Stop, Previous, Play/Pause, Next, Jump to Now Playing and Repeat, with the position bar above them.
+{12} **Transport controls:** Shuffle, Stop, Previous, Play/Pause, Next, Jump to Now Playing and Repeat, with the position bar above them.
 
 **Output & audio controls:** Click the device name to choose the output device, the sliders icon to open the Tone Control, or the speaker icon to change or mute the volume.
 
@@ -149,7 +155,7 @@ Drag tracks or folders here from the library or from Windows Explorer; they are 
 
 ![Searching the library](09-library-search)
 
-While typing in the search bar, the library shows only what matches, with the albums and tracks found.
+While typing in the search bar, the library shows only what matches, with the albums and tracks found. With the tiles shown, the albums found appear as tiles.
 
 ![The library as album tiles](11-library-tiles)
 
@@ -289,7 +295,7 @@ The settings of this page:
 
 ![The Main window card, open](24-prefs-1-mainwindow)
 
-- **Double click:** What double-clicking a library node does: play it at once, or only open or close it.
+- **Double click:** What double-clicking a library node does: play it at once, or only open or close it. For an album tile the second choice shows the album in the tree.
 - **Auto-collapse other nodes (accordion):** Closes the other open folders when one is opened.
 - **Show Artists, Albums, Genres:** Shows or hides these groups in the library pane.
 - **Show peak meter:** Shows the peak meter in the banner. It covers 60 dB: green in the lower half, amber higher up, red in the top part (above about -9 dB). The top block turns red for a moment when a sample was clipped.

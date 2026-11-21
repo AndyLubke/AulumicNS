@@ -26,8 +26,8 @@
       <UseVersionInfo Value="True"/>
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="1"/>
-      <BuildNr Value="14"/>
-      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.14"/>
+      <BuildNr Value="15"/>
+      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.15"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>

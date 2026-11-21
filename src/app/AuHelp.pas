@@ -2720,7 +2720,7 @@ begin
     if FView.Topics[I].Title = 'The main interface' then
     begin
       Check('the main window picture is shown', FPic.PictureName = '02-dark-playing', FPic.PictureName);
-      Check('with its 11 markers', FPic.MarkCount = 11, Format('%d markers', [FPic.MarkCount]));
+      Check('with its 12 markers', FPic.MarkCount = 12, Format('%d markers', [FPic.MarkCount]));
     end;
     if FView.Topics[I].Title = 'Aulumic overview' then
       Check('the overview has the main window picture', FPic.PictureName = '02-dark-playing', FPic.PictureName);
