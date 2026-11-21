@@ -18,12 +18,15 @@ Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It ne
 
 **Library and playlists**
 - A library of your music folders with a tree (folders, artists, albums, genres), search and virtual folders. Local folders are watched for changes.
+- Album tiles: the albums of any part of the library as covers, next to the tree. A tile plays, drags and opens its menu like an album in the tree.
 - Playlists and auto-playlists with a query builder, M3U import and export, ratings and favourites.
 - A tag editor, a cover viewer, a booklet viewer for PDF booklets and artist information.
 
 **Look and feel**
 - Dark and light theme (or follow Windows), six accent colours, sharp at every Windows scaling, touch scrolling.
 - A complete help inside the program (F1).
+
+![The library as album tiles](help/shots/11-library-tiles.png)
 
 ## Download
 
