@@ -556,32 +556,38 @@ begin
   end;
 end;
 
-{ 1.5 % from square: filled (the reduced picture is 128 x 126: by whole
-  pixels alone the rule could tip over) }
+{ 1.5 % from square: filled (the reduced picture is two pixels short of
+  square at a size of 128: by whole pixels alone the rule could tip over) }
 procedure TTestPictureFiles.ANearlySquareCoverFillsTheThumbnail;
 var
   T: TGfxBitmap;
 begin
   T := TGfxBitmap(Thumbnail(600, 591));
   try
-    AssertTrue('top edge', IsCover(T, 64, 0));
-    AssertTrue('bottom edge', IsCover(T, 64, CACHE_THUMB_SIZE - 1));
+    AssertTrue('top edge', IsCover(T, CACHE_THUMB_SIZE div 2, 0));
+    AssertTrue('bottom edge', IsCover(T, CACHE_THUMB_SIZE div 2, CACHE_THUMB_SIZE - 1));
   finally
     T.Free;
   end;
 end;
 
 procedure TTestPictureFiles.AWideCoverKeepsItsProportionsOnBlack;
+const
+  M = CACHE_THUMB_SIZE div 2;
+  Q = CACHE_THUMB_SIZE div 4;
+  D = CACHE_THUMB_SIZE div 12;
 var
   T: TGfxBitmap;
 begin
   T := TGfxBitmap(Thumbnail(800, 400));
   try
-    AssertTrue('black above', IsBlack(T, 64, 10));
-    AssertTrue('black below', IsBlack(T, 64, CACHE_THUMB_SIZE - 11));
-    AssertTrue('the cover in the middle', IsCover(T, 64, 64));
-    AssertTrue('the cover to the left edge', IsCover(T, 1, 64));
-    AssertTrue('the cover begins at a quarter', IsCover(T, 64, 36) and IsBlack(T, 64, 28));
+    { twice as wide as high: the cover is the middle half of the square.
+      M: the middle, Q: a quarter, D: a little way from an edge }
+    AssertTrue('black above', IsBlack(T, M, D));
+    AssertTrue('black below', IsBlack(T, M, CACHE_THUMB_SIZE - 1 - D));
+    AssertTrue('the cover in the middle', IsCover(T, M, M));
+    AssertTrue('the cover to the left edge', IsCover(T, 1, M));
+    AssertTrue('the cover begins at a quarter', IsCover(T, M, Q + D div 2) and IsBlack(T, M, Q - D div 2));
   finally
     T.Free;
   end;

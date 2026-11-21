@@ -52,8 +52,8 @@ const
     'modified LGPL. Artist information comes from Last.fm, Wikipedia and TheAudioDB. ' +
     'ASIO is a trademark and software of Steinberg Media Technologies GmbH.' +
     LineEnding + LineEnding +
-    'Aulumic is free software under the GNU General Public License, version 3: you may ' +
-    'use, share and change it. It comes without any warranty. The source code is on GitHub.';
+    'Aulumic is free software under the GNU General Public License, version 3: it may be ' +
+    'used, shared and changed. It comes without any warranty. The source code is on GitHub.';
 
 type
   { the background: the logo and the two thin lines around the facts }

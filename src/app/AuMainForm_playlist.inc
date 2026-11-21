@@ -926,7 +926,7 @@ var
   MarkRow: Integer;
   MarkAbove: Boolean;
 begin
-  Accept := ((Source = FLib.Tree) or (Source = FPl.List)) and not FPl.ReadOnly;
+  Accept := ((Source = FLib.Tree) or (Source = FLib.Tiles.Grid) or (Source = FPl.List)) and not FPl.ReadOnly;
   { a sorted list: nothing is moved in it, and what is dropped finds its
     place by itself - no marker }
   if FPl.SortActive then
@@ -965,7 +965,7 @@ begin
       else
         FPl.MoveEntries(FPl.SelectedEntries, At);
     end
-    else if Source = FLib.Tree then
+    else if (Source = FLib.Tree) or (Source = FLib.Tiles.Grid) then
     begin
       L := TTrackList.Create;
       try

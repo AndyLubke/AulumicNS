@@ -2648,15 +2648,12 @@ var
   St: UINT;
 begin
   G.FillRect(0, 0, Width, Height, EffBack);
-  if FSearch then R := Height / 2 else R := S(7);
+  { a search box looks like every other input (and like a drop button next
+    to it): the same corners, fill and border }
+  R := S(7);
   Bg := clInput;
-  if FSearch and not Focused then
-  begin
-    Bg := HoverMix(Blend(EffBack, clText, 0.06), clHover);
-  end;
   G.FillRound(0, 0, Width, Height, R, Bg);
   if Focused then Bd := clAccent
-  else if FSearch then Bd := 0
   else if HoverT > 0 then Bd := HoverMix(clInputLine, clInputLineHi)
   else Bd := clInputLine;
   if Bd <> 0 then

@@ -250,7 +250,7 @@ type
     FTextSize: TAuSegmented;
     FLibFont, FPlFont: TAuEdit;
     FLastFmKey: TAuEdit;
-    FGrouping, FHeaderFmt, FTrackFmt: TAuCombo;
+    FGrouping, FHeaderFmt, FTrackFmt, FTileSize: TAuCombo;
     FShowArtist, FShowAlbum, FShowGenre, FPeakMeter: TAuSwitch;
     { system }
     FAffinity, FMMCSS, FKeepAwake, FHighRes, FAlwaysLog: TAuSwitch;
@@ -349,7 +349,7 @@ const
   TEXT_SIZES: array[0..3] of Integer = (90, 100, 110, 120);
 
   { the keyboard shortcuts of the Shortcuts page }
-  SHORTCUTS: array[0..32, 0..1] of string = (
+  SHORTCUTS: array[0..33, 0..1] of string = (
     ('Space', 'Play / pause'),
     ('Ctrl+Left / Ctrl+Right', 'Back / forward 10 seconds'),
     ('Ctrl+Up / Ctrl+Down', 'Volume up / down'),
@@ -361,6 +361,7 @@ const
     ('Media keys', 'Play / pause, stop, next, previous'),
     ('Ctrl+O', 'Add files to the playlist'),
     ('Ctrl+F', 'Search the library'),
+    ('Ctrl+G', 'Library as a tree / as album tiles'),
     ('Enter', 'Play the selection (library or playlist)'),
     ('Del', 'Remove the selected tracks from the playlist'),
     ('Ctrl+1 .. Ctrl+5', 'Rate the selected playlist tracks (a header: its whole album)'),
@@ -951,7 +952,8 @@ end;
 
 function TPrefsForm.SumPaneText: string;
 begin
-  Result := Format('Library %s, playlist %s', [FLibFont.Text, FPlFont.Text]);
+  Result := Format('Library %s, playlist %s, tiles %s', [FLibFont.Text, FPlFont.Text,
+    LowerCase(TILE_SIZE_OPTIONS[EnsureRange(OptionInt(FTileSize, TILE_SIZE_OPTIONS, 2), 0, High(TILE_SIZE_OPTIONS))].DisplayName)]);
 end;
 
 function TPrefsForm.SumFilter: string;
@@ -1234,7 +1236,7 @@ begin
   NewPage('Library', icLibrary);
   Section('Library folders');
   H := TextBlock('Folders',
-    'The folders that hold your music. Aulumic shows everything in them, sub folders included.', RW);
+    'The folders that hold the music. Aulumic shows everything in them, sub folders included.', RW);
   Inc(FY, H + 10);
   FFolderList := TAuListView.Create(Self);
   FFolderList.Parent := FCur;
@@ -1244,7 +1246,7 @@ begin
   FFolderList.AutoFit := True;
   FFolderList.RowMenu := False;
   FFolderList.AddColumn('Folder', 300, 0, True);
-  FFolderList.EmptyText := 'No library folder yet.' + LineEnding + 'Add the folders with your music.';
+  FFolderList.EmptyText := 'No library folder yet.' + LineEnding + 'Add the folders that hold the music.';
   FFolderList.BackRole := crCard;
   FFolderList.OnDrawCell := @FolderCell;
   FFolderList.OnSelChange := @FolderSel;
@@ -1252,20 +1254,20 @@ begin
   Inc(FY, 176 + 12);
   FBtnAdd := AddButton(FCur, 'Add folder...', X0, FY, 140, bkNormal, @AddFolderClick);
   FBtnAdd.Icon := icFolderPlus;
-  FBtnAdd.Hint := 'Adds a folder to your library (Insert).';
+  FBtnAdd.Hint := 'Add a folder to the library (Insert).';
   FBtnAdd.ShowHint := True;
   FBtnRemove := AddButton(FCur, 'Remove', X0 + 150, FY, 120, bkNormal, @RemoveFolderClick);
   FBtnRemove.Icon := icTrash;
-  FBtnRemove.Hint := 'Removes the selected folder from the library (Del). Your files stay on disk.';
+  FBtnRemove.Hint := 'Remove the selected folder from the library (Del). The files stay on disk.';
   FBtnRemove.ShowHint := True;
   FBtnRepair := AddButton(FCur, 'Repair...', X0 + RW - 120, FY, 120, bkNormal, @RepairClick);
   FBtnRepair.Icon := icRefresh;
-  FBtnRepair.Hint := 'Rebuilds your library from scratch, thumbnails included. ' +
+  FBtnRepair.Hint := 'Rebuild the library from scratch, thumbnails included. ' +
     'Try this when tracks are missing or the library looks wrong.';
   FBtnRepair.ShowHint := True;
   FBtnScan := AddButton(FCur, 'Scan now', X0 + RW - 120 - 10 - 130, FY, 130, bkNormal, @ScanClick);
   FBtnScan.Icon := icScan;
-  FBtnScan.Hint := 'Checks your library folders for new, changed or removed files.';
+  FBtnScan.Hint := 'Check the library folders for new, changed or removed files.';
   FBtnScan.ShowHint := True;
   Inc(FY, 32 + 8);
   FFirstRow := False;
@@ -1273,7 +1275,7 @@ begin
     'New and changed files show up by themselves a few seconds later. Network folders aren''t ' +
     'watched (some NAS would never sleep): press Refresh (F5) or Rescan (Ctrl+F5) for those.');
   FRescan := SwitchRow('Auto-scan on startup',
-    'Check your library for changes every time Aulumic starts.');
+    'Check the library for changes every time Aulumic starts.');
   EndPage;
 end;
 
@@ -1290,9 +1292,9 @@ begin
     'Default layout of the tracks in playlists. Each playlist can override it.', TRACK_FORMAT_OPTIONS);
   FCursorFollows := SwitchRow('Cursor follows playback',
     'When a track starts, the selection moves to it and it scrolls into view. Only in the playlist ' +
-    'that is playing; other playlists stay where you left them.');
+    'that is playing; other playlists stay where they were.');
   FStickyHeaders := SwitchRow('Keep album headers in view',
-    'While you scroll through an album, its header stays at the top of the playlist.');
+    'While scrolling through an album, its header stays at the top of the playlist.');
   EndPage;
 end;
 
@@ -1304,7 +1306,7 @@ begin
   FApi.SetIcons([icHeadphones, icBolt]);
   FApi.OnChange := @ApiChange;
   StackRow('Output interface',
-    'WASAPI exclusive mode or the ASIO driver of your DAC. Both keep the Windows mixer out of the ' +
+    'WASAPI exclusive mode or the ASIO driver of the DAC. Both keep the Windows mixer out of the ' +
     'signal path; while Aulumic plays, no other program can use the device.', FApi, 360, 36);
   FDevice := TAuCombo.Create(Self);
   FDevice.OnChange := @DeviceChange;
@@ -1320,8 +1322,8 @@ procedure TPrefsForm.BuildDsd;
 begin
   NewPage('DSD', icDisc);
   FDoP := SwitchRow('Play DSD natively',
-    'Send DSD to your DAC as DSD, without converting it to PCM: as DoP over WASAPI, as native DSD ' +
-    'over ASIO when the driver can (else DoP). Your DAC must support DSD.');
+    'Send DSD to the DAC as DSD, without converting it to PCM: as DoP over WASAPI, as native DSD ' +
+    'over ASIO when the driver can (else DoP). The DAC must support DSD.');
   FDsdLowPass := SwitchRow('DSD low-pass',
     'Apply a 30 kHz low-pass filter when DSD is converted to PCM. Turning it off can cause ' +
     'distortion when ReplayGain is used.');
@@ -1378,7 +1380,7 @@ var
 begin
   NewPage('Volume', icVolume2);
   FLockVolume := SwitchRow('Lock volume to 100%',
-    'Keep the volume at 100% and let your DAC or amplifier control it. This also turns off ' +
+    'Keep the volume at 100% and let the DAC or amplifier control it. This also turns off ' +
     'ReplayGain, a fixed headroom and soft clipping. Needed for bit-perfect playback.');
   FReplayGain := ComboRow('ReplayGain mode',
     'Track: every song plays at the same loudness. Album: whole albums play at the same loudness, ' +
@@ -1392,7 +1394,7 @@ begin
     'a tone control boost is counted in. Bit-perfect playback is never touched. Or a fixed amount.',
     HEADROOM_OPTIONS);
   FSoftClip := SwitchRow('Enable soft clipping limiter',
-    'Gently rounds off peaks that would otherwise clip. You don''t need it with Headroom on ' +
+    'Gently rounds off peaks that would otherwise clip. It isn''t needed with Headroom on ' +
     'Automatic; it helps with a fixed headroom.');
   Inc(FY, 20);
   L := AddLabel(FCur, 'Any change of the level (volume below 100%, ReplayGain, headroom, tone control) ' +
@@ -1436,20 +1438,23 @@ begin
     'What double-clicking a library folder does: play it right away in the default playlist, ' +
     'or only open or close it.', DBLCLICK_OPTIONS);
   FAccordion := SwitchRow('Auto-collapse other nodes (accordion)',
-    'Closes the other open folders when you open one, which keeps the tree tidy.');
+    'Closes the other open folders when one is opened, which keeps the tree tidy.');
   Section('Show');
   FShowArtist := SwitchRow('Show Artists in library', 'Show the Artists group in the library pane.');
   FShowAlbum := SwitchRow('Show Albums in library', 'Show the Albums group in the library pane.');
   FShowGenre := SwitchRow('Show Genres in library', 'Show the Genres group in the library pane.');
   FPeakMeter := SwitchRow('Show peak meter', 'Show the peak meter in the top banner.');
   EndCard;
-  BeginCard(CARD_PANETEXT, 'Text size of the panes', icLibrary, @SumPaneText);
+  BeginCard(CARD_PANETEXT, 'Text and tile size of the panes', icLibrary, @SumPaneText);
   FLibFont := SpinRow('Library text size',
     'Tip: hold Ctrl and scroll the mouse wheel over the library to change it quickly.',
     FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   FPlFont := SpinRow('Playlist text size',
     'Tip: hold Ctrl and scroll the mouse wheel over the playlist to change it quickly.',
     FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
+  FTileSize := ComboRow('Album tile size',
+    'The size of the album tiles in the library pane; List shows a small cover with the text beside it. ' +
+    'Tip: hold Ctrl and scroll the mouse wheel over the tiles to change it quickly.', TILE_SIZE_OPTIONS);
   EndCard;
   EndPage;
 end;
@@ -1459,7 +1464,7 @@ begin
   NewPage('System', icCpu);
   Section('Drives');
   FKeepAwake := SwitchRow('Keep music drives awake during playback',
-    'Stops the drives you play from falling asleep mid-album. Handy for external drives ' +
+    'Stops the drives that are playing from falling asleep mid-album. Handy for external drives ' +
     'and NAS.');
   Section('Drawing');
   FAnimations := SwitchRow('Animations',
@@ -1471,8 +1476,8 @@ begin
   { set once per PC }
   BeginCard(CARD_THREAD, 'Audio thread', icCpu, @SumThread);
   FAffinity := SwitchRow('Optimize CPU core affinity',
-    'Keeps the audio thread off CPU core 0, where Windows is busiest. Turn it off if you use a ' +
-    'tool like Process Lasso to manage your cores.');
+    'Keeps the audio thread off CPU core 0, where Windows is busiest. Turn it off when a ' +
+    'tool like Process Lasso manages the cores.');
   FMMCSS := SwitchRow('Enable MMCSS (''Pro Audio'' mode)',
     'Registers the audio thread with Windows as a "Pro Audio" task, so it gets priority and isn''t ' +
     'throttled. Turn it off if an older DAC driver crashes or stutters.');
@@ -1483,7 +1488,7 @@ begin
   BeginCard(CARD_LOG, 'Log', icLog, @SumLog);
   FAlwaysLog := SwitchRow('Always save the log',
     'Writes AulumicNSLog.txt into the Data folder every time Aulumic closes. Otherwise it''s ' +
-    'only written after an error. Handy when you report a problem.');
+    'only written after an error. Handy for a problem report.');
   EndCard;
   BeginCard(CARD_ARTISTINFO, 'Artist information', icArtist, @SumArtistInfo);
   FLastFmKey := AddEdit(FCur, 0, 0, 300);
@@ -1569,6 +1574,7 @@ begin
     if D.UIFontSize >= TEXT_SIZES[I] - 4 then FTextSize.ItemIndex := I;
   FLibFont.Value := EnsureRange(D.LibraryFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   FPlFont.Value := EnsureRange(D.PlaylistFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
+  SelectOption(FTileSize, TILE_SIZE_OPTIONS, IntToStr(D.LibraryTileSize));
   SelectOption(FGrouping, GROUPING_MODE_OPTIONS, IntToStr(D.DefaultGroupingMode));
   SelectOption(FHeaderFmt, HEADER_FORMAT_OPTIONS, D.DefaultHeaderFormat);
   SelectOption(FTrackFmt, TRACK_FORMAT_OPTIONS, D.DefaultTrackFormat);
@@ -1638,6 +1644,7 @@ begin
   D.UIFontSize := TEXT_SIZES[EnsureRange(FTextSize.ItemIndex, 0, High(TEXT_SIZES))];
   D.LibraryFontSize := EnsureRange(FLibFont.Value, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   D.PlaylistFontSize := EnsureRange(FPlFont.Value, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
+  D.LibraryTileSize := OptionInt(FTileSize, TILE_SIZE_OPTIONS, 2);
   D.DefaultGroupingMode := OptionInt(FGrouping, GROUPING_MODE_OPTIONS, 0);
   D.DefaultHeaderFormat := OptionValue(FHeaderFmt, HEADER_FORMAT_OPTIONS, HEADER_FORMAT_OPTIONS[0].DataStr);
   D.DefaultTrackFormat := OptionValue(FTrackFmt, TRACK_FORMAT_OPTIONS, TRACK_FORMAT_OPTIONS[0].DataStr);

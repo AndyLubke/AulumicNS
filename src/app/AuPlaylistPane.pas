@@ -111,6 +111,7 @@ type
     FNextId: Integer;
     FOnLookup: TPlLookupEvent;
     FThumbs: TStringList;              // album hash -> TGfxBitmap (nil: none)
+    FThumbPx: Integer;                 // the size the kept thumbnails were read at
     FGroupMode: TGroupingMode;
     FSortMode: TPlSortMode;
     FSortReverse: Boolean;
@@ -153,7 +154,7 @@ type
     procedure SetAllCollapsed(AValue: Boolean);
     procedure SetPlaying(V: Integer);
     function ReadEntry(const APath: string): TPlEntry;
-    function ThumbOf(const H: TPlHeader): TGfxBitmap;
+    function ThumbOf(const H: TPlHeader; APixels: Integer): TGfxBitmap;
     function EntryFromTrack(const T: TTrackInfo): TPlEntry;
     procedure InsertEntries(const New_: array of TPlEntry; N, InsertAt: Integer);
     function TrackOf(const E: TPlEntry): TTrackInfo;
@@ -2118,16 +2119,28 @@ begin
     Result := Format('%.2d', [E + 1]);
 end;
 
-function TPlaylistPane.ThumbOf(const H: TPlHeader): TGfxBitmap;
+{ the thumbnail of a header, read at the size it is shown at (APixels, in
+  steps of 64 up to the thumbnail's own size). Every header of a paint asks
+  for the same size, so a new size is noticed by the first one - before any
+  kept picture was drawn in that paint - and the kept ones are let go. }
+function TPlaylistPane.ThumbOf(const H: TPlHeader; APixels: Integer): TGfxBitmap;
 var
   Hash, F: string;
-  Idx: Integer;
+  Idx, Px: Integer;
 begin
+  Px := EnsureRange(((APixels + 63) div 64) * 64, 64, CACHE_THUMB_SIZE);
+  if Px <> FThumbPx then
+  begin
+    for Idx := 0 to FThumbs.Count - 1 do
+      if FThumbs.Objects[Idx] <> nil then DisposeBitmap(TGfxBitmap(FThumbs.Objects[Idx]));
+    FThumbs.Clear;
+    FThumbPx := Px;
+  end;
   Hash := GenerateAlbumHash(H.AlbumArtist, H.Album, H.FolderDir);
   if FThumbs.Find(Hash, Idx) then Exit(TGfxBitmap(FThumbs.Objects[Idx]));
   Result := nil;
   F := AppCacheThumbsDir + Hash + '.jpg';
-  if FileExists(LongPath(F)) then Result := ImageFromFile(F, 256);
+  if FileExists(LongPath(F)) then Result := ImageFromFile(F, FThumbPx);
   FThumbs.AddObject(Hash, TObject(Result));
 end;
 
@@ -2188,7 +2201,7 @@ begin
     TX := X;
     if FGroupMode <> gmFolder then
     begin
-      if FDemo then Thumb := nil else Thumb := ThumbOf(Hdr);
+      if FDemo then Thumb := nil else Thumb := ThumbOf(Hdr, Round(Th));
       DrawTileArt(G, Thumb, X, Y + S(5), Th, Th, S(5), Hdr.Album + Hdr.AlbumArtist, False);
       TX := X + Th + S(14);
     end

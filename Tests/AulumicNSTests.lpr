@@ -36,7 +36,7 @@ uses
   TestDriveWake, TestCrashTracer, TestResampler, TestLibraryLogic, TestLibraryDatabase,
   TestLibraryScanner, TestPlaylistRows, TestAutoPlaylist, TestPlaylistImport,
   TestPlaylistStore, TestReplayGainScan, TestReplayGainThread, TestMetadataCustodian, TestDemoLibrary,
-  TestOutputRing, TestDsdToPcm, TestHangWatch, TestVolumePopup, TestLongPaths, TestToneControl, TestPlaylistPane,
+  TestOutputRing, TestDsdToPcm, TestHangWatch, TestVolumePopup, TestLongPaths, TestToneControl, TestPlaylistPane, TestLibraryTiles,
   TestImageLimit, TestImageFormats, TestHeadroom, TestTextTags, TestInputBlock, TestSettings, TestMetaNames;
 
 var

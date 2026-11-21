@@ -40,7 +40,7 @@ interface
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, ExtCtrls, LCLType, LMessages, Dialogs,
   AuGfx, AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuForms, AuExtra, AuTree, AuGroupList,
-  AuAppIcon, AuTitleBar, AuSingle, AuSettings, AuBanner, AuTransport, AuLibraryPane, AuPlaylistPane,
+  AuAppIcon, AuTitleBar, AuSingle, AuSettings, AuBanner, AuTransport, AuLibraryPane, AuTileGrid, AuPlaylistPane,
   AuToneForm, AuVolumePopup, AuLog, AuDialogs, AuPrefs, AuPlaylistManager, AuPlaylistEditor,
   ALAudioTypes, ALMetadata, uAppConsts, uAppStrings, uSettingsManager, uPlaybackManager,
   uAudioUtils, uMetaUtils, uOSUtils, uLibraryTypes, uLibraryManager, uUserStatsManager,
@@ -107,6 +107,7 @@ type
     FWatcher: TLibraryWatcher;
     FWatchMuteUntil: QWord;      // the watcher's changes are the program's own writes until then
     FCtxNode: TAuTreeNode;       // the node of the library context menu
+    FCtxTile: Integer;           // the tile of the library context menu
     FStartupScanDone: Boolean;
     FActivePlaySeconds: Double;  // play counting
     FIsScrobbled: Boolean;
@@ -346,6 +347,10 @@ type
     procedure PlTextSize(Sender: TObject);
     procedure TreeActivate(Sender: TObject; Node: TAuTreeNode; var Handled: Boolean);
     procedure TreeContext(Sender: TObject; Node: TAuTreeNode; ScreenPt: TPoint);
+    procedure TilesActivate(Sender: TObject; Index: Integer);
+    procedure TilesContext(Sender: TObject; Index: Integer; ScreenPt: TPoint);
+    procedure MnTileShowInTree(Sender: TObject);
+    procedure MnTileOpenFolder(Sender: TObject);
     procedure PlActivate(Sender: TObject; Row: Integer);
     procedure PlContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
     procedure PlKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -401,6 +406,8 @@ type
     procedure MnRepeatMode(Sender: TObject);
     procedure MnNewPlaylist(Sender: TObject);
     procedure MnViewCompact(Sender: TObject);
+    procedure MnViewTiles(Sender: TObject);
+    procedure LibTileMode(Sender: TObject);
     procedure MnViewPeakMeter(Sender: TObject);
     procedure MnViewCursorFollows(Sender: TObject);
     procedure MnPlFavourite(Sender: TObject);
@@ -630,7 +637,7 @@ begin
   else
   {$ENDIF}
   begin
-    FLib.Init(FLibrary);
+    FLib.Init(FLibrary, True);
     InitPlaylists;
     RestartWatcher;
     Application.QueueAsyncCall(@StartWatchAsync, 0);
@@ -1059,6 +1066,9 @@ begin
   FLib.Tree.OnActivate := @TreeActivate;
   FLib.Tree.OnNodeContext := @TreeContext;
   FLib.BtnRescan.OnClick := @RescanClick;
+  FLib.Tiles.Grid.OnActivate := @TilesActivate;
+  FLib.Tiles.Grid.OnTileContext := @TilesContext;
+  FLib.OnTileModeChange := @LibTileMode;
   FMainSplit := TAuSplitter.Create(Self);
   FMainSplit.Parent := FMid;
   FMainSplit.Align := alLeft;
@@ -1169,6 +1179,7 @@ begin
   M.Add('Peak meter', @MnViewPeakMeter);
   M.Add('Keep album headers in view', @MnPlSticky);
   M.Add('Cursor follows playback', @MnViewCursorFollows);
+  M.Add('Library as tiles', @MnViewTiles, icNone, 'Ctrl+G');
   M := FMainMenu.AddSub('Tools', icSliders);
   M.Add('Properties...', @MnProperties, icTag, 'Alt+Enter');
   M.Add('Calculate ReplayGain...', @MnReplayGain, icWave);
@@ -1209,6 +1220,7 @@ begin
   FMainViewMenu.Item(3).Checked := AppSettings.Data.ShowPeakmeter;
   FMainViewMenu.Item(4).Checked := AppSettings.Data.StickyHeaders;
   FMainViewMenu.Item(5).Checked := AppSettings.Data.CursorFollowsPlayback;
+  FMainViewMenu.Item(6).Checked := FLib.TileMode;
 end;
 
 { the mode of the item's Tag: the playback manager only steps through its
@@ -1246,6 +1258,27 @@ begin
   FBanner.Changed;
 end;
 
+{ the library pane as tiles or as the tree (also the two buttons of the pane) }
+procedure TMainForm.MnViewTiles(Sender: TObject);
+begin
+  FLib.SetTileMode(not FLib.TileMode, True);
+  FLib.FocusList;
+end;
+
+{ the tree and the tiles each have a width of the library pane: the tiles
+  take their own once the border was dragged while they were shown }
+procedure TMainForm.LibTileMode(Sender: TObject);
+begin
+  if FLib.TileMode then
+  begin
+    if AppSettings.Data.LeftPanelWidthTiles > 0 then FLibWanted := AppSettings.Data.LeftPanelWidthTiles;
+  end
+  else if AppSettings.Data.LeftPanelWidth > 0 then
+    FLibWanted := AppSettings.Data.LeftPanelWidth;
+  FLibWanted := EnsureRange(FLibWanted, MIN_LPANEL_WIDTH, 900);
+  MidResize(nil);
+end;
+
 procedure TMainForm.MnViewCursorFollows(Sender: TObject);
 begin
   AppSettings.Data.CursorFollowsPlayback := not AppSettings.Data.CursorFollowsPlayback;
@@ -1271,8 +1304,12 @@ end;
 
 procedure TMainForm.SaveWindowSettings;
 begin
-  { the width the user chose, not the one a narrow window allows just now }
-  AppSettings.Data.LeftPanelWidth := FLibWanted;
+  { the width the user chose, not the one a narrow window allows just now
+    (the tiles have one of their own only once the border was dragged
+    while they were shown: MainSplitMoved) }
+  if not FLib.TileMode then AppSettings.Data.LeftPanelWidth := FLibWanted
+  else if AppSettings.Data.LeftPanelWidthTiles > 0 then AppSettings.Data.LeftPanelWidthTiles := FLibWanted;
+  FLib.SaveView;
   AppSettings.Data.TopPanelHeight := Round(FBanner.Height / UIScale);
   AppSettings.Data.LibraryFontSize := EnsureRange(Round(FLib.Tree.TextSize) - 2, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   AppSettings.Data.PlayListFontSize := EnsureRange(Round(FPl.List.TextSize) - 2, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
@@ -1292,7 +1329,7 @@ begin
   if AppStateManager = nil then Exit;
   Lines := '';
   if AppStateManager.HasState(esBackgroundIOBusy) then
-    Lines := Lines + '- Tags are being written to your files. Files not written yet keep their old tags.' + sLineBreak;
+    Lines := Lines + '- Tags are being written to the files. Files not written yet keep their old tags.' + sLineBreak;
   if AppStateManager.HasState(esReplayGainBusy) then
     Lines := Lines + '- ReplayGain is being calculated, or its results are not saved yet. They are lost.' + sLineBreak;
   if (FLibrary <> nil) and FLibrary.IsScanning then
@@ -1595,7 +1632,8 @@ end;
 procedure TMainForm.MainSplitMoved(Sender: TObject);
 begin
   FLibWanted := Round(FLib.Width / UIScale);
-  AppSettings.Data.LeftPanelWidth := FLibWanted;
+  if FLib.TileMode then AppSettings.Data.LeftPanelWidthTiles := FLibWanted
+  else AppSettings.Data.LeftPanelWidth := FLibWanted;
 end;
 
 { the playlist keeps at least
@@ -1628,6 +1666,7 @@ procedure TMainForm.LibTextSize(Sender: TObject);
 begin
   AppSettings.Data.LibraryFontSize := EnsureRange(Round(FLib.Tree.TextSize) - 2, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   FLib.Tree.TextSize := PaneTextPx(AppSettings.Data.LibraryFontSize);
+  FLib.TextSizeChanged;
 end;
 
 procedure TMainForm.PlTextSize(Sender: TObject);
@@ -1776,6 +1815,8 @@ begin
     end;
     { the panes }
     FLib.Tree.TextSize := PaneTextPx(New.LibraryFontSize);
+    FLib.TextSizeChanged;
+    FLib.Tiles.Grid.TileSize := New.LibraryTileSize;
     FPl.List.TextSize := PaneTextPx(New.PlaylistFontSize);
     FLib.Tree.Accordion := New.AccordionEnabled;
     FPl.List.StickyHeaders := New.StickyHeaders;
@@ -2033,6 +2074,8 @@ procedure TMainForm.ShotTick(Sender: TObject);
     FTransport.LblPos.Caption := FormatDuration(AT_SEC);
     FTransport.LblTotal.Caption := Total;
   end;
+const
+  SHOT_FIRST_DIALOG = 24;    // the step of the first dialog (an even number)
 var
   N: TAuTreeNode;
   ShotNodes: TAuTreeNodeArray;
@@ -2071,6 +2114,40 @@ begin
          { --shot-scroll=<px>: the playlist scrolled down (a pinned header) }
          if Application.HasOption('shot-scroll') then
            FPl.List.ScrollTo(S(StrToIntDef(Application.GetOptionValue('shot-scroll'), 0)));
+         { --shot-tiles=<size>: the library pane as tiles of that size
+           (0 = the list); --shot-lib-width=<px>: the pane that wide }
+         if Application.HasOption('shot-lib-width') then
+         begin
+           FLibWanted := StrToIntDef(Application.GetOptionValue('shot-lib-width'), 300);
+           FLib.Width := S(FLibWanted);
+         end;
+         if Application.HasOption('shot-tiles') then
+         begin
+           { --shot-tiles-node: the tiles of a folder two levels down (a path
+             above the tiles) }
+           if Application.HasOption('shot-tiles-node') and (FLib.Tree.RootCount > 0) then
+           begin
+             N := FLib.Tree.Roots(0);
+             N.Expanded := True;
+             if N.Count > 0 then
+             begin
+               N := N[0];
+               N.Expanded := True;
+               if N.Count > 0 then N := N[0];
+             end;
+             FLib.Tree.SelectNode(N);
+           end;
+           FLib.Tiles.Grid.TileSize := StrToIntDef(Application.GetOptionValue('shot-tiles'), 2);
+           FLib.SetTileMode(True, False);
+           { the Tab order above the tiles, to compare with the left edges }
+           with TStringList.Create do
+           try
+             Add(FLib.TopTabOrder);
+             SaveToFile(FShotDir + 'tab-order.txt');
+           finally
+             Free;
+           end;
+         end;
        end;
     3: CaptureWindow('02-dark-playing');
     4: SetTheme(tmLight, AccentIndex);
@@ -2113,11 +2190,22 @@ begin
           end;
         end;
     19: CaptureWindow('10-library-playlist');
+    20: begin
+          { the library pane as album tiles (all albums of the library) }
+          FLib.Tiles.Grid.TileSize := TILE_SIZE_DEFAULT;
+          FLib.SetTileMode(True, False);
+        end;
+    21: CaptureWindow('11-library-tiles');
+    22: begin
+          FLib.SetTileMode(False, False);
+          FLib.Tiles.Grid.TileSize := AppSettings.Data.LibraryTileSize;
+        end;
+    23: ;
   else
     { the dialogs: shown (not modal), captured, freed }
-    if (FShotStep - 20) mod 2 = 0 then
+    if (FShotStep - SHOT_FIRST_DIALOG) mod 2 = 0 then
     begin
-      FShotForm := ShotDialog((FShotStep - 20) div 2, FShotName);
+      FShotForm := ShotDialog((FShotStep - SHOT_FIRST_DIALOG) div 2, FShotName);
       if FShotForm = nil then
       begin
         FShotTimer.Enabled := False;
@@ -2399,7 +2487,7 @@ begin
           'three albums of quiet, warm chamber jazz.' + LineEnding + LineEnding +
           'The biography of a real artist comes from Last.fm and is saved next to ' +
           'the program, so it is shown at once the next time. Press F2 to edit it; ' +
-          'your own text and picture are kept when the information is refreshed.',
+          'an edited text and a chosen picture are kept when the information is refreshed.',
           SafeFormat(FMT_ARTIST_LIB_STATS, [3, 34]), AIndex = 22);
       end;
     23: begin
@@ -2497,6 +2585,7 @@ begin
     case Key of
       Ord('F'): MnSearch(nil);
       Ord('J'): JumpToNowPlaying;
+      Ord('G'): MnViewTiles(nil);
       Ord('P'): MnPrefs(nil);
       Ord('T'): ShowTone;
       Ord('L'): MnLog(nil);
@@ -2512,12 +2601,12 @@ begin
       VK_RIGHT: if InEdit then Exit else SeekBy(10);
       VK_F5: MnRescan(nil);
       VK_TAB:
-        if FLib.Tree.Focused then FPl.List.SetFocus
-        else FLib.Tree.SetFocus;
+        if FLib.ListFocused then FPl.List.SetFocus
+        else FLib.FocusList;
       { the rating of the selected playlist rows (a header:
         its whole group), 0 = no rating }
       Ord('0')..Ord('5'), VK_NUMPAD0..VK_NUMPAD5:
-        if InEdit or FLib.Tree.Focused then Exit
+        if InEdit or FLib.ListFocused then Exit
         else RateSelection(IfThen(Key >= VK_NUMPAD0, Key - VK_NUMPAD0, Key - Ord('0')));
     else
       Exit;

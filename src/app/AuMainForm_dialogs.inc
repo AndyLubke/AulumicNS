@@ -166,7 +166,7 @@ end;
   neither has it) }
 procedure TMainForm.MnProperties(Sender: TObject);
 begin
-  if FLib.Tree.Focused or FLib.Search.Focused then MnLibProperties(Sender)
+  if FLib.ListFocused or FLib.Search.Focused then MnLibProperties(Sender)
   else MnPlProperties(Sender);
 end;
 

@@ -98,6 +98,10 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
+        <Filename Value="TestLibraryTiles.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit>
+      <Unit>
         <Filename Value="TestHelpers.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestHelpers"/>

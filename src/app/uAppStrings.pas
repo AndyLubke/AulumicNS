@@ -92,12 +92,12 @@ const
   LBL_CHANNELS_MONO           = 'Mono';
   LBL_CHANNELS_STEREO         = 'Stereo';
   // Hints
-  HINT_SHUFFLE_OFF            = 'Shuffle (off)';
-  HINT_SHUFFLE_TRACKS         = 'Shuffle (tracks)';
-  HINT_SHUFFLE_ALBUMS         = 'Shuffle (albums)';
-  HINT_REPEAT_OFF             = 'Repeat (off)';
-  HINT_REPEAT_ALL             = 'Repeat (all)';
-  HINT_REPEAT_TRACK           = 'Repeat (track)';
+  HINT_SHUFFLE_OFF            = 'Shuffle: off (Ctrl+S)';
+  HINT_SHUFFLE_TRACKS         = 'Shuffle: tracks (Ctrl+S)';
+  HINT_SHUFFLE_ALBUMS         = 'Shuffle: albums (Ctrl+S)';
+  HINT_REPEAT_OFF             = 'Repeat: off (Ctrl+R)';
+  HINT_REPEAT_ALL             = 'Repeat: all (Ctrl+R)';
+  HINT_REPEAT_TRACK           = 'Repeat: one track (Ctrl+R)';
 
   // =========================================================================
   // 3. STATUS BAR & PROGRESS TEXT (Prefix: STATUS_)
@@ -118,7 +118,7 @@ const
   FMT_STATUS_RG_CHECKING      = 'Checking existing tags %d/%d...';
   STATUS_RG_SKIPPING          = '(Skipping — already scanned)';
   FMT_STATUS_RG_FAST_FORWARD  = 'Fast-forwarding Album %d of %d...';
-  FMT_STATUS_RG_ANALYZING     = 'Analyzing Album %d of %d (Track %d/%d)';
+  FMT_STATUS_RG_ANALYZING     = 'Analysing album %d of %d (track %d/%d)';
   FMT_STATUS_RG_PARALLEL      = '%s  (+%d more)';   // the track started last, the others in work
   STATUS_RG_DECODE_ERROR      = 'Decode error / unsupported';
   STATUS_RG_ALBUM_INCOMPLETE  = 'Album incomplete (not saved)';
@@ -205,12 +205,12 @@ const
   ERR_FILE_NOT_FOUND          = 'File not found:';
 
   // 7B. Audio Engine & WASAPI Errors
-  ERR_AUDIO_UNKNOWN           = 'An unknown system or driver fault occurred during audio playback. Please check your DAC connection or restart the application.';
+  ERR_AUDIO_UNKNOWN           = 'An unknown system or driver fault occurred during audio playback. Please check the DAC connection or restart the program.';
   ERR_AUDIO_INVALID           = 'Invalid audio format or corrupted file header.';
   ERR_AUDIO_INUSE             = 'The audio device is being used by another application in Exclusive Mode.';
   ERR_AUDIO_EXCLDISABLED      = 'Exclusive Mode is disabled for this device in Windows Sound Settings.';
   ERR_AUDIO_RATE              = 'The selected Sample rate is not supported by this device.';
-  ERR_AUDIO_DISABLED          = 'Audio device disconnected or invalid output. Please check your DAC settings.';
+  ERR_AUDIO_DISABLED          = 'Audio device disconnected or invalid output. Please check the DAC settings.';
   ERR_AUDIO_RESOURCES_INVALID = 'The device reset the audio stream (for example when it was switched on or off).';
   ERR_AUDIO_DEVICE_UNAVAILABLE = 'The audio device is not available. It may be switched off or disconnected. Switch it on, or choose another device in Preferences, and press Play again.';
   ERR_AUDIO_ENDPOINTFAIL      = 'Failed to create audio endpoint.';
@@ -236,7 +236,7 @@ const
   ERR_SHORTCUT_DELETE         = 'Could not delete the shortcut. It may be locked by another program.';
   // 7F. File, Playlist, Decoder & Resampler Errors
   ERR_READING_FILE_PREFIX     = 'Error reading file: ';
-  MSG_TAG_EDITOR_READ_FAILED  = 'The tags of this file could not be read. It will not be changed when you save.';
+  MSG_TAG_EDITOR_READ_FAILED  = 'The tags of this file could not be read. It will not be changed when the tags are saved.';
   FMT_LOG_TAGEDIT_SKIPPED     = 'Tag editor: %d file(s) could not be read and were not changed.';
   ERR_DECODE_DSF_RATE         = 'Invalid or corrupted DSF sample rate.';
   ERR_DECODE_DSF_STEREO       = 'DSD-to-PCM requires a 2-channel stereo DSF file.';
@@ -252,7 +252,7 @@ const
   // ===========================================================================
   // 7E. LAST.FM SCRAPER STATUS & ERROR STRINGS (uLastFmScraper)
   // ===========================================================================
-  ERR_LASTFM_MISSING_API_KEY = 'Biographies come from Last.fm, and that needs a Last.fm API key of your own (free). Enter it in Preferences > System > Artist information.';
+  ERR_LASTFM_MISSING_API_KEY = 'Biographies come from Last.fm, and that needs a personal Last.fm API key (free). Enter it in Preferences > System > Artist information.';
   ERR_LASTFM_NETWORK_PREFIX  = 'Last.fm network error: ';
   ERR_LASTFM_API_PREFIX      = 'Last.fm: ';
   ERR_LASTFM_GENERIC         = 'Last.fm returned an error.';
@@ -278,17 +278,17 @@ const
   HINT_ARTIST_CLEAR_IMAGE       = 'Remove the artist picture (Del)';
   HINT_ARTIST_EDIT_START        = 'Edit the biography (F2)';
   HINT_ARTIST_EDIT_DONE         = 'Finish editing (F2). Changes are saved automatically.';
-  HINT_ARTIST_REFRESH           = 'Reload the biography and picture from online sources (F5). Your own picture and edited biography are kept.';
-  HINT_ARTIST_IMG_EDIT          = 'Click or press Ctrl+O to replace the picture. You can also drop an image file or paste one with Ctrl+V.';
+  HINT_ARTIST_REFRESH           = 'Reload the biography and picture from online sources (F5). A chosen picture and an edited biography are kept.';
+  HINT_ARTIST_IMG_EDIT          = 'Click or press Ctrl+O to replace the picture. An image file can also be dropped here or pasted with Ctrl+V.';
   HINT_ARTIST_MEMO_EDIT         = 'Type or paste the biography. Press F2 when done; changes are saved automatically.';
 
   // Cover Art Popup Hints
-  HINT_COVER_PREV               = 'Previous image (Left arrow, right-click or scroll up)';
-  HINT_COVER_NEXT               = 'Next image (Right arrow, click or scroll down)';
+  HINT_COVER_PREV               = 'Previous image (Left, right-click or scroll up)';
+  HINT_COVER_NEXT               = 'Next image (Right, click or scroll down)';
   // Playlist Manager Hints (AuPlaylistManager)
-  HINT_PLM_LIST                 = 'Your playlists. Auto-playlists (funnel icon) are listed below the divider; their tracks are chosen by rules.';
+  HINT_PLM_LIST                 = 'All playlists. Auto-playlists (funnel icon) are listed below the divider; their tracks are chosen by rules.';
   HINT_PLM_NEW                  = 'Create a new standard playlist (Ctrl+N).';
-  HINT_PLM_NEW_AUTO             = 'Create a new auto-playlist. Its tracks are chosen automatically by rules you set.';
+  HINT_PLM_NEW_AUTO             = 'Create a new auto-playlist. Its tracks are chosen automatically by its rules.';
   HINT_PLM_EDIT                 = 'Edit the selected playlist (F2). For an auto-playlist this includes its rules.';
   HINT_PLM_REMOVE               = 'Remove the selected playlist(s) (Del).';
   HINT_PLM_IMPORT               = 'Import an M3U or M3U8 file as a standard playlist. If the name is taken, a number is added, e.g. "Name (2)".';
@@ -299,7 +299,7 @@ const
   // ===========================================================================
   LBL_FETCHING_INFO             = 'Fetching information...';
   LBL_BIO_UNAVAILABLE           = 'Biography not available.';
-  FMT_ARTIST_LIB_STATS          = 'Library: %d Albums, %d Tracks';
+  FMT_ARTIST_LIB_STATS          = 'Library: %d albums, %d tracks';
 
   DLG_SELECT_ARTIST_PIC_TITLE   = 'Select artist picture';
   DLG_FILTER_ARTIST_PIC         = 'All Supported Images|*.jpg;*.jpeg;*.png;*.bmp|JPEG Images (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG Images (*.png)|*.png|Bitmap Images (*.bmp)|*.bmp';
@@ -355,7 +355,7 @@ const
   FMT_TITLE_CREATE_VIRTUAL_FOLDER    = 'Create Virtual Folder - %s';
   FMT_TITLE_EDIT_VIRTUAL_FOLDER      = 'Edit Virtual Folder - %s';
   FMT_ALIAS_LOCATION_HEADER          = 'External folders to merge into "%s" (or click Auto-find to scan library):';
-  FMT_CONFIRM_DELETE_VIRTUAL_FOLDER  = 'Are you sure you want to remove the virtual folder "%s"?' + sLineBreak + sLineBreak +
+  FMT_CONFIRM_DELETE_VIRTUAL_FOLDER  = 'Are you sure you want to remove the Virtual Folder "%s"?' + sLineBreak + sLineBreak +
                                        'Your actual music files will NOT be deleted or modified.';
 
   LBL_ALIAS_SEARCH_TERM              = 'Auto-find term:';
@@ -371,21 +371,21 @@ const
 
   FMT_ALIAS_AUTOFIND_ADDED           = 'Auto-find added %d related folder(s) matching "%s" (highlighted above). Press Delete or click Remove to exclude any unwanted folders.';
   FMT_ALIAS_AUTOFIND_EXISTING        = 'All %d external folder(s) matching "%s" are already in the list.';
-  FMT_ALIAS_AUTOFIND_NONE            = 'No external folders found matching "%s". You can type another search term or enable more tags above and click Auto-find again.';
+  FMT_ALIAS_AUTOFIND_NONE            = 'No external folders found matching "%s". Try another search term, or enable more tags above and click Auto-find again.';
 
-  HINT_ALIAS_NAME                    = 'The name of this virtual folder in the library tree.';
-  HINT_ALIAS_SEARCH_TERM             = 'The name or word Auto-find searches for, e.g. Bach. Leave empty to use the virtual folder name.';
+  HINT_ALIAS_NAME                    = 'The name of this Virtual Folder in the library tree.';
+  HINT_ALIAS_SEARCH_TERM             = 'The name or word Auto-find searches for, e.g. Bach. Leave empty to use the name of the Virtual Folder.';
   HINT_ALIAS_SEARCH_IN               = 'Choose which tags Auto-find searches.';
   HINT_ALIAS_TAG_ARTIST              = 'Search the Artist, Album artist and Performer tags.';
   HINT_ALIAS_TAG_COMPOSER             = 'Search the Composer tag.';
   HINT_ALIAS_TAG_ALBUM_TITLE          = 'Search the Album and Title tags.';
   HINT_ALIAS_TAG_COMMENT_GENRE       = 'Search the Comment and Genre tags.';
   HINT_ALIAS_TAG_FOLDER              = 'Search the folder names on disk.';
-  HINT_ALIAS_LIST                    = 'The folders shown inside this virtual folder. Folders just found by Auto-find are highlighted, so you can check them.';
-  HINT_ALIAS_ADD                     = 'Choose one or more folders to add. You can also drag folders here from Windows Explorer.';
+  HINT_ALIAS_LIST                    = 'The folders shown inside this Virtual Folder. Folders just found by Auto-find are highlighted, so they are easy to check.';
+  HINT_ALIAS_ADD                     = 'Choose one or more folders to add. Folders can also be dragged here from Windows Explorer.';
   HINT_ALIAS_AUTOFIND                = 'Search the library for folders whose tracks match the Auto-find term in the selected tags.';
   HINT_ALIAS_REMOVE                  = 'Remove the selected folder(s) from the list (Del). The folders themselves are not changed.';
-  HINT_ALIAS_SAVE                    = 'Save the virtual folder and update the library.';
+  HINT_ALIAS_SAVE                    = 'Save the Virtual Folder and update the library.';
 
   // ===========================================================================
   // REPLAYGAIN SCANNER STRINGS (AuReplayGainForm)
@@ -411,9 +411,9 @@ const
   STATUS_RG_DRIVE_OFFLINE            = 'Drive offline';
   STATUS_RG_FILE_MISSING             = 'File missing';
 
-  MSG_RG_INFO_TEXT                   = 'ReplayGain scans your audio files to ensure consistent playback volume ' +
-                                       'across your entire library, preserving full dynamic range without clipping.' + sLineBreak + sLineBreak +
-                                       'Note: This requires a deep, high-precision analysis of your audio data. ' +
+  MSG_RG_INFO_TEXT                   = 'ReplayGain scans the audio files to ensure consistent playback volume ' +
+                                       'across the entire library, preserving full dynamic range without clipping.' + sLineBreak + sLineBreak +
+                                       'Note: This requires a deep, high-precision analysis of the audio data. ' +
                                        'Scanning large libraries or high-resolution DSD albums may take a long time to finish.';
   MSG_RG_LIBRARY_EMPTY               = 'No scanned audio tracks were found in the database.';
   MSG_RG_SELECTION_EMPTY             = 'No valid audio tracks were highlighted.';
@@ -680,6 +680,14 @@ const
   DSD_GAIN_OPTIONS: array[0..1] of TFormatDef = (
     (DisplayName: '+0.0 dB (purist - preserve headroom)'; DataStr: '0'),
     (DisplayName: '+6.0 dB (standard - match PCM volume)'; DataStr: '6')
+  );
+
+  { the sizes of the library's album tiles (TAuTileGrid.TileSize) }
+  TILE_SIZE_OPTIONS: array[0..3] of TFormatDef = (
+    (DisplayName: 'List'; DataStr: '0'),
+    (DisplayName: 'Small'; DataStr: '1'),
+    (DisplayName: 'Medium'; DataStr: '2'),
+    (DisplayName: 'Large'; DataStr: '3')
   );
 
   GROUPING_MODE_OPTIONS: array[0..2] of TFormatDef = (

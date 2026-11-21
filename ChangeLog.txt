@@ -6,6 +6,35 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.14 (21 November 2026)
+-------------------------------------------------------------------------------
+
+Note: after updating, rescan the library once to refresh the cover pictures
+(the refresh button next to the search bar, or Ctrl+F5). Until then the
+covers are shown as before.
+
+Library
+  - Album tiles. Two buttons next to the search bar switch the library pane
+    between the tree and album tiles (also Ctrl+G, or "Library as tiles" in
+    the View menu). The tiles show the albums under the node selected in the
+    tree as covers, with album and artist. A tile works like an album in the
+    tree: double-click, drag onto the playlist, or right-click for the menu,
+    which also has "Show in tree".
+  - Finding the way in the tiles. A line above them shows the path of the
+    node; click a part of it to go up, or the cross for all albums. Two
+    buttons, as above the playlist, choose the order (artist, album, year or
+    the date added) and reverse it. The search fills the tiles too, and
+    typing a letter jumps to the next match.
+  - Tile size. Set with Ctrl + mouse wheel or in Preferences > Appearance;
+    the smallest size is a list with a small cover and the text beside it.
+  - Sharper covers in the playlist headers and the tiles (see the note
+    above).
+  - The library keeps its place. After a restart the same nodes are open,
+    the same node is selected, and the tree and the tiles are scrolled to
+    where they were.
+
+Other
+  - Some layout and design improvements.
 Version 1.0.0.12 (20 November 2026)
 -------------------------------------------------------------------------------
 

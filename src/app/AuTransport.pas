@@ -21,7 +21,7 @@ interface
 
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuIcons, AuControls, AuExtra;
+  AuGfx, AuTheme, AuIcons, AuControls, AuExtra, uAppStrings;
 
 type
   { TTransportBar }
@@ -121,7 +121,7 @@ begin
   Seek.BigStep := 30;
   Seek.AlwaysAccent := True;
   Seek.Hint := 'Position (Ctrl+Left / Ctrl+Right)';
-  BtnShuffle := Btn(icShuffle, 'Shuffle (Ctrl+S)');
+  BtnShuffle := Btn(icShuffle, HINT_SHUFFLE_OFF);
   BtnStop := Btn(icStopSolid, 'Stop', 17);
   BtnPrev := Btn(icPrev, 'Previous track', 18);
   BtnPlay := Btn(icPlay, 'Play / pause (Space)', 20);
@@ -129,7 +129,7 @@ begin
   BtnPlay.SetBounds(0, 0, S(46), S(46));
   BtnNext := Btn(icNext, 'Next track', 18);
   BtnJump := Btn(icLocate, 'Jump to Now Playing (Ctrl+J)');
-  BtnRepeat := Btn(icRepeat, 'Repeat (Ctrl+R)');
+  BtnRepeat := Btn(icRepeat, HINT_REPEAT_OFF);
   BtnDevice := TAuDropButton.Create(Self);
   BtnDevice.Parent := Self;
   BtnDevice.Flat := True;
@@ -221,10 +221,10 @@ end;
 procedure TTransportBar.SetRepeatMode(M: Integer);
 begin
   case M of
-    1: begin BtnRepeat.Icon := icRepeat; BtnRepeat.Active := True; BtnRepeat.Hint := 'Repeat: all (Ctrl+R)'; end;
-    2: begin BtnRepeat.Icon := icRepeatOne; BtnRepeat.Active := True; BtnRepeat.Hint := 'Repeat: one track (Ctrl+R)'; end;
+    1: begin BtnRepeat.Icon := icRepeat; BtnRepeat.Active := True; BtnRepeat.Hint := HINT_REPEAT_ALL; end;
+    2: begin BtnRepeat.Icon := icRepeatOne; BtnRepeat.Active := True; BtnRepeat.Hint := HINT_REPEAT_TRACK; end;
   else
-    begin BtnRepeat.Icon := icRepeat; BtnRepeat.Active := False; BtnRepeat.Hint := 'Repeat: off (Ctrl+R)'; end;
+    begin BtnRepeat.Icon := icRepeat; BtnRepeat.Active := False; BtnRepeat.Hint := HINT_REPEAT_OFF; end;
   end;
 end;
 

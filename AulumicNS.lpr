@@ -20,11 +20,11 @@ uses
   AuD2D, AuGfx,
   Interfaces, Forms,
   { the GUI library }
-  AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuExtra, AuTitleBar,
+  AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuTileGrid, AuExtra, AuTitleBar,
   AuFolderPicker, AuAppIcon,
   { the program }
   AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uAppLifetime,
-  uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuPlaylistPane, AuToneForm, AuVolumePopup,
+  uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuPlaylistPane, AuToneForm, AuVolumePopup,
   uCrashTracer, uHangWatch, uDriveKeepAlive, uInputBlock, uEngineStateManager, uFileLockRegistry, uMetadataPayloads, uMetaUtils,
   uOSUtils, uPlaybackIOWorker, {$IFDEF DEBUG}AuTouchProbe,{$ENDIF}
   { the engine (with the built-in decoders and resampler) }

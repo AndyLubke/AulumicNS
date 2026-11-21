@@ -498,7 +498,7 @@ begin
     FValues[B].HAlign := 1;
   end;
   FFlat := AddButton(Self, 'Flat', FW - 20 - 110, FH - 52, 110, bkNormal, @FlatClick);
-  FFlat.Hint := 'All bands to 0 dB';
+  FFlat.Hint := 'Set all bands to 0 dB.';
   FFlat.ShowHint := True;
   FEnable.TabOrder := 0;
   for B := 0 to TONE_BANDS - 1 do
@@ -564,7 +564,7 @@ begin
   begin
     Caption := 'Tone Control (disabled for DSD)';
     FEnable.Caption := 'Disabled for DSD';
-    FEnable.Description := 'DSD goes to your DAC unchanged';
+    FEnable.Description := 'DSD goes to the DAC unchanged';
   end
   else if On then
   begin

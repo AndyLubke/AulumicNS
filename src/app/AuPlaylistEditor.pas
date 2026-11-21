@@ -206,7 +206,7 @@ begin
       TextRole := crAccent;
     end;
     Inc(Y, 28);
-    H := SettingRow('Smart rule template', 'Choose a ready-made set of rules, or make your own.', Y,
+    H := SettingRow('Smart rule template', 'Choose a ready-made set of rules, or make a custom one.', Y,
       RW - CTRL_W - 20, Cap);
     FTemplate := AddCombo(FContent, X0 + RW - CTRL_W, Y + Math.Max(0, (H - 32) div 2), CTRL_W, [LBL_CUSTOM_PREFS], 0);
     TemplateIdx := 0;

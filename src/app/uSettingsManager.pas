@@ -55,6 +55,7 @@ type
     WinState            : TWindowState;
     TopPanelHeight      : integer;
     LeftPanelWidth      : integer;
+    LeftPanelWidthTiles : integer;   // the library pane's width with tiles (0: as with the tree)
     ToneWinLeft         : integer;
     ToneWinTop          : integer;
     // The sizes of the cover viewer and Artist Info, in 96-DPI
@@ -63,7 +64,11 @@ type
     ArtistWinW, ArtistWinH : integer;
     PropsWinW, PropsWinH   : integer;   // Properties
 
-    LibrarySelection    : string;
+    LibrarySelection    : string;    // the library tree's selected node (see TLibraryPane.SaveView)
+    LibraryExpanded     : string;    // its opened nodes
+    LibraryTopRow       : integer;   // its first row shown
+    LibraryTilesAll     : boolean;   // the tiles show all albums, not the selected node
+    LibraryTilesScroll  : integer;   // how far the tiles are scrolled (unscaled pixels)
     PlaylistSelection   : string;
     ActivePlayList      : string;
 
@@ -81,6 +86,10 @@ type
     // --- UI & BEHAVIOR PREFERENCES ---
     AccordionEnabled    : boolean;
     DoubleClickAction   : integer;
+    LibraryTiles        : boolean;   // the library pane shows tiles, not the tree
+    LibraryTileSize     : integer;   // 0 = a list .. 3 = large tiles
+    LibraryTileSort     : integer;   // artist, album, year, added
+    LibraryTileSortRev  : boolean;   // that order backwards
     AutoRescanLibrary   : boolean;
     DarkMode            : boolean;
     DefaultGroupingMode : integer;
@@ -164,8 +173,13 @@ const
   KEY_WIN_STATE         = 'WindowState';
   KEY_PANEL_TOP         = 'TopPanelHeight';
   KEY_PANEL_LEFT        = 'LeftPanelWidth';
+  KEY_PANEL_LEFT_TILES  = 'LeftPanelWidthTiles';
 
   KEY_LIB_SELECTION     = 'LibrarySelection';
+  KEY_LIB_EXPANDED      = 'LibraryExpanded';
+  KEY_LIB_TOP_ROW       = 'LibraryTopRow';
+  KEY_LIB_TILES_ALL     = 'LibraryTilesAll';
+  KEY_LIB_TILES_SCROLL  = 'LibraryTilesScroll';
   KEY_PLAY_SELECTION    = 'PlaylistSelection';
   KEY_ACTIVE_PLAYLIST   = 'ActivePlaylist';
 
@@ -221,6 +235,10 @@ const
 
   KEY_ACCORDION           = 'AccordionEnabled';
   KEY_DBL_CLICK           = 'DoubleClickAction';
+  KEY_LIB_TILES           = 'LibraryTiles';
+  KEY_LIB_TILE_SIZE       = 'LibraryTileSize';
+  KEY_LIB_TILE_SORT       = 'LibraryTileSort';
+  KEY_LIB_TILE_SORT_REV   = 'LibraryTileSortReverse';
   KEY_AUTO_RESCAN         = 'AutoRescanLibrary';
 
   KEY_SHOWPEAKMETER       = 'ShowPeakMeter';
@@ -637,6 +655,10 @@ begin
   Data.PropsWinW         := FIniFile.ReadInteger(SEC_WINDOW, KEY_PROPS_WIN_W, 0);
   Data.PropsWinH         := FIniFile.ReadInteger(SEC_WINDOW, KEY_PROPS_WIN_H, 0);
   Data.LibrarySelection  := FIniFile.ReadString(SEC_WINDOW, KEY_LIB_SELECTION, '');
+  Data.LibraryExpanded   := FIniFile.ReadString(SEC_WINDOW, KEY_LIB_EXPANDED, '');
+  Data.LibraryTopRow     := FIniFile.ReadInteger(SEC_WINDOW, KEY_LIB_TOP_ROW, 0);
+  Data.LibraryTilesAll   := FIniFile.ReadBool(SEC_WINDOW, KEY_LIB_TILES_ALL, False);
+  Data.LibraryTilesScroll := FIniFile.ReadInteger(SEC_WINDOW, KEY_LIB_TILES_SCROLL, 0);
   Data.PlaylistSelection := FIniFile.ReadString(SEC_WINDOW, KEY_PLAY_SELECTION, '');
   Data.ActivePlaylist    := FIniFile.ReadString(SEC_UI, KEY_ACTIVE_PLAYLIST, LBL_DEFAULT_PLAYLIST);
 
@@ -722,6 +744,11 @@ begin
 
   Data.AccordionEnabled  := FIniFile.ReadBool(SEC_LIBRARY, KEY_ACCORDION, False);
   Data.DoubleClickAction := FIniFile.ReadInteger(SEC_LIBRARY, KEY_DBL_CLICK, VAL_DEF_DBL_CLICK);
+  Data.LibraryTiles      := FIniFile.ReadBool(SEC_LIBRARY, KEY_LIB_TILES, False);
+  Data.LeftPanelWidthTiles := FIniFile.ReadInteger(SEC_WINDOW, KEY_PANEL_LEFT_TILES, 0);
+  Data.LibraryTileSize   := FIniFile.ReadInteger(SEC_LIBRARY, KEY_LIB_TILE_SIZE, 2);
+  Data.LibraryTileSort   := FIniFile.ReadInteger(SEC_LIBRARY, KEY_LIB_TILE_SORT, 0);
+  Data.LibraryTileSortRev := FIniFile.ReadBool(SEC_LIBRARY, KEY_LIB_TILE_SORT_REV, False);
   Data.AutoRescanLibrary := FIniFile.ReadBool(SEC_LIBRARY, KEY_AUTO_RESCAN, False);
 
   Data.DarkMode          := FIniFile.ReadBool(SEC_UI, KEY_DARK_MODE, True);
@@ -876,6 +903,9 @@ begin
   // The panes (unscaled; the main window fits them to its own size)
   Data.TopPanelHeight := SettingsAdjust(Data.TopPanelHeight, 0, MAX_STORED_PIXELS);
   Data.LeftPanelWidth := SettingsAdjust(Data.LeftPanelWidth, 0, MAX_STORED_PIXELS);
+  Data.LeftPanelWidthTiles := SettingsAdjust(Data.LeftPanelWidthTiles, 0, MAX_STORED_PIXELS);
+  if Data.LibraryTopRow < 0 then Data.LibraryTopRow := 0;
+  if Data.LibraryTilesScroll < 0 then Data.LibraryTilesScroll := 0;
   Data.LibraryFontSize  := SettingsAdjust(Data.LibraryFontSize,  FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   Data.PlayListFontSize := SettingsAdjust(Data.PlayListFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   Data.ThemeMode  := SettingsAdjust(Data.ThemeMode, 0, 2);
@@ -953,6 +983,8 @@ begin
   Data.Audio.ResampleAntiAliasIndex := SettingsAdjust(Data.Audio.ResampleAntiAliasIndex, 0, High(ANTI_ALIAS_OPTIONS));
   Data.DefaultGroupingMode          := SettingsAdjust(Data.DefaultGroupingMode,          0, High(GROUPING_MODE_OPTIONS));
   Data.DoubleClickAction            := SettingsAdjust(Data.DoubleClickAction,            0, High(DBLCLICK_OPTIONS));
+  Data.LibraryTileSize              := SettingsAdjust(Data.LibraryTileSize,              0, 3);
+  Data.LibraryTileSort              := SettingsAdjust(Data.LibraryTileSort,              0, 3);
 end;
 
 procedure TAppSettings.Save(AForm: TForm);
@@ -988,8 +1020,13 @@ begin
 
   FIniFile.WriteInteger(SEC_WINDOW, KEY_PANEL_TOP,  Data.TopPanelHeight);
   FIniFile.WriteInteger(SEC_WINDOW, KEY_PANEL_LEFT, Data.LeftPanelWidth);
+  FIniFile.WriteInteger(SEC_WINDOW, KEY_PANEL_LEFT_TILES, Data.LeftPanelWidthTiles);
 
   FIniFile.WriteString(SEC_WINDOW, KEY_LIB_SELECTION,  Data.LibrarySelection);
+  FIniFile.WriteString(SEC_WINDOW, KEY_LIB_EXPANDED,   Data.LibraryExpanded);
+  FIniFile.WriteInteger(SEC_WINDOW, KEY_LIB_TOP_ROW,   Data.LibraryTopRow);
+  FIniFile.WriteBool(SEC_WINDOW, KEY_LIB_TILES_ALL,    Data.LibraryTilesAll);
+  FIniFile.WriteInteger(SEC_WINDOW, KEY_LIB_TILES_SCROLL, Data.LibraryTilesScroll);
   FIniFile.WriteString(SEC_WINDOW, KEY_PLAY_SELECTION, Data.PlaylistSelection);
   FIniFile.WriteString(SEC_UI, KEY_ACTIVE_PLAYLIST,    Data.ActivePlaylist);
 
@@ -1052,6 +1089,10 @@ begin
 
   FIniFile.WriteBool(SEC_LIBRARY, KEY_ACCORDION,       Data.AccordionEnabled);
   FIniFile.WriteInteger(SEC_LIBRARY, KEY_DBL_CLICK,    Data.DoubleClickAction);
+  FIniFile.WriteBool(SEC_LIBRARY, KEY_LIB_TILES,       Data.LibraryTiles);
+  FIniFile.WriteInteger(SEC_LIBRARY, KEY_LIB_TILE_SIZE, Data.LibraryTileSize);
+  FIniFile.WriteInteger(SEC_LIBRARY, KEY_LIB_TILE_SORT, Data.LibraryTileSort);
+  FIniFile.WriteBool(SEC_LIBRARY, KEY_LIB_TILE_SORT_REV, Data.LibraryTileSortRev);
   FIniFile.WriteBool(SEC_LIBRARY, KEY_AUTO_RESCAN,     Data.AutoRescanLibrary);
   FIniFile.WriteBool(SEC_UI, KEY_DARK_MODE,            Data.DarkMode);
 

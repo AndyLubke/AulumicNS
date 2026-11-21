@@ -69,6 +69,14 @@ function GenerateAlbumHash(const AlbumArtist, Album, FolderPath: string): string
 
 procedure ClearThumbnailCache;
 
+{ The thumbnails of the cache were all made at CACHE_THUMB_SIZE (a note in
+  the cache folder says for which size it was last made complete). While it
+  is not current, a library scan makes the thumbnails of another size again. }
+function ThumbCacheIsCurrent: Boolean;
+procedure MarkThumbCacheCurrent;
+{ a thumbnail file of another size than CACHE_THUMB_SIZE (its header is read) }
+function ThumbnailHasOldSize(const AThumbFile: string): Boolean;
+
 // AForce: replace an existing thumbnail (the cover may have changed); when no
 // cover can be read, an existing thumbnail is kept
 procedure GenerateAndCacheThumbnail(var Meta: TAudioMetadata;
@@ -856,6 +864,56 @@ begin
       FindClose(SR);
     end;
   end;
+end;
+
+const
+  THUMB_SIZE_NOTE = 'thumbs.size';
+
+function ThumbCacheIsCurrent: Boolean;
+var
+  SL: TStringList;
+  F: string;
+begin
+  Result := False;
+  F := AppCacheThumbsDir + THUMB_SIZE_NOTE;
+  if (AppCacheThumbsDir = '') or not FileExists(LongPath(F)) then Exit;
+  SL := TStringList.Create;
+  try
+    try
+      SL.LoadFromFile(F);
+      Result := Trim(SL.Text) = IntToStr(CACHE_THUMB_SIZE);
+    except
+      Result := False;
+    end;
+  finally
+    SL.Free;
+  end;
+end;
+
+procedure MarkThumbCacheCurrent;
+var
+  SL: TStringList;
+begin
+  if AppCacheThumbsDir = '' then Exit;
+  SL := TStringList.Create;
+  try
+    try
+      if not DirectoryExists(LongPath(AppCacheThumbsDir)) then ForceDirectories(AppCacheThumbsDir);
+      SL.Text := IntToStr(CACHE_THUMB_SIZE);
+      SL.SaveToFile(AppCacheThumbsDir + THUMB_SIZE_NOTE);
+    except
+      // not written: the next scan looks at the thumbnails again
+    end;
+  finally
+    SL.Free;
+  end;
+end;
+
+function ThumbnailHasOldSize(const AThumbFile: string): Boolean;
+var
+  W, H: Integer;
+begin
+  Result := ImageSizeFromFile(AThumbFile, W, H) and (W > 0) and (W <> CACHE_THUMB_SIZE);
 end;
 
 { The thumbnail is made with the picture decoder of Windows (AuGfx / WIC),

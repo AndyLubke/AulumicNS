@@ -210,7 +210,11 @@ end;
 
 procedure TMainForm.StateClearThumbs;
 begin
-  if not FShuttingDown then FPl.ClearThumbCache;
+  if not FShuttingDown then
+  begin
+    FPl.ClearThumbCache;
+    FLib.Tiles.ClearThumbCache;
+  end;
 end;
 
 { ---- watching the library folders (local folders only) ---- }
@@ -378,6 +382,58 @@ begin
   It := FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
   It.Enabled := Node <> nil;
   FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
+{ ---- the tiles of the library pane ---- }
+
+{ double click / Enter on a tile: "Play Immediately", or the album in the
+  tree (what "Expand / Collapse" is for a tile) }
+procedure TMainForm.TilesActivate(Sender: TObject; Index: Integer);
+begin
+  if AppSettings.Data.DoubleClickAction = 0 then LibPlay(FLib.ActionNodes)
+  else FLib.ShowTileInTree(Index);
+end;
+
+procedure TMainForm.TilesContext(Sender: TObject; Index: Integer; ScreenPt: TPoint);
+var
+  It: TAuMenuItem;
+  OneTile: Boolean;
+begin
+  FCtxTile := Index;
+  OneTile := FLib.Tiles.Grid.SelCount <= 1;
+  { the menu runs its item after the popup is gone: kept in FCtxMenu }
+  FCtxMenu.Free;
+  FCtxMenu := TAuMenu.Create;
+  FCtxMenu.Add('Play', @MnLibPlay, icPlay, 'Enter');
+  It := FCtxMenu.Add('Add to current playlist', @MnLibAdd, icPlus);
+  It.Enabled := not FPl.ReadOnly;
+  It := FCtxMenu.Add('Replace current playlist', @MnLibSend, icPlaylist);
+  It.Enabled := not FPl.ReadOnly;
+  if FPlaylists <> nil then
+    AddToPlaylistMenu(FCtxMenu.AddSub('Add to playlist', icPlaylist), @MnLibAddTo);
+  FCtxMenu.AddSeparator;
+  It := FCtxMenu.Add('Show in tree', @MnTileShowInTree, icList);
+  It.Enabled := OneTile;
+  { no disk access here: only whether the drive / share is there }
+  It := FCtxMenu.Add('Open folder...', @MnTileOpenFolder, icFolder);
+  It.Enabled := OneTile and (FLibrary <> nil) and FLibrary.IsRootAvailable(FLib.TileFolder(Index));
+  FCtxMenu.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
+  FCtxMenu.AddSeparator;
+  FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
+  FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
+procedure TMainForm.MnTileShowInTree(Sender: TObject);
+begin
+  FLib.ShowTileInTree(FCtxTile);
+end;
+
+procedure TMainForm.MnTileOpenFolder(Sender: TObject);
+var
+  Dir: string;
+begin
+  Dir := FLib.TileFolder(FCtxTile);
+  if Dir <> '' then RevealPath(IncludeTrailingPathDelimiter(Dir));
 end;
 
 procedure TMainForm.MnLibPlay(Sender: TObject);

@@ -153,7 +153,7 @@ const
   FORM_APPLOG_MINWIDTH        = 560;
   FORM_APPLOG_MINHEIGHT       = 300;
 
-  CACHE_THUMB_SIZE            = 128;
+  CACHE_THUMB_SIZE            = 256;
 
   // Font Sizes
   FONT_LISTDEFAULTSIZE        = 12;

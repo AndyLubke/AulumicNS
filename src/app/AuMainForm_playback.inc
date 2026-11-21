@@ -1178,11 +1178,11 @@ begin
   if IsDoP or (IsDsdToPcm and AppSettings.Data.Audio.DisableResampleForDSD) then
   begin
     if IsDoP then
-      ALMessageDlg(TITLE_PLAYBACK_ERROR, SafeFormat('Your DAC does not accept %s as DoP.' + LineEnding + LineEnding +
+      ALMessageDlg(TITLE_PLAYBACK_ERROR, SafeFormat('The DAC does not accept %s as DoP.' + LineEnding + LineEnding +
         'Turn off "Play DSD natively" in Preferences > DSD to convert DSD to PCM.',
         [FormatRateKHz(AttemptedRate)]), mkError)
     else
-      ALMessageDlg(TITLE_PLAYBACK_ERROR, SafeFormat('Your DAC does not support %s.', [FormatRateKHz(AttemptedRate)]), mkError);
+      ALMessageDlg(TITLE_PLAYBACK_ERROR, SafeFormat('The DAC does not support %s.', [FormatRateKHz(AttemptedRate)]), mkError);
     Exit;
   end;
   Rates := TargetRateChoices(SampleRateFamily(AttemptedRate));
@@ -1196,7 +1196,7 @@ begin
   if Length(Pick) = 0 then Exit;
   F := TAuForm.CreateAu(Self, 'Sample rate not supported', 480, 210);
   try
-    L := F.AddLabel(F, SafeFormat('Your DAC does not support %s.' + LineEnding +
+    L := F.AddLabel(F, SafeFormat('The DAC does not support %s.' + LineEnding +
       'Play it resampled to another rate? (Preferences > Resampler keeps this choice.)',
       [FormatRateKHz(AttemptedRate)]), 24, 20, 432, False);
     L.Height := S(60);

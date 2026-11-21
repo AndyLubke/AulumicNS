@@ -43,6 +43,7 @@ type
     FProgressCounter  : integer;
     FExistingDict     : TStringList;
     FCheckedThumbs    : TStringList;
+    FThumbUpgrade     : Boolean;      // the cache holds thumbnails of another size: they are made again
     // The texts that repeat from track to track (folder,
     // artist, album ...) once, and their search forms per pool id: the
     // records of a scan take half the memory, and the search form of an
@@ -81,6 +82,7 @@ type
     procedure PreScanCount(const Dir: string);
     function  ScanRootGone(const APath: string): Boolean;
     procedure HandleLostRoots;
+    function ThumbNeeded(const AHash: string; out AForce: Boolean): Boolean;
     procedure ScanDirectory(const Dir: string);
     procedure MarkExistingTaken(const APath: string);
     procedure CarryOverExistingUnder(const ADir: string; IncludeSubDirs: Boolean);
@@ -541,6 +543,20 @@ end;
 // Moves every scan folder that cannot be reached any more from
 // FFoldersToScan to FRootsLost and keeps all of its records that were not
 // re-read yet. Called after the pre-count and again after the actual scan.
+// An album's thumbnail has to be made: there is none, or (while the cache is
+// not current) it has another size - then AForce, to replace the file.
+function TLibraryScannerThread.ThumbNeeded(const AHash: string; out AForce: Boolean): Boolean;
+var
+  F: string;
+begin
+  AForce := False;
+  F := AppCacheThumbsDir + AHash + '.jpg';
+  if not FileExists(LongPath(F)) then
+    Exit(True);
+  Result := FThumbUpgrade and ThumbnailHasOldSize(F);
+  AForce := Result;
+end;
+
 procedure TLibraryScannerThread.HandleLostRoots;
 var
   I: integer;
@@ -665,6 +681,7 @@ var
   FileTime         : int64;
   FileSize         : int64;
   Idx, ThumbIdx    : integer;
+  ThumbForce       : Boolean;
   ExistingTrack    : PTrackInfo;
   ClonedTrack      : PTrackInfo;
   AddedTrack       : PTrackInfo;
@@ -832,8 +849,8 @@ begin
                       if (ThumbHash <> '') and (not FCheckedThumbs.Find(ThumbHash, ThumbIdx)) then
                       begin
                         FCheckedThumbs.Add(ThumbHash);
-                        if not FileExists(LongPath(AppCacheThumbsDir + ThumbHash + '.jpg')) then
-                          GenerateThumbIsolated(FullPath, ThumbHash, True);
+                        if ThumbNeeded(ThumbHash, ThumbForce) then
+                          GenerateThumbIsolated(FullPath, ThumbHash, True, ThumbForce);
                       end;
                       ThumbHash := '';
 
@@ -899,8 +916,8 @@ begin
                       // do not count as changed.
                       if not CountedAsAdded then
                         GenerateThumbIsolated(FullPath, ThumbHash, TrackHasCover, True)
-                      else if not FileExists(LongPath(AppCacheThumbsDir + ThumbHash + '.jpg')) then
-                        GenerateThumbIsolated(FullPath, ThumbHash, TrackHasCover);
+                      else if ThumbNeeded(ThumbHash, ThumbForce) then
+                        GenerateThumbIsolated(FullPath, ThumbHash, TrackHasCover, ThumbForce);
                     end;
                     ThumbHash := '';
                   end;
@@ -1013,6 +1030,8 @@ var
 begin
   FLastUITick         := GetTickCount64;
   FScannedFolderCount := 0;
+  // (a repair empties the cache anyway)
+  FThumbUpgrade       := FIsRefresh and not ThumbCacheIsCurrent;
 
   OfflineRoots := TStringList.Create;
   try
@@ -1181,6 +1200,10 @@ begin
       // scan keeps all of its existing records that were not re-read
       if not Terminated then
         HandleLostRoots;
+
+      // every folder was there and read: the cache is complete at this size
+      if (not Terminated) and (FRootsOffline.Count = 0) and (FRootsLost.Count = 0) then
+        MarkThumbCacheCurrent;
 
     except
       // Swallowed (never kill the thread), but the scan is flagged as

@@ -112,6 +112,7 @@ type
     procedure UpdateScroll;
     procedure UpdateRowHeight;
     procedure SetTextSize(V: Single);
+    procedure SetTopRow(V: Integer);
     procedure SelectRangeRows(A, B: Integer; Add: Boolean);
     procedure ClearSelectionQuiet;
     procedure MoveFocusRow(R: Integer; Shift: TShiftState);
@@ -166,6 +167,8 @@ type
     property FocusedNode: TAuTreeNode read FFocus;
     property TextSize: Single read FTextSize write SetTextSize;
     property RowHeight: Integer read FRowH;
+    { the first row shown (the scroll position) }
+    property TopRow: Integer read FTop write SetTopRow;
     property Accordion: Boolean read FAccordion write FAccordion;
     property MultiSelect: Boolean read FMultiSelect write FMultiSelect;
     property RowMenu: Boolean read FRowMenu write FRowMenu;
@@ -319,6 +322,14 @@ begin
   FTextSize := V;
   UpdateRowHeight;
   UpdateScroll;
+  Invalidate;
+end;
+
+procedure TAuTreeView.SetTopRow(V: Integer);
+begin
+  UpdateScroll;
+  FScroll.Position := Math.Max(0, V);
+  FTop := FScroll.Position;
   Invalidate;
 end;
 

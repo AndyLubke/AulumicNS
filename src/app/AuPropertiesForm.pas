@@ -354,8 +354,8 @@ begin
     Height := S(40);
     TextRole := crTextFaint;
   end;
-  FTagsNote := AddLabel(FTags, 'Several values in one field: separate them with ";". Only the fields you ' +
-    'change are written; the files keep all their other tags.', 0, 0, 400);
+  FTagsNote := AddLabel(FTags, 'Several values in one field: separate them with ";". Only the changed ' +
+    'fields are written; the files keep all their other tags.', 0, 0, 400);
   with FTagsNote do
   begin
     FontSize := 11.5;
