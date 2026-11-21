@@ -37,6 +37,8 @@ Take `AulumicNS-<version>-win64.zip` from the **Releases** page of this reposito
 - Aulumic is portable: it keeps its settings and library in the folders `Data` and `Cache` next to the program file. If it can't write there, it uses `%APPDATA%\AulumicNS`.
 - To remove it, delete the folder.
 
+**New versions:** to get an email from GitHub whenever a new version is released, sign in to GitHub, open this repository and choose **Watch > Custom > Releases**. Without a GitHub account, the releases can be followed in a feed reader at `https://github.com/AndyLubke/AulumicNS/releases.atom`.
+
 ## First steps
 
 1. **Add your music:** Main menu > Preferences > Library > Add folder.
