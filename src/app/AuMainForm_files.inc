@@ -311,11 +311,28 @@ end;
   RevealFileInExplorer's FileExists would freeze the window while a NAS wakes up. A
   network drive that does not answer gets a note instead. }
 procedure TMainForm.RevealPath(const APath: string);
+begin
+  if Trim(APath) = '' then Exit;
+  if DriveAwakeFor(APath) then RevealFileInExplorer(APath);
+end;
+
+{ The window's title while nothing plays: the name and the version (the
+  screenshots show the name alone, so they do not change with every build) }
+function TMainForm.IdleCaption: string;
+begin
+  Result := AppTitle;
+  if not Application.HasOption('shots') then Result := Result + ' ' + GetAppVersion;
+end;
+
+{ Wakes the drive of a file or folder on a worker thread before the window's
+  thread reads there. False: the wait was stopped, the program is closing, or
+  a network drive does not answer (a note says so). }
+function TMainForm.DriveAwakeFor(const APath: string): Boolean;
 var
   Paths, Unreachable: TStringList;
   Reachable: Boolean;
 begin
-  if Trim(APath) = '' then Exit;
+  Result := False;
   Paths := TStringList.Create;
   Unreachable := TStringList.Create;
   try
@@ -327,6 +344,6 @@ begin
     Paths.Free;
   end;
   if FShuttingDown then Exit;
-  if Reachable then RevealFileInExplorer(APath)
-  else FToast.ShowToast('Drive not reachable', ExtractFileDrive(APath), icInfo, 2600);
+  if not Reachable then FToast.ShowToast('Drive not reachable', ExtractFileDrive(APath), icInfo, 2600);
+  Result := Reachable;
 end;

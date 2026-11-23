@@ -78,6 +78,31 @@ function  EntryFromTrack(const ATrack: TTrackInfo): TPlaylistEntry;
 // A track with the entry's path (FolderDir from it) and fields; the rest empty
 function  TrackFromEntry(const AEntry: TPlaylistEntry): TTrackInfo;
 
+// ---- Works (a symphony whose movements are tracks) ----
+
+type
+  // A track of a group, for FindWorks
+  TWorkRow = record
+    Title, Work: string;   // in: the title and the work of its tag ('' = none)
+    Disc: Integer;         // in: its disc number
+    Heading: string;       // out: the work's name when a heading belongs above this track
+    Part: string;          // out: the title to show under a heading ('' = the whole title)
+    First, Last: Integer;  // out: the first and last track of its work in the list (-1: in no work)
+  end;
+  TWorkRows = array of TWorkRow;
+
+// The work a title names in front of a colon: 'Symphony No. 5: I. Allegro'
+// is the work 'Symphony No. 5' and its part 'I. Allegro'. False without
+// ': ', or when the work is shorter than three characters or the part empty.
+function  SplitWorkTitle(const ATitle: string; out AWork, APart: string): Boolean;
+// The works among the tracks of one group, in their order. A work is two or
+// more tracks in a row of one disc with the same work: that of the tag, else
+// the one their titles name (SplitWorkTitle). Its first track gets the
+// heading; the tracks get their part as the title when all their titles
+// name the same work in front of the colon. A work of a single track gets
+// no heading: its title says it all.
+procedure FindWorks(var ARows: TWorkRows);
+
 // ---- Row rules ----
 
 // S trimmed and on one line (CR / LF become spaces)
@@ -132,6 +157,74 @@ implementation
 
 uses
   StrUtils, uAppStrings, uOSUtils, uUserStatsManager;
+
+{ Works }
+
+function SplitWorkTitle(const ATitle: string; out AWork, APart: string): Boolean;
+var
+  P: Integer;
+begin
+  AWork := '';
+  APart := '';
+  P := Pos(': ', ATitle);
+  if P < 2 then Exit(False);
+  AWork := Trim(Copy(ATitle, 1, P - 1));
+  APart := Trim(Copy(ATitle, P + 2, MaxInt));
+  Result := (Length(AWork) >= 3) and (APart <> '');
+  if not Result then
+  begin
+    AWork := '';
+    APart := '';
+  end;
+end;
+
+procedure FindWorks(var ARows: TWorkRows);
+var
+  Cand, InTitle, Parts: array of string;
+  N, I, J, K: Integer;
+  SamePrefix: Boolean;
+begin
+  N := Length(ARows);
+  Cand := nil;
+  InTitle := nil;
+  Parts := nil;
+  SetLength(Cand, N);
+  SetLength(InTitle, N);
+  SetLength(Parts, N);
+  for I := 0 to N - 1 do
+  begin
+    ARows[I].Heading := '';
+    ARows[I].Part := '';
+    ARows[I].First := -1;
+    ARows[I].Last := -1;
+    SplitWorkTitle(ARows[I].Title, InTitle[I], Parts[I]);
+    Cand[I] := Trim(ARows[I].Work);
+    if Cand[I] = '' then Cand[I] := InTitle[I];
+  end;
+  I := 0;
+  while I < N do
+  begin
+    J := I;
+    if Cand[I] <> '' then
+      while (J + 1 < N) and (ARows[J + 1].Disc = ARows[I].Disc) and (AnsiCompareText(Cand[J + 1], Cand[I]) = 0) do
+        Inc(J);
+    if J > I then
+    begin
+      ARows[I].Heading := Cand[I];
+      for K := I to J do
+      begin
+        ARows[K].First := I;
+        ARows[K].Last := J;
+      end;
+      SamePrefix := InTitle[I] <> '';
+      for K := I + 1 to J do
+        if (InTitle[K] = '') or (AnsiCompareText(InTitle[K], InTitle[I]) <> 0) then SamePrefix := False;
+      if SamePrefix then
+        for K := I to J do ARows[K].Part := Parts[K];
+    end;
+    I := J + 1;
+  end;
+end;
 
 { Copying }
 

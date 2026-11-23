@@ -40,7 +40,7 @@ interface
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, ExtCtrls, LCLType, LMessages, Dialogs,
   AuGfx, AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuForms, AuExtra, AuTree, AuGroupList,
-  AuAppIcon, AuTitleBar, AuSingle, AuSettings, AuBanner, AuTransport, AuLibraryPane, AuTileGrid, AuPlaylistPane,
+  AuAppIcon, AuTitleBar, AuSingle, AuSettings, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuLibraryCheck, AuTileGrid, AuPlaylistPane,
   AuToneForm, AuVolumePopup, AuLog, AuDialogs, AuPrefs, AuPlaylistManager, AuPlaylistEditor,
   ALAudioTypes, ALMetadata, uAppConsts, uAppStrings, uSettingsManager, uPlaybackManager,
   uAudioUtils, uMetaUtils, uOSUtils, uLibraryTypes, uLibraryManager, uUserStatsManager,
@@ -105,7 +105,10 @@ type
     { library }
     FLibrary: TLibraryManager;
     FWatcher: TLibraryWatcher;
+    FCtxPlEntry: Integer;        // the entry the playlist's menu was opened on (-1: none)
+    FCheckPaths: TStringList;    // Tag consistency: the files of the checked part (nil: the whole library)
     FWatchMuteUntil: QWord;      // the watcher's changes are the program's own writes until then
+    FOwnWrites: Integer;         // > 0: the program is writing a file of its own into a library folder
     FCtxNode: TAuTreeNode;       // the node of the library context menu
     FCtxTile: Integer;           // the tile of the library context menu
     FStartupScanDone: Boolean;
@@ -138,6 +141,7 @@ type
     {$IFDEF DEBUG}
     FShotDir: string;
     FShotStep: Integer;
+    FShotWorks: Boolean;         // the screenshot of the work headings can be made
     FShotTimer: TTimer;
     FDebugScan: Boolean;         // --add-folder: scan at start
     FShotWait: Integer;
@@ -283,6 +287,7 @@ type
     procedure FreeLibrary;
     function LibLookup(const APath: string; out ATrack: TTrackInfo): Boolean;
     procedure RequestLibraryScan(FullRebuild, SilentQueue: Boolean);
+    procedure AskLibraryRebuild(Data: PtrInt);
     procedure LibraryScanProgress(Sender: TObject; const ScanMsg: string;
       const CurrentFolder: string; TrackCount, TotalTracks: Integer);
     procedure LibraryScanDone(Sender: TObject; HasChanges: Boolean);
@@ -304,6 +309,12 @@ type
     procedure MnLibCollapseAll(Sender: TObject);
     procedure MnLibOpenFolder(Sender: TObject);
     procedure MnVirtualFolder(Sender: TObject);
+    procedure MnLibShowGroup(Sender: TObject);
+    procedure MnCheckTags(Sender: TObject);
+    procedure MnCheckTagsAll(Sender: TObject);
+    procedure MnPlCheckTags(Sender: TObject);
+    procedure CheckTagsOf(APaths: TStringList; const AScope: string);
+    procedure CheckCollect(ATracks: TTrackList);
     procedure MnRemoveVirtualFolder(Sender: TObject);
     procedure MnLibraryFolders(Sender: TObject);
     { ---- AuMainForm_dialogs.inc ---- }
@@ -397,8 +408,13 @@ type
     procedure MnClearList(Sender: TObject);
     procedure MnShowInExplorer(Sender: TObject);
     procedure RevealPath(const APath: string);
+    function DriveAwakeFor(const APath: string): Boolean;
+    function IdleCaption: string;
+    procedure MuteWatcherForOwnWrites;
     procedure MnOverflowArtist(Sender: TObject);
     procedure MnPlSticky(Sender: TObject);
+    procedure MnViewWorks(Sender: TObject);
+    procedure MnPlSelectWork(Sender: TObject);
     procedure SortClick(Sender: TObject);
     procedure MnSort(Sender: TObject);
     procedure MnSortReverse(Sender: TObject);
@@ -557,7 +573,7 @@ begin
   FLastPlaySec := -1;
   CreateNew(AOwner, 0);
   PixelsPerInch := D;
-  Caption := AppTitle;
+  Caption := IdleCaption;
   { the library before the panes that show it }
   InitLibrary;
   { our own title bar, drawn in the theme (first: it is the topmost control);
@@ -1082,6 +1098,7 @@ begin
   FMid.OnResize := @MidResize;
   FPl := TPlaylistPane.Create(Self);
   FPl.List.StickyHeaders := Dat.StickyHeaders;
+  FPl.WorkHeadings := Dat.WorkHeadings;
   FPl.Parent := FMid;
   FPl.Align := alClient;
   FPl.List.TextSize := PaneTextPx(Dat.PlayListFontSize);
@@ -1183,7 +1200,10 @@ begin
   M.Add('Library as tiles', @MnViewTiles, icNone, 'Ctrl+G');
   M := FMainMenu.AddSub('Tools', icSliders);
   M.Add('Properties...', @MnProperties, icTag, 'Alt+Enter');
-  M.Add('Calculate ReplayGain...', @MnReplayGain, icWave);
+  { the main menu's two work on the whole library and say so; the popup
+    menus have them for the selection }
+  M.Add('Calculate ReplayGain for the library...', @MnReplayGain, icWave);
+  M.Add('Check tag consistency of the library...', @MnCheckTagsAll, icDocument);
   M.AddSeparator;
   M.Add('Show log...', @MnLog, icLog, 'Ctrl+L');
   M.Add('Show Debug Queue...', @MnDebugQueue, icBug, 'Ctrl+D');
@@ -1852,6 +1872,7 @@ begin
     { the library }
     FoldersChanged := (FLibrary <> nil) and ApplyLibraryFolders(NewFolders);
     if (not FoldersChanged) and ((Old.ShowLibArtist <> New.ShowLibArtist) or
+       (Old.ShowLibComposer <> New.ShowLibComposer) or
        (Old.ShowLibAlbum <> New.ShowLibAlbum) or (Old.ShowLibGenre <> New.ShowLibGenre)) then
       FLib.RefreshLibrary;
     if Old.WatchFolders <> New.WatchFolders then RestartWatcher;
@@ -1974,7 +1995,12 @@ procedure TMainForm.ShotTick(Sender: TObject);
     if not FDebugScan then Exit;
     L := TTrackList.Create;
     try
-      FLibrary.GetTracksByArtist('The Example Quartet', L);
+      { --shot-playlist-artist=<name>: the playlist of another artist of the
+        library }
+      if Application.HasOption('shot-playlist-artist') then
+        FLibrary.GetTracksByArtist(Application.GetOptionValue('shot-playlist-artist'), L)
+      else
+        FLibrary.GetTracksByArtist('The Example Quartet', L);
       if L.Count = 0 then Exit;
       FPl.AddTracks(L);
     finally
@@ -2081,7 +2107,7 @@ const
 var
   N: TAuTreeNode;
   ShotNodes: TAuTreeNodeArray;
-  I, J: Integer;
+  I, J, K: Integer;
 begin
   { --add-folder: the scan first (at most about a minute) }
   if FDebugScan and (FShotStep = 0) and (FShotWait < 90) and
@@ -2122,6 +2148,34 @@ begin
          begin
            FLibWanted := StrToIntDef(Application.GetOptionValue('shot-lib-width'), 300);
            FLib.Width := S(FLibWanted);
+         end;
+         { --shot-lib-open=<group>: that group of the tree and its first
+           entry opened (Composers: the group switched on first) }
+         if Application.HasOption('shot-lib-open') then
+         begin
+           if SameText(Application.GetOptionValue('shot-lib-open'), NODE_COMPOSERS) then
+           begin
+             AppSettings.Data.ShowLibComposer := True;
+             FLib.RefreshLibrary;
+           end;
+           for I := 0 to FLib.Tree.RootCount - 1 do
+             if SameText(FLib.Tree.Roots(I).Caption, Application.GetOptionValue('shot-lib-open')) then
+             begin
+               N := FLib.Tree.Roots(I);
+               N.Expanded := True;
+               if N.Count > 0 then N[0].Expanded := True;
+               if N.Count > 1 then N[1].Expanded := True;
+             end;
+         end;
+         { --shot-search=<text>: the library pane with that search;
+           --shot-tile-sort=<n>: the tiles in that order }
+         if Application.HasOption('shot-tile-sort') then
+           FLib.Tiles.Sort := TTileSort(EnsureRange(StrToIntDef(Application.GetOptionValue('shot-tile-sort'), 0),
+             Ord(Low(TTileSort)), Ord(High(TTileSort))));
+         if Application.HasOption('shot-search') then
+         begin
+           FLib.Search.Text := Application.GetOptionValue('shot-search');
+           FLib.PerformSearch;
          end;
          if Application.HasOption('shot-tiles') then
          begin
@@ -2201,8 +2255,26 @@ begin
     22: begin
           FLib.SetTileMode(False, False);
           FLib.Tiles.Grid.TileSize := AppSettings.Data.LibraryTileSize;
+          { the playlist at the first album with works (the classical album
+            of the demo library), its header at the top }
+          FShotWorks := False;
+          for I := 0 to FPl.EntryCount - 1 do
+            if FPl.WorkOfEntry(I, J, K) then
+            begin
+              J := FPl.RowOfEntry(J) - 1;        // (the album's header, when the work begins the album)
+              if J >= 0 then
+              begin
+                FPl.List.ScrollTo(FPl.List.RowRect(J).Top + FPl.List.ScrollOffset - S(4));
+                FShotWorks := True;
+              end;
+              Break;
+            end;
         end;
-    23: ;
+    23: if FShotWorks then
+        begin
+          CaptureWindow('12-playlist-works');
+          FPl.List.ScrollTo(0);
+        end;
   else
     { the dialogs: shown (not modal), captured, freed }
     if (FShotStep - SHOT_FIRST_DIALOG) mod 2 = 0 then
@@ -2259,6 +2331,7 @@ var
   Tp: TTonePresets;
   Dir, Card: string;
   WasOn: Boolean;
+  CheckList: TTrackList;
 begin
   Result := nil;
   AName := '';
@@ -2577,6 +2650,17 @@ begin
           { the About window (no folder of this PC) }
           AName := '48-about';
           Result := CreateAboutForm(Self, True);
+        end;
+    37: begin
+          { Tag consistency, for the whole library of the shot }
+          AName := '49-tag-consistency';
+          CheckList := TTrackList.Create;
+          try
+            if FLibrary <> nil then FLibrary.GetAllTracks(CheckList);
+            Result := CreateLibraryCheckForm(Self, 'The whole library', CheckList);
+          finally
+            CheckList.Free;
+          end;
         end;
   end;
 end;

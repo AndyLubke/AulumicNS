@@ -24,7 +24,7 @@ interface
 
 uses
   Windows, Classes, SysUtils, Controls, Forms, ExtCtrls, LCLType,
-  AuGfx, AuTheme, AuControls, AuForms, uMetadataPayloads;
+  AuGfx, AuTheme, AuControls, AuForms, uMetadataPayloads, uDriveKeepAlive;
 
 type
   PTagEditNodeData = ^TTagEditNodeData;
@@ -71,6 +71,14 @@ function WakeDrivesWithWindow(AOwner: TComponent; APaths: TStrings; const ACapti
   (AOffline is then empty). }
 function FindOfflineDrivesWithWindow(AOwner: TComponent; APaths, AOffline: TStrings;
   const ACaption: string): Boolean;
+{ Writes a small text file on a worker thread behind the same window
+  (uDriveKeepAlive.SaveTextFileAside): a disk that has to spin up can hold a
+  write for many seconds. AReplaces <> '': that file is deleted once AFile is
+  written. }
+function SaveTextFileWithWindow(AOwner: TComponent; const AFile, AReplaces, AText, ACaption: string;
+  out AError: string): TFileSaveResult;
+{ Deletes a file the same way; fsrSaved = the file is gone }
+function DeleteFileWithWindow(AOwner: TComponent; const AFile, ACaption: string): TFileSaveResult;
 { True while a wait of WakeDrivesWithWindow /
   FindOfflineDrivesWithWindow holds the input and the busy cursor (the window
   itself comes later, or not at all); its busy cursor is not left behind, see
@@ -81,7 +89,7 @@ implementation
 
 uses
   AuAudioTypes, AudioTag, baseTag, ALMetadata, uMetaUtils, uOSUtils, uAppStrings, uAppConsts,
-  Dialogs, uEngineStateManager, uDriveKeepAlive, AuDialogs, AuLog, uInputBlock;
+  Dialogs, uEngineStateManager, AuDialogs, AuLog, uInputBlock;
 
 type
   { TTagLoaderForm }
@@ -255,6 +263,37 @@ begin
   end;
 end;
 
+function SaveTextFileWithWindow(AOwner: TComponent; const AFile, AReplaces, AText, ACaption: string;
+  out AError: string): TFileSaveResult;
+var
+  W: TDriveWaiter;
+begin
+  W := TDriveWaiter.Create;
+  try
+    W.FOwner := AOwner;
+    W.FCaption := ACaption;
+    W.FStart := GetTickCount64;
+    Result := SaveTextFileAside(AFile, AReplaces, AText, @W.OnWait, AError);
+  finally
+    W.Free;
+  end;
+end;
+
+function DeleteFileWithWindow(AOwner: TComponent; const AFile, ACaption: string): TFileSaveResult;
+var
+  W: TDriveWaiter;
+begin
+  W := TDriveWaiter.Create;
+  try
+    W.FOwner := AOwner;
+    W.FCaption := ACaption;
+    W.FStart := GetTickCount64;
+    Result := DeleteFileAside(AFile, @W.OnWait);
+  finally
+    W.Free;
+  end;
+end;
+
 procedure DisposeTagData(var AData: TList);
 var
   I: Integer;
@@ -322,6 +361,7 @@ begin
     D^.Current.AlbumArtist := NormalizeSemicolons(Meta.AlbumArtist);
     D^.Current.Genre := NormalizeSemicolons(Meta.Genre);
     D^.Current.Composer := NormalizeSemicolons(Meta.Composer);
+    D^.Current.Work := Meta.Work;
     D^.Current.Performer := NormalizeSemicolons(Meta.Performer);
     D^.Current.Comment := Meta.Comment;
     D^.Current.Track := Meta.TrackNumber;

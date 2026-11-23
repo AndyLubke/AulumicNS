@@ -35,6 +35,7 @@ type
     // AMayFail: a refused file is no failure of the test; True = written
     function RunJob(Job: PMetadataJob; AMayFail: Boolean = False): Boolean;
     function TagsOf(const APath: string): TAudioTagValues;
+    function WorkFields(const APath: string): Integer;
   protected
     procedure SetUp; override;
     procedure TearDown; override;
@@ -45,6 +46,7 @@ type
     procedure DsfTagsAreWritten;
     procedure DffTagsAreWritten;
     procedure DffTagIsReplacedNotAdded;
+    procedure WorkIsWrittenInEveryFormat;
     procedure ReplayGainTagsAreWritten;
     procedure TrackOnlyReplayGainRemovesTheAlbumValues;
     procedure DamagedTagIsRepairedWithACopy;
@@ -54,7 +56,7 @@ type
 implementation
 
 uses
-  Forms, ALMetadata, AuLog, uMetadataCustodian, uAppConsts, AudioTag, baseTag, file_dff, TestHelpers;
+  Forms, ALMetadata, AuLog, uMetadataCustodian, uAppConsts, AudioTag, baseTag, tag_id3v2, file_dff, TestHelpers;
 
 { ---- the audio bytes of the test files ---- }
 
@@ -187,6 +189,7 @@ begin
   Result.Genre := M.Genre;
   Result.Composer := M.Composer;
   Result.Performer := M.Performer;
+  Result.Work := M.Work;
   Result.Comment := M.Comment;
   Result.Track := M.TrackNumber;
   Result.Disc := M.DiscNumber;
@@ -492,6 +495,100 @@ begin
     AssertEquals('Still one copy', 1, Copies);
   finally
     AppTagBackupDir := OldDir;
+  end;
+end;
+
+{ how many fields of the file's tag hold the work: WORK fields of a Vorbis
+  comment, TXXX frames with the description WORK of an ID3 tag }
+function TTestMetadataCustodian.WorkFields(const APath: string): Integer;
+var
+  R: TTagReader;
+  I: Integer;
+  F: TFrameElement;
+  Desc, Val: string;
+begin
+  Result := 0;
+  R := GetFileTagsObject(APath);
+  try
+    for I := 0 to R.Tags.Count - 1 do
+    begin
+      F := R.Tags.Frames[I];
+      if F = nil then Continue;
+      if SameText(F.ID, 'WORK') then Inc(Result)
+      else if (F is TID3Frame) and SameText(F.ID, 'TXXX') and TID3Frame(F).SplitTextPair(Desc, Val) and
+              SameText(Trim(Desc), 'WORK') then Inc(Result);
+    end;
+  finally
+    R.Free;
+  end;
+end;
+
+{ the Work field in all four formats: written, changed (one field, not two)
+  and removed, with the other fields left alone }
+procedure TTestMetadataCustodian.WorkIsWrittenInEveryFormat;
+const
+  // Typed: UTF-8 strings, compared byte for byte
+  WORK_A: string = 'Symphony No. 9 in D minor, Op. 125 «Choral»';
+  WORK_B: string = 'Dvořák: Symphony No. 9';
+var
+  Files: array[0..3] of string;
+  I: Integer;
+  P: string;
+  Orig, Cur, Got: TAudioTagValues;
+begin
+  Files[0] := FDir + 'w.wav';
+  Files[1] := FDir + 'w.flac';
+  Files[2] := FDir + 'w.dsf';
+  Files[3] := FDir + 'w.dff';
+  WriteTestWav(Files[0]);
+  AddWavId3Tag(Files[0], ['TIT2', 'The Title', 'TPE1', 'The Artist']);
+  WritePatternFlac(Files[1], 4096);
+  WriteTestDsf(Files[2], 8192);
+  WriteTestDff(Files[3], 8192);
+  for I := 0 to High(Files) do
+  begin
+    P := Files[I];
+    { a title first, so every file has a tag with something else in it }
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Title := 'The Title';
+    Cur.Composer := 'A Composer';
+    WriteTags(P, Orig, Cur);
+    AssertEquals(P + ': no work yet', 0, WorkFields(P));
+    AssertEquals(P + ': read as empty', '', TagsOf(P).Work);
+
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Work := WORK_A;
+    WriteTags(P, Orig, Cur);
+    Got := TagsOf(P);
+    AssertEquals(P + ': the work', WORK_A, Got.Work);
+    AssertEquals(P + ': one field', 1, WorkFields(P));
+    AssertEquals(P + ': the title stays', 'The Title', Got.Title);
+    AssertEquals(P + ': the composer stays', 'A Composer', Got.Composer);
+
+    Orig := Got;
+    Cur := Orig;
+    Cur.Work := WORK_B;
+    WriteTags(P, Orig, Cur);
+    AssertEquals(P + ': the new work', WORK_B, TagsOf(P).Work);
+    AssertEquals(P + ': still one field', 1, WorkFields(P));
+
+    { another field edited: the work is not touched }
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Title := 'Another Title';
+    WriteTags(P, Orig, Cur);
+    AssertEquals(P + ': the work after another edit', WORK_B, TagsOf(P).Work);
+
+    Orig := TagsOf(P);
+    Cur := Orig;
+    Cur.Work := '';
+    WriteTags(P, Orig, Cur);
+    Got := TagsOf(P);
+    AssertEquals(P + ': the work removed', '', Got.Work);
+    AssertEquals(P + ': no field left', 0, WorkFields(P));
+    AssertEquals(P + ': the title is still there', 'Another Title', Got.Title);
   end;
 end;
 

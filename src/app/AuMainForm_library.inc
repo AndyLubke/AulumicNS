@@ -237,6 +237,15 @@ begin
   end;
 end;
 
+{ What the folder watcher has seen up to now, and sees in the next
+  OWN_WRITES_GRACE_MS, is a write of the program itself, which has put the
+  change into the library already: no refresh scan for it }
+procedure TMainForm.MuteWatcherForOwnWrites;
+begin
+  FWatchMuteUntil := GetTickCount64 + OWN_WRITES_GRACE_MS;
+  if FWatcher <> nil then FWatcher.Discard;
+end;
+
 procedure TMainForm.CheckWatcher;
 const
   WATCH_QUIET_MS = 4000;     // the files are copied, then the refresh starts
@@ -246,7 +255,7 @@ begin
     library scan after every save: while the tag writer works and for
     OWN_WRITES_GRACE_MS after its batch (BackgroundIOBatchFinished) the
     changes are forgotten; the writer updates the library records itself }
-  if (AppStateManager <> nil) and AppStateManager.HasState(esBackgroundIOBusy) then
+  if (FOwnWrites > 0) or ((AppStateManager <> nil) and AppStateManager.HasState(esBackgroundIOBusy)) then
     FWatchMuteUntil := GetTickCount64 + OWN_WRITES_GRACE_MS;
   if GetTickCount64 < FWatchMuteUntil then
   begin
@@ -324,6 +333,7 @@ end;
 procedure TMainForm.TreeContext(Sender: TObject; Node: TAuTreeNode; ScreenPt: TPoint);
 var
   It: TAuMenuItem;
+  Sub: TAuMenu;
   IsRoot, IsTrack, OneNode: Boolean;
 begin
   { the right-clicked node becomes the selection (unless it is in it) }
@@ -356,6 +366,12 @@ begin
   { the setting of Preferences > Appearance > Main window, at hand }
   It := FCtxMenu.Add('Auto-collapse other nodes', @MnLibAccordion);
   It.Checked := AppSettings.Data.AccordionEnabled;
+  { the groups of the tree, as the four switches of the same card }
+  Sub := FCtxMenu.AddSub('Show', icEye);
+  Sub.Add(NODE_ARTISTS, @MnLibShowGroup, icArtist, '', 0).Checked := AppSettings.Data.ShowLibArtist;
+  Sub.Add(NODE_COMPOSERS, @MnLibShowGroup, icComposer, '', 1).Checked := AppSettings.Data.ShowLibComposer;
+  Sub.Add(NODE_ALBUMS, @MnLibShowGroup, icAlbum, '', 2).Checked := AppSettings.Data.ShowLibAlbum;
+  Sub.Add(NODE_GENRES, @MnLibShowGroup, icGenre, '', 3).Checked := AppSettings.Data.ShowLibGenre;
   FCtxMenu.AddSeparator;
   if (Node <> nil) and FLib.IsVirtualLink(Node) then
   begin
@@ -376,8 +392,12 @@ begin
   It := FCtxMenu.Add('Open folder...', @MnLibOpenFolder, icFolder);
   It.Enabled := (Node <> nil) and OneNode and (Node.Path <> '') and
     FLibrary.IsRootAvailable(Node.Path);
-  It := FCtxMenu.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
+  { what works on the selection as a whole }
+  Sub := FCtxMenu.AddSub('Tools', icSliders);
+  It := Sub.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
   It.Enabled := (Node <> nil) and not IsRoot;
+  It := Sub.Add('Check tag consistency...', @MnCheckTags, icDocument);
+  It.Enabled := Node <> nil;
   FCtxMenu.AddSeparator;
   It := FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
   It.Enabled := Node <> nil;
@@ -397,6 +417,7 @@ end;
 procedure TMainForm.TilesContext(Sender: TObject; Index: Integer; ScreenPt: TPoint);
 var
   It: TAuMenuItem;
+  Sub: TAuMenu;
   OneTile: Boolean;
 begin
   FCtxTile := Index;
@@ -417,7 +438,9 @@ begin
   { no disk access here: only whether the drive / share is there }
   It := FCtxMenu.Add('Open folder...', @MnTileOpenFolder, icFolder);
   It.Enabled := OneTile and (FLibrary <> nil) and FLibrary.IsRootAvailable(FLib.TileFolder(Index));
-  FCtxMenu.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
+  Sub := FCtxMenu.AddSub('Tools', icSliders);
+  Sub.Add('Calculate ReplayGain...', @MnLibReplayGain, icWave);
+  Sub.Add('Check tag consistency...', @MnCheckTags, icDocument);
   FCtxMenu.AddSeparator;
   FCtxMenu.Add('Properties...', @MnLibProperties, icTag, 'Alt+Enter');
   FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
@@ -462,6 +485,21 @@ begin
   FLib.Tree.Accordion := AppSettings.Data.AccordionEnabled;
 end;
 
+{ Show > Artists / Composers / Albums / Genres: the group comes or goes at
+  once (the tree is built again, so the menu's node is not used after it) }
+procedure TMainForm.MnLibShowGroup(Sender: TObject);
+begin
+  if not (Sender is TAuMenuItem) then Exit;
+  case TAuMenuItem(Sender).Tag of
+    0: AppSettings.Data.ShowLibArtist := not AppSettings.Data.ShowLibArtist;
+    1: AppSettings.Data.ShowLibComposer := not AppSettings.Data.ShowLibComposer;
+    2: AppSettings.Data.ShowLibAlbum := not AppSettings.Data.ShowLibAlbum;
+    3: AppSettings.Data.ShowLibGenre := not AppSettings.Data.ShowLibGenre;
+  end;
+  FCtxNode := nil;
+  FLib.RefreshLibrary;
+end;
+
 procedure TMainForm.MnLibExpandAll(Sender: TObject);
 begin
   if FCtxNode = nil then Exit;
@@ -503,8 +541,9 @@ end;
 procedure TMainForm.MnVirtualFolder(Sender: TObject);
 var
   Node: TAuTreeNode;
-  BaseDir, LinkName, LinkPath, OldLink: string;
+  BaseDir, LinkName, LinkPath, OldLink, Replaces, Err: string;
   IsEdit: Boolean;
+  Saved: TFileSaveResult;
   SL: TStringList;
 begin
   Node := FCtxNode;
@@ -518,6 +557,8 @@ begin
       BaseDir := ExtractFilePath(Node.Path);
       LinkName := ChangeFileExt(ExtractFileName(Node.Path), '');
       OldLink := Node.Path;
+      { the link file is read here: its drive is woken first }
+      if not DriveAwakeFor(OldLink) then Exit;
       if FileExists(OldLink) then
       try
         SL.LoadFromFile(OldLink, TEncoding.UTF8);
@@ -533,15 +574,38 @@ begin
     if not EditVirtualFolder(Self, BaseDir, LinkName, SL, IsEdit, FLibrary) then Exit;
     if Trim(LinkName) = '' then Exit;
     LinkPath := IncludeTrailingPathDelimiter(BaseDir) + Trim(LinkName) + EXT_AULLINK;
+    Replaces := '';
+    if IsEdit and (OldLink <> '') and not SameText(OldLink, LinkPath) then Replaces := OldLink;
+    { the node is not used after the wait below: the tree may be built again
+      while it runs }
+    if (not IsEdit) and not Node.Expanded then Node.Expanded := True;
+    { written on a worker thread: a disk that has to spin up holds the write
+      for many seconds }
+    Inc(FOwnWrites);        // (the watcher is checked while the write waits for the disk)
     try
-      if IsEdit and (OldLink <> '') and not SameText(OldLink, LinkPath) and FileExists(OldLink) then
-        SysUtils.DeleteFile(OldLink);
-      SL.WriteBOM := False;
-      SL.SaveToFile(LinkPath, TEncoding.UTF8);
-      if IsEdit and (OldLink <> '') and not SameText(OldLink, LinkPath) then FLibrary.RefreshVirtualLink(OldLink);
+      Saved := SaveTextFileWithWindow(Self, LinkPath, Replaces, SL.Text, APP_TITLE, Err);
+    finally
+      Dec(FOwnWrites);
+    end;
+    case Saved of
+      fsrStopped:
+        begin
+          AddLog(SafeFormat('[Library] Saving the virtual folder "%s" was stopped.', [LinkPath]));
+          FToast.ShowToast('Saving was stopped', 'The virtual folder may not have been written.', icInfo, 4000);
+          Exit;
+        end;
+      fsrFailed:
+        begin
+          AuMessage(SafeFormat(FMT_ERR_SHORTCUT_FILESAVE, [Err]), amError, abOK, TITLE_ERROR);
+          Exit;
+        end;
+    end;
+    if FShuttingDown then Exit;
+    MuteWatcherForOwnWrites;
+    try
+      if Replaces <> '' then FLibrary.RefreshVirtualLink(Replaces);
       FLibrary.RefreshVirtualLink(LinkPath);
       AddLog(SafeFormat('[Library] Virtual folder saved: "%s" (%d folders).', [LinkPath, SL.Count]));
-      if (not IsEdit) and not Node.Expanded then Node.Expanded := True;
       FLib.RefreshLibrary;
     except
       on E: Exception do
@@ -558,22 +622,41 @@ procedure TMainForm.MnRemoveVirtualFolder(Sender: TObject);
 var
   Node: TAuTreeNode;
   Link: string;
+  Gone: TFileSaveResult;
 begin
   Node := FCtxNode;
   if (Node = nil) or (FLibrary = nil) or not FLib.IsVirtualLink(Node) then Exit;
   Link := Node.Path;
   if ALMessageDlg(TITLE_CONFIRM_DELETE, SafeFormat(FMT_CONFIRM_DELETE_VIRTUAL_FOLDER,
     [ChangeFileExt(ExtractFileName(Link), '')]), [mbYes, mbNo], mbNo, mkWarning) <> mrYes then Exit;
-  if (not FileExists(Link)) or SysUtils.DeleteFile(Link) then
-  begin
-    FLibrary.RefreshVirtualLink(Link);
-    AddLog(SafeFormat('[Library] Virtual folder removed: "%s".', [Link]));
-    if (Node.Parent <> nil) and (Node.Parent.Level > 0) then FLib.Tree.SelectNode(Node.Parent);
-    FCtxNode := nil;
-    FLib.RefreshLibrary;
-  end
-  else
-    ALMessageDlg(TITLE_ERROR, ERR_SHORTCUT_DELETE, mkError);
+  { the node is not used after the wait below: the tree may be built again
+    while it runs }
+  if (Node.Parent <> nil) and (Node.Parent.Level > 0) then FLib.Tree.SelectNode(Node.Parent);
+  FCtxNode := nil;
+  { deleted on a worker thread, as the link is saved }
+  Inc(FOwnWrites);
+  try
+    Gone := DeleteFileWithWindow(Self, Link, APP_TITLE);
+  finally
+    Dec(FOwnWrites);
+  end;
+  case Gone of
+    fsrStopped:
+      begin
+        AddLog(SafeFormat('[Library] Removing the virtual folder "%s" was stopped.', [Link]));
+        Exit;
+      end;
+    fsrFailed:
+      begin
+        ALMessageDlg(TITLE_ERROR, ERR_SHORTCUT_DELETE, mkError);
+        Exit;
+      end;
+  end;
+  if FShuttingDown then Exit;
+  MuteWatcherForOwnWrites;
+  FLibrary.RefreshVirtualLink(Link);
+  AddLog(SafeFormat('[Library] Virtual folder removed: "%s".', [Link]));
+  FLib.RefreshLibrary;
 end;
 
 { ---- the library menu ---- }
@@ -634,6 +717,22 @@ begin
 end;
 
 { Ctrl+F5 and the button: look for new, changed and removed files }
+{ The library was written by a version without the Work field: its tracks
+  have no work until every file is read again. Asked at each start until a
+  rebuild has done that (TLibraryManager.NeedsRebuildForWorks). }
+procedure TMainForm.AskLibraryRebuild(Data: PtrInt);
+begin
+  if FShuttingDown or (FLibrary = nil) or FLibrary.IsScanning or not FLibrary.NeedsRebuildForWorks then Exit;
+  AddLog('[Library] The library is in the format of an earlier version (no works): a rebuild is offered.');
+  if ALMessageDlg(TITLE_LIBRARY_OLD_FORMAT, MSG_LIBRARY_OLD_FORMAT, [mbYes, mbNo], mbYes, mkQuestion) <> mrYes then
+  begin
+    AddLog('[Library] The rebuild was put off; the question comes again at the next start.');
+    Exit;
+  end;
+  if FShuttingDown then Exit;
+  RequestLibraryScan(True, False);
+end;
+
 procedure TMainForm.MnRescan(Sender: TObject);
 begin
   RequestLibraryScan(False, False);

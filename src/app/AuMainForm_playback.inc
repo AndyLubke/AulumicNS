@@ -124,6 +124,10 @@ begin
       {$ENDIF}
         if AppSettings.Data.AutoRescanLibrary and (FLibrary <> nil) and FLibrary.HasScanFolders then
           RequestLibraryScan(False, True);
+      { a library of an earlier version: the question whether to rebuild it,
+        once this tick is over (it opens a window) }
+      if (FLibrary <> nil) and (not ErrorBoxesOff) and FLibrary.NeedsRebuildForWorks then
+        Application.QueueAsyncCall(@AskLibraryRebuild, 0);
     end;
     CheckWatcher;
     CheckPlaylistSave;
@@ -1140,7 +1144,7 @@ begin
         UpdateToneButton;
         FPl.PlayingEntry := -1;
         FStatus.EngineText := '';
-        Caption := AppTitle;
+        Caption := IdleCaption;
         FRateShown := False;
         UpdateBanner;
         UpdateRateLine;

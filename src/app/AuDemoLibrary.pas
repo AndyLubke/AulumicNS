@@ -82,12 +82,12 @@ const
      Comment: 'Four concertos for violin and strings.';
      Year: 2018; Rate: 192000; Bits: 24; Discs: 2; C1: $1D2B45; C2: $8FB3D9; Motif: 3;
      Booklet: True; Scans: True; RG: False;
-     Tracks: 'Concerto No. 1 "Thaw" - I. Allegro=5:42|Concerto No. 1 "Thaw" - II. Largo=6:55|' +
-       'Concerto No. 1 "Thaw" - III. Presto=4:21|Concerto No. 2 "Tide" - I. Moderato=6:08|' +
-       'Concerto No. 2 "Tide" - II. Adagio=8:12|Concerto No. 2 "Tide" - III. Allegro vivo=4:47|' +
-       'Concerto No. 3 "Ember" - I. Allegro=5:33|Concerto No. 3 "Ember" - II. Andante=7:19|' +
-       'Concerto No. 3 "Ember" - III. Vivace=4:02|Concerto No. 4 "Frost" - I. Allegro non troppo=6:26|' +
-       'Concerto No. 4 "Frost" - II. Lento=9:10|Concerto No. 4 "Frost" - III. Finale=5:05'),
+     Tracks: 'Concerto No. 1 "Thaw": I. Allegro=5:42|Concerto No. 1 "Thaw": II. Largo=6:55|' +
+       'Concerto No. 1 "Thaw": III. Presto=4:21|Concerto No. 2 "Tide": I. Moderato=6:08|' +
+       'Concerto No. 2 "Tide": II. Adagio=8:12|Concerto No. 2 "Tide": III. Allegro vivo=4:47|' +
+       'Concerto No. 3 "Ember": I. Allegro=5:33|Concerto No. 3 "Ember": II. Andante=7:19|' +
+       'Concerto No. 3 "Ember": III. Vivace=4:02|Concerto No. 4 "Frost": I. Allegro non troppo=6:26|' +
+       'Concerto No. 4 "Frost": II. Lento=9:10|Concerto No. 4 "Frost": III. Finale=5:05'),
     (Artist: 'Copper Lanterns'; Album: 'Harbour Songs'; Genre: 'Folk'; Composer: 'Copper Lanterns';
      Performer: 'Copper Lanterns'; Comment: '';
      Year: 2016; Rate: 44100; Bits: 16; Discs: 1; C1: $5A2A12; C2: $F2C46B; Motif: 4;

@@ -200,6 +200,16 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestTonePresets"/>
       </Unit>
+      <Unit>
+        <Filename Value="TestLibraryCheck.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestLibraryCheck"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestProperties.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestProperties"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

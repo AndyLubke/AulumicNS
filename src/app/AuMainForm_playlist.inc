@@ -439,7 +439,28 @@ begin
     It.Tag := I;
     It.Checked := (P^.TrackFmt <> '') and (P^.TrackFmt = TRACK_FORMAT_OPTIONS[I].DataStr);
   end;
+  { the tracks of a work under a heading of their own (all playlists) }
+  FViewMenu.AddSeparator;
+  It := FViewMenu.Add('Work headings', @MnViewWorks);
+  It.Checked := AppSettings.Data.WorkHeadings;
+  It.Enabled := PlGroupMode(P) <> gmFlat;
   FViewMenu.PopupBelow(FPl.BtnView, True);
+end;
+
+procedure TMainForm.MnPlSelectWork(Sender: TObject);
+begin
+  FPl.SelectWork(FCtxPlEntry);
+end;
+
+procedure TMainForm.MnViewWorks(Sender: TObject);
+begin
+  AppSettings.Data.WorkHeadings := not AppSettings.Data.WorkHeadings;
+  BeginBusy;
+  try
+    FPl.WorkHeadings := AppSettings.Data.WorkHeadings;
+  finally
+    EndBusy;
+  end;
 end;
 
 { the sort button: the order of the groups of the shown playlist (its
@@ -706,6 +727,7 @@ var
   I: Integer;
   It: TAuMenuItem;
   HasSel, RO: Boolean;
+  WorkLast: Integer;
 begin
   HasSel := Length(FPl.SelectedEntries) > 0;
   RO := FPl.ReadOnly;
@@ -715,6 +737,10 @@ begin
     windows last, Properties at the very end }
   It := FCtxMenu.Add('Play', @MnPlaySelected, icPlay, 'Enter');
   It.Enabled := HasSel;
+  { the movements of the work the clicked track belongs to (work headings) }
+  FCtxPlEntry := FPl.EntryOfRow(Row);
+  It := FCtxMenu.Add('Select work', @MnPlSelectWork, icNote);
+  It.Enabled := FPl.WorkOfEntry(FCtxPlEntry, I, WorkLast);
   Sub := FCtxMenu.AddSub('Rating', icStar);
   for I := 5 downto 1 do
   begin
@@ -732,7 +758,11 @@ begin
   FCtxMenu.AddSeparator;
   It := FCtxMenu.Add('Open folder...', @MnShowInExplorer, icFolder);
   It.Enabled := HasSel;
-  It := FCtxMenu.Add('Calculate ReplayGain...', @MnPlReplayGain, icWave);
+  { what works on the selected tracks as a whole }
+  Sub := FCtxMenu.AddSub('Tools', icSliders);
+  It := Sub.Add('Calculate ReplayGain...', @MnPlReplayGain, icWave);
+  It.Enabled := HasSel;
+  It := Sub.Add('Check tag consistency...', @MnPlCheckTags, icDocument);
   It.Enabled := HasSel;
   FCtxMenu.AddSeparator;
   It := FCtxMenu.Add('Remove from playlist', @MnRemoveSelected, icTrash, 'Del');

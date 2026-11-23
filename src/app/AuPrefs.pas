@@ -251,7 +251,7 @@ type
     FLibFont, FPlFont: TAuEdit;
     FLastFmKey: TAuEdit;
     FGrouping, FHeaderFmt, FTrackFmt, FTileSize: TAuCombo;
-    FShowArtist, FShowAlbum, FShowGenre, FPeakMeter: TAuSwitch;
+    FShowArtist, FShowComposer, FShowAlbum, FShowGenre, FPeakMeter: TAuSwitch;
     { system }
     FAffinity, FMMCSS, FKeepAwake, FHighRes, FAlwaysLog: TAuSwitch;
     FRgThreads: TAuCombo;
@@ -943,6 +943,7 @@ var
 begin
   S1 := '';
   Add(FShowArtist.Checked, 'Artists');
+  Add(FShowComposer.Checked, 'Composers');
   Add(FShowAlbum.Checked, 'Albums');
   Add(FShowGenre.Checked, 'Genres');
   Add(FPeakMeter.Checked, 'peak meter');
@@ -1441,6 +1442,8 @@ begin
     'Closes the other open folders when one is opened, which keeps the tree tidy.');
   Section('Show');
   FShowArtist := SwitchRow('Show Artists in library', 'Show the Artists group in the library pane.');
+  FShowComposer := SwitchRow('Show Composers in library',
+    'Show the Composers group in the library pane: the composers from the composer tag, with their albums.');
   FShowAlbum := SwitchRow('Show Albums in library', 'Show the Albums group in the library pane.');
   FShowGenre := SwitchRow('Show Genres in library', 'Show the Genres group in the library pane.');
   FPeakMeter := SwitchRow('Show peak meter', 'Show the peak meter in the top banner.');
@@ -1579,6 +1582,7 @@ begin
   SelectOption(FHeaderFmt, HEADER_FORMAT_OPTIONS, D.DefaultHeaderFormat);
   SelectOption(FTrackFmt, TRACK_FORMAT_OPTIONS, D.DefaultTrackFormat);
   FShowArtist.Checked := D.ShowLibArtist;
+  FShowComposer.Checked := D.ShowLibComposer;
   FShowAlbum.Checked := D.ShowLibAlbum;
   FShowGenre.Checked := D.ShowLibGenre;
   FPeakMeter.Checked := D.ShowPeakmeter;
@@ -1649,6 +1653,7 @@ begin
   D.DefaultHeaderFormat := OptionValue(FHeaderFmt, HEADER_FORMAT_OPTIONS, HEADER_FORMAT_OPTIONS[0].DataStr);
   D.DefaultTrackFormat := OptionValue(FTrackFmt, TRACK_FORMAT_OPTIONS, TRACK_FORMAT_OPTIONS[0].DataStr);
   D.ShowLibArtist := FShowArtist.Checked;
+  D.ShowLibComposer := FShowComposer.Checked;
   D.ShowLibAlbum := FShowAlbum.Checked;
   D.ShowLibGenre := FShowGenre.Checked;
   D.ShowPeakmeter := FPeakMeter.Checked;

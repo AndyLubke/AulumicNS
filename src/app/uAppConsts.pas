@@ -49,6 +49,8 @@ const
 
   // Tag field names (ReplayGain)
   TAG_RG_PREFIX               = 'REPLAYGAIN';
+  { the work of a track: the field's name in a Vorbis comment, the description of its TXXX frame in an ID3 tag }
+  TAG_WORK                    = 'WORK';
   TAG_R128_PREFIX             = 'R128';
   TAG_RG_TRACK_GAIN           = 'REPLAYGAIN_TRACK_GAIN';
   TAG_RG_ALBUM_GAIN           = 'REPLAYGAIN_ALBUM_GAIN';

@@ -24,6 +24,7 @@ type
     Genre       : string;
     Composer    : string;
     Performer   : string;
+    Work        : string;      // the work a track belongs to (FLAC WORK, ID3 TXXX 'WORK')
     Comment     : string;
     TrackNumber : integer;
     DiscNumber  : integer;
@@ -539,7 +540,16 @@ begin
             end;
           end;
 
+          // The work: a field of its own in a Vorbis comment, a TXXX frame
+          // with the description WORK in an ID3 tag (the first one counts)
+          if (Result.Work = '') and ((UpperID = 'TXXX') or (UpperID = 'TXX')) and (Frame is TID3Frame) and
+             TID3Frame(Frame).SplitTextPair(PairDesc, PairValue) and SameText(Trim(PairDesc), TAG_WORK) then
+            Result.Work := SanitizeAndCompactTag(PairValue, 512);
+
           case UpperID of
+            'WORK':
+              if Result.Work = '' then
+                Result.Work := SanitizeAndCompactTag(CleanStr, 512);
             // ID3v2.2 frame IDs (TCO, TP1, TP2, TCM, TP3, COM, TPA,
             // TRK) are read as well; the tag editor writes them for v2.2 tags.
             'GENRE', 'TCON', 'TCO':

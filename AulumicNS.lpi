@@ -26,8 +26,8 @@
       <UseVersionInfo Value="True"/>
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="1"/>
-      <BuildNr Value="17"/>
-      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.17"/>
+      <BuildNr Value="18"/>
+      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.18"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
@@ -80,7 +80,7 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="121">
+    <Units Count="123">
       <Unit0>
         <Filename Value="AulumicNS.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -565,6 +565,14 @@
         <Filename Value="src/app/uTonePresets.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit120>
+      <Unit121>
+        <Filename Value="src/library/uLibraryCheck.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit121>
+      <Unit122>
+        <Filename Value="src/app/AuLibraryCheck.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit122>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

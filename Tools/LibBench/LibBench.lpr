@@ -33,7 +33,7 @@ program LibBench;
 uses
   Interfaces, Forms, Classes, SysUtils, Windows, Math,
   uLibraryManager, uLibraryTypes, uUserStatsManager, uAppConsts, uAppStrings,
-  uPlaylistFile, uPlaylistStore, AuPlaylistPane, AuLog;
+  uPlaylistFile, uPlaylistStore, AuPlaylistPane, AuLog, uLibraryCheck;
 
 var
   Lib: TLibraryManager;
@@ -215,6 +215,92 @@ var TL: TTrackList;
 begin
   TL := TTrackList.Create;
   try Lib.GetTracksInFolderRecursive(GRoot, TL); ACount := TL.Count; finally TL.Free; end;
+end;
+
+var
+  GLinkDir: string = '';
+  GLinkTargets: Integer = 0;
+
+{ the folder of the virtual folder with the most targets ('' = no virtual folders) }
+function BiggestLinkDir: string;
+var
+  Roots, Links, Targets: TStringList;
+  I, J: Integer;
+begin
+  Result := '';
+  Roots := TStringList.Create;
+  Links := TStringList.Create;
+  Targets := TStringList.Create;
+  try
+    Lib.GetScanFolders(Roots);
+    for I := 0 to Roots.Count - 1 do
+    begin
+      Lib.GetVirtualLinksUnder(ExcludeTrailingPathDelimiter(Roots[I]), Links);
+      for J := 0 to Links.Count - 1 do
+      begin
+        Lib.GetVirtualLinkTargets(Links[J], Targets);
+        if Targets.Count > GLinkTargets then
+        begin
+          GLinkTargets := Targets.Count;
+          Result := ExtractFileDir(Links[J]);
+        end;
+      end;
+    end;
+  finally
+    Targets.Free;
+    Links.Free;
+    Roots.Free;
+  end;
+end;
+{ a folder as the tiles and the folder actions ask for it: its tracks and
+  those of the virtual folders in it (the library folder; the folder of the
+  virtual folder with the most targets) }
+procedure OpRootWithLinks(out ACount: Integer);
+var TL: TTrackList;
+begin
+  TL := TTrackList.Create;
+  try Lib.GetTracksInFolderWithLinks(GRoot, TL); ACount := TL.Count; finally TL.Free; end;
+end;
+
+procedure OpLinkFolderWithLinks(out ACount: Integer);
+var TL: TTrackList;
+begin
+  TL := TTrackList.Create;
+  try Lib.GetTracksInFolderWithLinks(GLinkDir, TL); ACount := TL.Count; finally TL.Free; end;
+end;
+
+{ the check of the tags (the Tag consistency window) for the whole library; the
+  count is the number of findings }
+var
+  GCheckShown: Boolean = False;
+
+procedure OpCheckTags(out ACount: Integer);
+var
+  TL: TTrackList;
+  Found: TCheckFindings;
+  K: TCheckKind;
+  I, N: Integer;
+begin
+  TL := TTrackList.Create;
+  try
+    Lib.GetAllTracks(TL);
+    CheckTracks(TL, Found);
+    ACount := Length(Found);
+    { once: how many findings of each kind }
+    if not GCheckShown then
+    begin
+      GCheckShown := True;
+      for K := Low(TCheckKind) to High(TCheckKind) do
+      begin
+        N := 0;
+        for I := 0 to High(Found) do
+          if Found[I].Kind = K then Inc(N);
+        WriteLn(Format('    %-28s %6d', [CHECK_KIND_NAMES[K], N]));
+      end;
+    end;
+  finally
+    TL.Free;
+  end;
 end;
 
 procedure OpSearch(out ACount: Integer);
@@ -637,6 +723,43 @@ begin
   Run('GetTracksByQuery ' + AQuery, @OpQuery);
 end;
 
+procedure ExportTracks(const AFile: string);
+var
+  TL: TTrackList;
+  SL: TStringList;
+  I: Integer;
+  T: PTrackInfo;
+
+  function F(const S: string): string;
+  begin
+    Result := StringReplace(StringReplace(StringReplace(S, #9, ' ', [rfReplaceAll]), #13, ' ', [rfReplaceAll]),
+      #10, ' ', [rfReplaceAll]);
+  end;
+
+begin
+  TL := TTrackList.Create;
+  SL := TStringList.Create;
+  try
+    Lib.GetAllTracks(TL);
+    SL.Add('Path'#9'Folder'#9'Title'#9'Artist'#9'AlbumArtist'#9'Album'#9'Genre'#9'Composer'#9'Performer'#9 +
+      'Track'#9'Disc'#9'Year'#9'Duration');
+    for I := 0 to TL.Count - 1 do
+    begin
+      T := TL[I];
+      SL.Add(F(T^.FilePath) + #9 + F(T^.FolderDir) + #9 + F(T^.Title) + #9 + F(T^.Artist) + #9 +
+        F(T^.AlbumArtist) + #9 + F(T^.Album) + #9 + F(T^.Genre) + #9 + F(T^.Composer) + #9 +
+        F(T^.Performer) + #9 + IntToStr(T^.TrackNumber) + #9 + IntToStr(T^.DiscNumber) + #9 +
+        IntToStr(T^.Year) + #9 + F(T^.DurationStr));
+    end;
+    SL.WriteBOM := False;
+    SL.SaveToFile(AFile, TEncoding.UTF8);
+    WriteLn('exported ', TL.Count, ' tracks to ', AFile);
+  finally
+    SL.Free;
+    TL.Free;
+  end;
+end;
+
 var
   Dir: string;
   SL: TStringList;
@@ -667,6 +790,16 @@ begin
     WriteLn(Format('%-44s %8.2f ms   n=%d   heap %.1f MB', ['LoadDatabase', NowMs - T0,
       Lib.GetTrackCount, PrivateMB - HeapBefore]));
     WriteLn('  ', Lib.GetLoadSummary);
+
+    { --export=<file>: the text fields of every track, tab-separated, one
+      line per track with a heading line (to count things in a library with
+      other tools), and nothing else }
+    for I := 2 to ParamCount do
+      if Copy(ParamStr(I), 1, 9) = '--export=' then
+      begin
+        ExportTracks(Copy(ParamStr(I), 10, MaxInt));
+        Halt(0);
+      end;
 
     { the arguments: the artist and the genre with the most tracks, a root }
     SL := TStringList.Create;
@@ -730,6 +863,11 @@ begin
     Run('GetTracksInFolder (one album)', @OpTracksInFolder);
     Run('GetTracksInFolderRecursive (one album)', @OpFolderRecursive);
     Run('GetTracksInFolderRecursive (root)', @OpRootRecursive);
+    Run('GetTracksInFolderWithLinks (root)', @OpRootWithLinks);
+    Run('CheckTracks (whole library)', @OpCheckTags);
+    GLinkDir := BiggestLinkDir;
+    if GLinkDir <> '' then
+      Run('GetTracksInFolderWithLinks (' + IntToStr(GLinkTargets) + ' linked folders)', @OpLinkFolderWithLinks);
     SearchFor('pink floyd');
     SearchFor('the');
     SearchFor('bach suite');

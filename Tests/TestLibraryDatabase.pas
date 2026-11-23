@@ -46,6 +46,9 @@ type
   published
     procedure LoadReadsEveryField;
     procedure LoadReadsFoldersAndVirtualFolders;
+    procedure FolderWithVirtualFoldersGivesTheirTracksToo;
+    procedure ComposersGroupListsEachComposer;
+    procedure SearchPassesOverFullStopsAndCommas;
     procedure LoadDecodesEscapedCharacters;
     procedure SaveAndReloadKeepsEverything;
     procedure EditedTagsWithSpecialCharactersSurvive;
@@ -88,6 +91,7 @@ type
     procedure TearDown; override;
   published
     procedure AnEditSurvivesWithoutASave;
+    procedure TheWorkSurvivesInTheJournalAndTheSnapshot;
     procedure AJournalOfAnOlderSnapshotIsIgnored;
     procedure ATornJournalRecordIsIgnored;
     procedure ADamagedSnapshotIsKeptAsABackup;
@@ -99,7 +103,7 @@ type
 implementation
 
 uses
-  TestHelpers, uDbStore, uUserStatsManager, uLibraryDatabase;
+  TestHelpers, uDbStore, uUserStatsManager, uLibraryDatabase, uAppStrings;
 
 const
   TRACK1_PATH = 'D:\Music\Miles Davis\Kind of Blue\01 - So What.flac';
@@ -338,6 +342,227 @@ begin
   finally
     SL.Free;
     Lib.Free;
+  end;
+end;
+
+// A folder as the album tiles show it: its own tracks and those of the
+// virtual folders in it, each once, also when two links point at each other
+procedure TTestLibraryDatabase.FolderWithVirtualFoldersGivesTheirTracksToo;
+const
+  FAV_LINK  = 'D:\Music\Jazz\Favourites.aullink';
+  BACK_LINK = 'E:\Klassik\Bach\Back.aullink';
+
+  function Line(const APath, AFolder, ATitle: string): string;
+  begin
+    Result := TrackLine([APath, AFolder, ATitle, 'Artist', ATitle + ' album', 'Genre', '1',
+      '1500000000', '03:00', 'Artist', '1', '2000', '2000', '44100', '16', '1700000000', 'False',
+      '1000', '', '', '']);
+  end;
+
+var
+  Lib: TLibraryManager;
+  SL: TStringList;
+  TL: TTrackList;
+  Txt: string;
+
+  function Has(const APath: string): Boolean;
+  var
+    I: Integer;
+  begin
+    Result := False;
+    for I := 0 to TL.Count - 1 do
+      if SameText(TL[I]^.FilePath, APath) then Exit(True);
+  end;
+
+begin
+  Txt := FDbFile + '.links.txt';
+  SL := TStringList.Create;
+  TL := TTrackList.Create;
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    SL.Add('?FOLDER?D:\Music');
+    SL.Add('?FOLDER?E:\Klassik');
+    SL.Add('?LINK?' + FAV_LINK + #9 + 'E:\Klassik\Bach');
+    SL.Add('?LINK?' + FAV_LINK + #9 + 'D:\Music\Jazz\Miles');     // inside its own folder
+    SL.Add('?LINK?' + BACK_LINK + #9 + 'D:\Music\Jazz');          // and back again
+    SL.Add(Line('D:\Music\Jazz\Miles\a.flac', 'D:\Music\Jazz\Miles', 'A'));
+    SL.Add(Line('D:\Music\Rock\b.flac', 'D:\Music\Rock', 'B'));
+    SL.Add(Line('E:\Klassik\Bach\c.flac', 'E:\Klassik\Bach', 'C'));
+    SL.Add(Line('E:\Klassik\Mozart\d.flac', 'E:\Klassik\Mozart', 'D'));
+    SL.SaveToFile(Txt, TEncoding.UTF8);
+    AssertEquals('Imported', 4, ImportTextDatabase(Lib, Txt));
+
+    Lib.GetVirtualLinksUnder('D:\Music', SL);
+    AssertEquals('Links below D:\Music', 1, SL.Count);
+    AssertEquals('The link', FAV_LINK, SL[0]);
+    Lib.GetVirtualLinksUnder('D:\Music\Rock', SL);
+    AssertEquals('None below Rock', 0, SL.Count);
+
+    Lib.GetTracksInFolderWithLinks('D:\Music\Jazz', TL);
+    AssertEquals('Jazz: its own track and the linked one, each once', 2, TL.Count);
+    AssertTrue('Jazz: own', Has('D:\Music\Jazz\Miles\a.flac'));
+    AssertTrue('Jazz: linked', Has('E:\Klassik\Bach\c.flac'));
+
+    Lib.GetTracksInFolderWithLinks('D:\Music', TL);
+    AssertEquals('The library folder: the link lies in a sub folder', 3, TL.Count);
+    AssertTrue('Music: linked', Has('E:\Klassik\Bach\c.flac'));
+    AssertFalse('Music: not what no link leads to', Has('E:\Klassik\Mozart\d.flac'));
+
+    Lib.GetTracksInFolderWithLinks(FAV_LINK, TL);
+    AssertEquals('The virtual folder itself', 2, TL.Count);
+
+    Lib.GetTracksInFolderWithLinks('E:\Klassik\Mozart', TL);
+    AssertEquals('A folder without links: its own tracks', 1, TL.Count);
+
+    Lib.GetTracksInFolderWithLinks('E:\Klassik', TL);
+    AssertEquals('Through the link back: everything but Rock', 3, TL.Count);
+    AssertFalse('Klassik: Rock is not linked', Has('D:\Music\Rock\b.flac'));
+
+    Lib.GetTracksInFolderWithLinks('', TL);
+    AssertEquals('No path', 0, TL.Count);
+  finally
+    Lib.Free;
+    TL.Free;
+    SL.Free;
+    DeleteFile(Txt);
+  end;
+end;
+
+// The Composers group: a track with two composers is listed under both, a
+// track without one under "Unknown Composer", and two recordings of one
+// work stay two albums
+procedure TTestLibraryDatabase.ComposersGroupListsEachComposer;
+
+  function Line(const AFile, AArtist, AAlbum, AComposer: string): string;
+  begin
+    Result := TrackLine(['D:\Music\' + AFile, 'D:\Music\' + ExtractFileDir(AFile), 'Title', AArtist, AAlbum,
+      'Classical', '1', '1500000000', '03:00', AArtist, '1', '2000', '2000', '44100', '16', '1700000000',
+      'False', '1000', '', AComposer, '']);
+  end;
+
+var
+  Lib: TLibraryManager;
+  SL: TStringList;
+  TL: TTrackList;
+  Txt: string;
+begin
+  Txt := FDbFile + '.composers.txt';
+  SL := TStringList.Create;
+  TL := TTrackList.Create;
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    SL.Add('?FOLDER?D:\Music');
+    SL.Add(Line('Recital\1.flac', 'Pianist A', 'Recital', 'Bach; Gounod'));
+    SL.Add(Line('Gould\1.flac', 'Gould', 'Goldberg Variations', 'Bach'));
+    SL.Add(Line('Lang\1.flac', 'Lang', 'Goldberg Variations', 'Bach'));
+    SL.Add(Line('Lang\2.flac', 'Lang', 'Goldberg Variations', 'Bach'));
+    SL.Add(Line('Pop\1.flac', 'Band', 'Songs', ''));
+    SL.SaveToFile(Txt, TEncoding.UTF8);
+    AssertEquals('Imported', 5, ImportTextDatabase(Lib, Txt));
+
+    Lib.GetUniqueComposers(SL);
+    AssertEquals('Composers', 3, SL.Count);
+    AssertTrue('Bach', SL.IndexOf('Bach') >= 0);
+    AssertTrue('Gounod', SL.IndexOf('Gounod') >= 0);
+    AssertTrue('Unknown', SL.IndexOf(LBL_UNKNOWN_COMPOSER) >= 0);
+
+    Lib.GetTracksByComposer('Bach', TL);
+    AssertEquals('Bach: all four', 4, TL.Count);
+    Lib.GetComposersOfTracks(TL, SL);
+    AssertEquals('The composers of those tracks', 2, SL.Count);
+    AssertTrue('Gounod among them', SL.IndexOf('Gounod') >= 0);
+    Lib.GetTracksByComposer('gounod', TL);
+    AssertEquals('Gounod, any case: the shared track', 1, TL.Count);
+    Lib.GetTracksByComposer(LBL_UNKNOWN_COMPOSER, TL);
+    AssertEquals('Without a composer', 1, TL.Count);
+    AssertEquals('It is the pop track', 'Songs', TL[0]^.Album);
+    Lib.GetTracksByComposer('Nobody', TL);
+    AssertEquals('An unknown name', 0, TL.Count);
+
+    Lib.GetAlbumsByComposer('Bach', SL);
+    AssertEquals('Bach: two recordings and the recital', 3, SL.Count);
+    AssertTrue('Gould', SL.IndexOf('Gould - Goldberg Variations') >= 0);
+    AssertTrue('Lang', SL.IndexOf('Lang - Goldberg Variations') >= 0);
+    AssertTrue('Recital', SL.IndexOf('Pianist A - Recital') >= 0);
+    Lib.GetAlbumsByComposer('Gounod', SL);
+    AssertEquals('Gounod: the recital only', 1, SL.Count);
+
+    Lib.GetTracksByComposerAndAlbum('Bach', 'Lang - Goldberg Variations', TL);
+    AssertEquals('One recording', 2, TL.Count);
+    Lib.GetTracksByComposerAndAlbum('Gounod', 'Lang - Goldberg Variations', TL);
+    AssertEquals('Not this composer', 0, TL.Count);
+    Lib.GetTracksByComposerAndAlbum(LBL_UNKNOWN_COMPOSER, 'Band - Songs', TL);
+    AssertEquals('The album without a composer', 1, TL.Count);
+  finally
+    Lib.Free;
+    TL.Free;
+    SL.Free;
+    DeleteFile(Txt);
+  end;
+end;
+
+// The search takes "op 27" and "op. 27" as the same, whichever way the tag
+// or the search has it; numbers still match inside longer ones
+procedure TTestLibraryDatabase.SearchPassesOverFullStopsAndCommas;
+
+  function Line(const AFile, ATitle, AArtist: string): string;
+  begin
+    Result := TrackLine(['D:\Music\' + AFile, 'D:\Music', ATitle, AArtist, 'Album', 'Genre', '1',
+      '1500000000', '03:00', AArtist, '1', '2000', '2000', '44100', '16', '1700000000', 'False',
+      '1000', '', '', '']);
+  end;
+
+var
+  Lib: TLibraryManager;
+  SL, A, B, C, D: TStringList;
+  TL: TTrackList;
+  Txt: string;
+
+  function Hits(const AQuery: string): Integer;
+  begin
+    Lib.SearchLibrary(AQuery, A, B, C, D, TL);
+    Result := TL.Count;
+  end;
+
+begin
+  Txt := FDbFile + '.search.txt';
+  SL := TStringList.Create;
+  A := TStringList.Create;
+  B := TStringList.Create;
+  C := TStringList.Create;
+  D := TStringList.Create;
+  TL := TTrackList.Create;
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    SL.Add('?FOLDER?D:\Music');
+    SL.Add(Line('1.flac', 'Sonata Op 27 No 2', 'Pianist'));
+    SL.Add(Line('2.flac', 'Sonata Op. 27, No. 2', 'Pianist'));
+    SL.Add(Line('3.flac', 'Quartet Op.27', 'Quartet'));
+    SL.Add(Line('4.flac', 'Suite Op. 127', 'J.S. Bach'));
+    SL.Add(Line('5.flac', 'Rose Rouge', 'St. Germain'));
+    SL.SaveToFile(Txt, TEncoding.UTF8);
+    AssertEquals('Imported', 5, ImportTextDatabase(Lib, Txt));
+
+    AssertEquals('Without stops: every spelling of the tag', 4, Hits('op 27'));
+    AssertEquals('With a stop: the same', 4, Hits('op. 27'));
+    AssertEquals('Stop and comma typed', 2, Hits('op. 27, no. 2'));
+    AssertEquals('Written together in the tag', 1, Hits('quartet op 27'));
+    AssertEquals('Initials without their stops', 1, Hits('js bach'));
+    AssertEquals('Initials with them', 1, Hits('j.s. bach'));
+    AssertEquals('An abbreviation without its stop', 1, Hits('st germain'));
+    AssertEquals('And with it', 1, Hits('st. germain'));
+    AssertEquals('A number inside a longer one, as before', 1, Hits('127'));
+    AssertEquals('Nothing but stops finds nothing', 0, Hits('...'));
+    AssertEquals('A word that is not there', 0, Hits('op 28'));
+  finally
+    Lib.Free;
+    TL.Free;
+    D.Free;
+    C.Free;
+    B.Free;
+    A.Free;
+    SL.Free;
+    DeleteFile(Txt);
   end;
 end;
 
@@ -1092,6 +1317,51 @@ begin
     Lib.Free;
   end;
   AssertEquals('Kept in the new snapshot', 'So What (journal)', TitleAfterReload(TRACK1_PATH));
+end;
+
+// The work of a track: in the journal behind the fields an earlier version
+// reads, in the snapshot behind its tracks
+procedure TTestLibraryStore.TheWorkSurvivesInTheJournalAndTheSnapshot;
+var
+  Lib: TLibraryManager;
+  T: TTrackInfo;
+begin
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    Lib.LoadDatabase;
+    AssertFalse('The sample library knows its works', Lib.NeedsRebuildForWorks);
+    AssertTrue('Found', Lib.TryGetTrack(TRACK2_PATH, T));
+    AssertEquals('None yet', '', T.Work);
+    T.Work := '  Symphonie Nr. 9 «Aus der Neuen Welt»  ';
+    Lib.UpdateRecord(T);
+    Lib.IsDirty := False;
+  finally
+    Lib.Free;
+  end;
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    Lib.LoadDatabase;
+    AssertTrue('Found', Lib.TryGetTrack(TRACK2_PATH, T));
+    AssertEquals('From the journal, trimmed', 'Symphonie Nr. 9 «Aus der Neuen Welt»', T.Work);
+    AssertEquals('The other fields too', 'Antonín Dvořák', T.AlbumArtist);
+    AssertTrue('Track 1 found', Lib.TryGetTrack(TRACK1_PATH, T));
+    AssertEquals('Track 1 has none', '', T.Work);
+    Lib.SaveDatabase;
+  finally
+    Lib.Free;
+  end;
+  Lib := TLibraryManager.Create(FDbFile);
+  try
+    Lib.LoadDatabase;
+    AssertTrue('Found', Lib.TryGetTrack(TRACK2_PATH, T));
+    AssertEquals('From the snapshot', 'Symphonie Nr. 9 «Aus der Neuen Welt»', T.Work);
+    AssertTrue('Track 1 found', Lib.TryGetTrack(TRACK1_PATH, T));
+    AssertEquals('Track 1 still has none', '', T.Work);
+    AssertFalse('No rebuild asked for', Lib.NeedsRebuildForWorks);
+    Lib.IsDirty := False;
+  finally
+    Lib.Free;
+  end;
 end;
 
 // A crash right after a snapshot was written, before its new journal was

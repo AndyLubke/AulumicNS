@@ -45,8 +45,8 @@ uses
 
 type
   TLibNodeType = (lntCategory, lntArtist, lntArtistAlbum, lntAlbum, lntGenre, lntGenreAlbum,
-    lntFolder, lntTrack);
-  TLibCategory = (lcNone, lcFolders, lcArtists, lcAlbums, lcGenres, lcTracks);
+    lntFolder, lntTrack, lntComposer, lntComposerAlbum);
+  TLibCategory = (lcNone, lcFolders, lcArtists, lcAlbums, lcGenres, lcTracks, lcComposers);
 
 const
   LNF_VIRTUAL = 1;     // a virtual folder (.aullink)
@@ -160,6 +160,7 @@ type
 const
   NODE_FOLDERS = 'Folders';
   NODE_ARTISTS = 'Artists';
+  NODE_COMPOSERS = 'Composers';
   NODE_ALBUMS  = 'Albums';
   NODE_GENRES  = 'Genres';
   NODE_TRACKS  = 'Tracks';
@@ -501,6 +502,7 @@ begin
       Exit;                                   // the empty text explains what to do
     AddCategory(NODE_FOLDERS, lcFolders, icFolder);
     if AppSettings.Data.ShowLibArtist then AddCategory(NODE_ARTISTS, lcArtists, icArtist);
+    if AppSettings.Data.ShowLibComposer then AddCategory(NODE_COMPOSERS, lcComposers, icComposer);
     if AppSettings.Data.ShowLibAlbum then AddCategory(NODE_ALBUMS, lcAlbums, icAlbum);
     if AppSettings.Data.ShowLibGenre then AddCategory(NODE_GENRES, lcGenres, icGenre);
   finally
@@ -630,6 +632,12 @@ begin
               for I := 0 to SL.Count - 1 do
                 AddNode(Node, lntArtist, CleanNodeText(SL[I]), SL[I], '', icArtist, True);
             end;
+          lcComposers:
+            begin
+              FLib.GetUniqueComposers(SL);
+              for I := 0 to SL.Count - 1 do
+                AddNode(Node, lntComposer, CleanNodeText(SL[I]), SL[I], '', icComposer, True);
+            end;
           lcAlbums:
             begin
               FLib.GetUniqueAlbums(SL);
@@ -677,6 +685,21 @@ begin
             C := AddNode(Node, lntGenreAlbum, CleanNodeText(SL[I]), SL[I], '', icAlbum, True);
             C.Filter := Node.Text;
           end;
+        end;
+      lntComposer:
+        begin
+          FLib.GetAlbumsByComposer(Node.Text, SL);
+          for I := 0 to SL.Count - 1 do
+          begin
+            C := AddNode(Node, lntComposerAlbum, CleanNodeText(SL[I]), SL[I], '', icAlbum, True);
+            C.Filter := Node.Text;
+          end;
+        end;
+      lntComposerAlbum:
+        begin
+          FLib.GetTracksByComposerAndAlbum(Node.Filter, Node.Text, TL);
+          TL.Sort(@SortTracks_ByAlbum);
+          FillTracks(Node, TL, True);
         end;
       lntAlbum:
         begin
@@ -827,7 +850,7 @@ end;
 procedure TLibraryPane.PerformSearch;
 var
   Q: string;
-  MArt, MAlb, MGen, MFld: TStringList;
+  MArt, MAlb, MGen, MFld, MCmp: TStringList;
   MTrk: TTrackList;
   I: Integer;
   Cat: TAuTreeNode;
@@ -878,6 +901,24 @@ begin
         for I := 0 to MArt.Count - 1 do
           AddNode(Cat, lntArtist, CleanNodeText(MArt[I]), MArt[I], '', icArtist, True);
         Cat.Expanded := True;
+      end;
+      { the composers of the tracks found, when the Composers group is shown }
+      if AppSettings.Data.ShowLibComposer then
+      begin
+        MCmp := TStringList.Create;
+        try
+          FLib.GetComposersOfTracks(MTrk, MCmp);
+          if MCmp.Count > 0 then
+          begin
+            Cat := AddCategory(NODE_COMPOSERS, lcComposers, icComposer);
+            Cat.ChildrenLoaded := True;
+            for I := 0 to MCmp.Count - 1 do
+              AddNode(Cat, lntComposer, CleanNodeText(MCmp[I]), MCmp[I], '', icComposer, True);
+            Cat.Expanded := True;
+          end;
+        finally
+          MCmp.Free;
+        end;
       end;
       if MAlb.Count > 0 then
       begin
@@ -941,16 +982,13 @@ end;
 
 procedure TLibraryPane.CollectTracks(const ANodes: TAuTreeNodeArray; AList: TTrackList);
 var
-  I, J: Integer;
+  I: Integer;
   N: TAuTreeNode;
-  Part, Sub: TTrackList;
-  Links: TStringList;
+  Part: TTrackList;
   T: TTrackInfo;
 begin
   if FLib = nil then Exit;
   Part := TTrackList.Create;
-  Sub := TTrackList.Create;
-  Links := TStringList.Create;
   try
     for I := 0 to High(ANodes) do
     begin
@@ -963,33 +1001,23 @@ begin
         lntArtistAlbum: FLib.GetTracksByArtistAndAlbum(N.Filter, N.Text, Part);
         lntGenre: FLib.GetTracksByGenre(N.Text, Part);
         lntGenreAlbum: FLib.GetTracksByGenreAndAlbum(N.Filter, N.Text, Part);
+        lntComposer: FLib.GetTracksByComposer(N.Text, Part);
+        lntComposerAlbum: FLib.GetTracksByComposerAndAlbum(N.Filter, N.Text, Part);
+        { a folder with the virtual folders in it (or a virtual folder itself),
+          as the tree shows it }
         lntFolder:
-          if IsVirtualLink(N) or IsAulLinkFile(N.Path) then
-          begin
-            Links.Clear;
-            FLib.GetVirtualLinkTargets(N.Path, Links);
-            for J := 0 to Links.Count - 1 do
-            begin
-              KeepWindowAlive;
-              Sub.Clear;
-              FLib.GetTracksInFolderRecursive(ExcludeTrailingPathDelimiter(Links[J]), Sub);
-              Part.AddList(Sub);
-            end;
-          end
-          else
-            FLib.GetTracksInFolderRecursive(ExcludeTrailingPathDelimiter(N.Path), Part);
+          if N.Path <> '' then FLib.GetTracksInFolderWithLinks(N.Path, Part);
         lntTrack:
           if FLib.TryGetTrack(N.Path, T) then Part.Add(T);
       else
         ;   // a category: never the whole library at once
       end;
-      if NodeType(N) in [lntArtist, lntGenre] then Part.Sort(@SortTracks_ByArtist)
-      else if NodeType(N) in [lntAlbum, lntArtistAlbum, lntGenreAlbum] then Part.Sort(@SortTracks_ByAlbum);
+      if NodeType(N) in [lntArtist, lntGenre, lntComposer] then Part.Sort(@SortTracks_ByArtist)
+      else if NodeType(N) in [lntAlbum, lntArtistAlbum, lntGenreAlbum, lntComposerAlbum] then
+        Part.Sort(@SortTracks_ByAlbum);
       AList.AddList(Part);
     end;
   finally
-    Links.Free;
-    Sub.Free;
     Part.Free;
   end;
 end;

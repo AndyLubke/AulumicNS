@@ -22,15 +22,15 @@ With the volume at 100 % and nothing else switched on, the DAC gets the audio ex
 
 ![The main window while an album plays](02-dark-playing)
 
-The parts of the window are explained one by one in **The main interface**.
+The parts of the window are explained one by one in The main interface.
 
-The whole program is one file, `AulumicNS.exe`: no DLLs, no separate PDF viewer. The NS stands for Native Sound, because the audio reaches the DAC as it is in the file. The library, playlists and settings live in a **Data** folder next to it, so it runs from any folder or a USB stick.
+The whole program is one file, `AulumicNS.exe`. The NS stands for Native Sound, because the audio reaches the DAC as it is in the file. The library, playlists and settings live in a Data folder next to it, so it runs from any folder or a USB stick.
 
 # Getting started
 
 ![Preferences: Library, where the music is added](24-prefs-0)
 
-1. **Add music:** Open Preferences (the gear in the title bar, or Ctrl+P). On the Library page, click **Add folder...** and choose the folder that holds the music. The scan starts right away; the page and the status line show its progress.
+1. **Add music:** Open Preferences (the gear in the title bar, or Ctrl+P). On the Library page, click Add folder and choose the folder that holds the music. The scan starts right away; the page and the status line show its progress.
 2. **Choose the output:** Click the device name at the bottom right of the main window and pick the DAC. WASAPI devices and ASIO drivers share one list.
 3. **Play:** Double-click an album or a folder in the library on the left (in the tree, or an album tile), or drag it onto the playlist on the right.
 
@@ -61,15 +61,17 @@ Both skip the Windows mixer, so neither changes the audio.
 
 **Gapless playback:** No pauses or clicks between tracks that run into each other, as on live albums, concept albums or classical works.
 
-**Volume control:** Leave the volume to the DAC for bit-perfect playback, or use the built-in volume control. It calculates in 64-bit floating point and dithers the result, so the program itself adds no rounding errors. Like every digital volume control, it uses fewer of the DAC's bits the further it is turned down.
+**Volume control:** Leave the volume to the DAC for bit-perfect playback, or use the built-in volume control.
 
-**Library management:** Browse by folder, artist, album or genre, in a tree or as album tiles, search the whole library, edit tags (including Composer and Performer) and covers, and combine folders with Virtual Folders. Aulumic keeps an eye on the library folders, so new and changed files show up by themselves.
+**Library management:** Browse by folder, artist, album or genre - and by composer, when that group is switched on -, in a tree or as album tiles, search the whole library, edit tags (including Composer, Performer and Work) and covers, and combine folders with Virtual Folders. Aulumic keeps an eye on the library folders, so new and changed files show up by themselves.
 
-**Built-in tools:** A ReplayGain scanner (EBU R128), a booklet viewer for the PDF booklets of albums, a cover viewer, artist biographies and pictures, and a five-band tone control.
+**Built-in tools:** A ReplayGain scanner (EBU R128), a check of the tags for things that don't agree, a booklet viewer for the PDF booklets of albums, a cover viewer, artist biographies and pictures, and a five-band tone control.
 
-**Resampling:** Optional up- and downsampling of PCM audio with linear, intermediate or minimum phase filters. With **Headroom** on *Automatic*, an album whose peaks would not fit after resampling is lowered just far enough.
+**Classical music:** The movements of a work (a symphony, a concerto) stand under a heading of their own inside the album, and the library can be browsed by composer.
 
-**Windows playback optimization:** The audio thread is registered with the Windows Multimedia Class Scheduler (MMCSS), so dropouts are less likely when the PC is busy.
+**Resampling:** Optional up- and downsampling of PCM audio with linear, intermediate or minimum phase filters. With Headroom on *Automatic*, an album whose peaks would not fit after resampling is lowered just far enough.
+
+**Windows playback optimization:** Windows is asked to give the audio priority, so dropouts are less likely when the PC is busy.
 
 **Look and feel:** Dark and light mode switch at once (or follow Windows), six accent colours, vector icons that stay sharp at every screen scaling, and a text size for all windows.
 
@@ -81,7 +83,7 @@ Both skip the Windows mixer, so neither changes the audio.
 
 From top to bottom; the numbers are those in the picture:
 
-**Title bar:** In the colours of the theme. Drag it to move the window, double-click it to maximize; snapping to the screen edges and the snap layouts of Windows 11 work as usual. The **Main menu** button (three lines) {1} is at the left, next to the program icon; the **Preferences** gear {2} is at the right, before the minimize button. A click on the program icon itself opens the window menu of Windows (Restore, Move, Size ...), as in every Windows program.
+**Title bar:** In the colours of the theme. Drag it to move the window, double-click it to maximize; snapping to the screen edges and the snap layouts of Windows 11 work as usual. The Main menu button (three lines) {1} is at the left, next to the program icon; the Preferences gear {2} is at the right, before the minimize button. A click on the program icon itself opens the window menu of Windows (Restore, Move, Size ...), as in every Windows program. The title shows the playing track; while nothing plays, it shows the version number.
 
 {1} **Main menu:** The button with the three lines at the left of the title bar opens all main functions and tools:
 
@@ -89,24 +91,24 @@ From top to bottom; the numbers are those in the picture:
 - **Playback:** Play, stop, previous and next, the shuffle and repeat modes, the Tone Control and Jump to Now Playing.
 - **Library:** Search, refresh, rescan and the library folders.
 - **Playlist:** New playlist, the Playlist Manager, import and export, expand or collapse all albums, remove dead items and clear the playlist.
-- **View:** The switches that are changed now and then, without opening Preferences: dark or light mode and the accent colour under **Theme**, **Compact rows**, **Peak meter**, **Keep album headers in view**, **Cursor follows playback** and **Library as tiles**. A tick shows what is on.
-- **Tools:** Properties and ReplayGain for the whole library, the log and the Debug Queue.
+- **View:** The switches that are changed now and then, without opening Preferences: dark or light mode and the accent colour under Theme, Compact rows, Peak meter, Keep album headers in view, Cursor follows playback and Library as tiles. A tick shows what is on.
+- **Tools:** Properties, Calculate ReplayGain for the library and Check tag consistency of the library (both for everything in the library; the same two for a selection are in the right-click menus), the log and the Debug Queue.
 - **Below these:** Preferences, Help, About and Quit.
 
 {2} **Preferences:** The gear at the right of the title bar opens Preferences (also with Ctrl+P), where all settings are.
 
 {3} **Now Playing banner:** Shows the cover, title, album, genre, the credited artists, performers and composers, and the audio format of the playing track.
 
-- **Cover & album title:** Click the cover or the album title to open the **Cover Art Viewer**.
-- **Artists, performers & composers:** Everyone is listed once, with what they do behind the name in smaller text (*piano, composer*). Click a name to open **Artist Info**. If the line gets too long, the roles are left out to make room for more names; if there are still more names than fit, click **+n more** at the end of the line for the others.
-- **Bit-perfect / Processed badge:** Click it to see the **Signal Path**.
-- **Booklet & favourite:** If the album folder contains a PDF booklet, a **Booklet** icon appears; click it to read the booklet. Click the **Heart** to mark the playing album as a favourite.
+- **Cover & album title:** Click the cover or the album title to open the Cover Art Viewer.
+- **Artists, performers & composers:** Everyone is listed once, with what they do behind the name in smaller text (*piano, composer*). Click a name to open Artist Info. If the line gets too long, the roles are left out to make room for more names; if there are still more names than fit, click +n more at the end of the line for the others.
+- **Bit-perfect / Processed badge:** Click it to see the Signal Path.
+- **Booklet & favourite:** If the album folder contains a PDF booklet, a Booklet icon appears; click it to read the booklet. Click the Heart to mark the playing album as a favourite.
 - **Output sample rate:** Click the output rate on the right of the banner to choose another resampling target rate.
-- **Sizes:** Drag the lower edge of the banner to make it smaller or larger, and the border between the library and the playlist to change their widths. Both follow the pointer during the drag. (With *Use the graphics card* switched off, only a line moves and the size changes on release.)
+- **Sizes:** Drag the lower edge of the banner to make it smaller or larger, and the border between the library and the playlist to change their widths.
 
-{4} **Search bar:** Filters the library on title, artist, album artist, composer, performer, album, genre and folder. Accents are ignored (searching for *Dvorak* also finds *Dvořák*). The tree shows what was found; with the tiles shown, they show the albums found.
+{4} **Search bar:** Filters the library on title, artist, album artist, composer, performer, album, genre and folder. Accents are ignored (searching for *Dvorak* also finds *Dvořák*), and so are full stops and commas (*op 27* finds *Op. 27*, *js bach* finds *J.S. Bach*). The tree shows what was found; with the tiles shown, they show the albums found.
 
-{5} **Tree or tiles:** The two buttons next to the search bar switch the library pane between the tree (the button with the lines) and album tiles (the button with the squares). Ctrl+G does the same, and so does **Library as tiles** in the View menu of the main menu.
+{5} **Tree or tiles:** The two buttons next to the search bar switch the library pane between the tree (the button with the lines) and album tiles (the button with the squares). Ctrl+G does the same, and so does Library as tiles in the View menu of the main menu.
 
 - **Narrow pane:** There is one button, which switches to and fro.
 - **Sort buttons:** With the tiles shown, their two sort buttons stand between the search bar and these buttons.
@@ -118,34 +120,38 @@ From top to bottom; the numbers are those in the picture:
 
 {7} **Sort:** Two buttons set the order of the albums in this playlist.
 
-- **The button with the name:** Chooses the order: **Playlist order** (the order in which the music was put in), **Artist**, **Album**, **Year** (the oldest first) or **Added to library** (the newest first).
+- **The button with the name:** Chooses the order: Playlist order (the order in which the music was put in), Artist, Album, Year (the oldest first) or Added to library (the newest first).
 - **The arrow button:** Reverses that order; the arrow points down while it is reversed.
-- **A sort is a view:** It changes what is shown and the order of playback. The order in which the music was added is kept, and **Playlist order** brings it back.
+- **A sort is a view:** It changes what is shown and the order of playback. The order in which the music was added is kept, and Playlist order brings it back.
 - **While sorted or reversed:** Albums can't be dragged to another place, and added music finds its own place.
 - **Remembered:** Each playlist keeps its choice. The buttons aren't there in a flat list, which is sorted by its column headings.
 
-{8} **View & edit:** **View** changes how the playlist is grouped and shown; the pencil {9} opens the Playlist Manager. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list.
+{8} **View & edit:** The View button changes how the playlist is grouped and shown; the pencil {9} opens the Playlist Manager. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list. Work headings, at the bottom of that menu, switches the headings of works on or off for all playlists.
 
-{10} **Library pane:** The music collection, grouped by folder, artist, album or genre, as a tree or as album tiles {5}. Right-click (or click the three dots on a row) for more options, such as playing or adding to a playlist (**Replace current playlist** empties the playlist first), **Auto-collapse other nodes**, Virtual Folders, ReplayGain or Properties. If a library folder sits on a drive that isn't connected, it's dimmed and marked **(not available)**; its tracks stay in the library.
+{10} **Library pane:** The music collection, grouped by folder, artist, album or genre, as a tree or as album tiles {5}. Right-click (or click the three dots on a row) for more options, such as playing or adding to a playlist (Replace current playlist empties the playlist first), Auto-collapse other nodes, Virtual Folders, Tools (ReplayGain and the tag consistency check for the selection) or Properties. If a library folder sits on a drive that isn't connected, it's dimmed and marked (not available); its tracks stay in the library.
 
+- **Groups:** The Show entry of the right-click menu switches the groups Artists, Composers, Albums and Genres on or off; a group comes or goes at once. The same four switches are in Preferences > Appearance.
+- **Composers:** This group is off at first. It lists the composers from the composer tag with their albums; a track with several composers stands under each of them. An album is named with its artist there, so recordings of the same work stay apart.
+- **Virtual Folders in a folder:** A folder counts with the Virtual Folders inside it: playing or adding the folder takes their tracks along, and its tiles show their albums.
 - **Position:** The library is as it was when Aulumic was closed: the same nodes open, the same selection and scroll position, and the tiles at the same place.
 - **Refresh:** F5 reads the selected folder again from the library and brings the playlist up to date.
 
-{11} **Playlist pane:** The tracks of the selected playlist, with the album covers in the album headers. Click the stars to rate a track or a whole album; click the cover in an album header to open the Cover Art Viewer. Right-click for more options: what can be done with the selected tracks comes first (Play, Rating, **Favourite** - five stars, Add to, Open folder, ReplayGain, Remove from playlist), then what concerns the whole playlist, then the Playlist Manager and Properties.
+{11} **Playlist pane:** The tracks of the selected playlist, with the album covers in the album headers. Click the stars to rate a track or a whole album; click the cover in an album header to open the Cover Art Viewer. Right-click for more options: what can be done with the selected tracks comes first (Play, Select work, Rating, Favourite - five stars, Add to, Open folder, Tools - ReplayGain and the tag consistency check -, Remove from playlist), then what concerns the whole playlist, then the Playlist Manager and Properties.
 
-- **Album headers:** Under the stars a header shows how many tracks the album has and how long it plays, unless the header format shows these already or the pane is too narrow. While scrolling through a long album, its header stays at the top of the list, and it works there as usual: click the cover, the stars or the triangle. This can be switched off in Preferences > Playlists, or with **Keep album headers in view** in the View menu of the main menu.
-- **Flat list:** The view **Flat list** shows the tracks as a table: number, title, artist, album, rating and time.
-  - **Sorting:** Click a heading to sort by that column, and again to reverse. The column sorted by before decides among equal values: click **Album**, then **Artist**, for artists with their albums together. A click on **#** brings back the playlist order.
+- **Album headers:** Under the stars a header shows how many tracks the album has and how long it plays, unless the header format shows these already or the pane is too narrow. While scrolling through a long album, its header stays at the top of the list, and it works there as usual: click the cover, the stars or the triangle. This can be switched off in Preferences > Playlists, or with Keep album headers in view in the View menu of the main menu.
+- **Flat list:** The view Flat list shows the tracks as a table: number, title, artist, album, rating and time.
+  - **Sorting:** Click a heading to sort by that column, and again to reverse. The column sorted by before decides among equal values: click Album, then Artist, for artists with their albums together. A click on # brings back the playlist order.
   - **Columns:** Right-click the headings to choose them; album artist, year, genre, format, plays, last played and added are there too.
-  - **Widths:** Drag the line between two headings. The column on one side grows by what the other gives up; next to the title it is the title that gives or takes. When the columns don't fit beside the title, they all get a little narrower, and only in a very narrow pane are the least important ones left out.
+  - **Widths:** Drag the line between two headings. In a very narrow pane the least important columns are left out.
   - **Remembered:** Each playlist keeps its own columns, widths and sort. As with the album sort, the order in which the music was added is kept, and tracks can't be dragged while a column sort is on. The track format isn't used in a flat list.
 - **Position:** Each playlist remembers its scroll position and which albums were closed, also after a restart.
-- **Several discs:** An album on more than one disc gets a small **Disc 1**, **Disc 2** heading above the first track of each disc.
+- **Several discs:** An album on more than one disc gets a small Disc 1, Disc 2 heading above the first track of each disc.
+- **Works:** The movements of a classical work stand under a heading of their own. This is described further down, under its picture.
 - **Guest artists:** In an album whose tracks aren't all by the same artist (a compilation, or a track with a guest), the artist is shown behind the title of each track that isn't by the album artist alone. If the track format shows the artist itself, this is left out.
 
-Drag tracks or folders here from the library or from Windows Explorer; they are inserted where they are dropped, and an album is never split. Drag tracks inside the playlist to change the order. Hold **Ctrl** while dropping from Explorer to replace the playlist and start playing.
+Drag tracks or folders here from the library or from Windows Explorer; they are inserted where they are dropped, and an album is never split. Drag tracks inside the playlist to change the order. Hold Ctrl while dropping from Explorer to replace the playlist and start playing.
 
-**Remove dead items** (right-click menu) takes out the tracks whose files are gone. Tracks on a drive that isn't connected, or on a NAS that doesn't answer, are kept. Before anything is removed, Aulumic reports how many tracks it found and how many it keeps, and asks. While a drive wakes up, a small window with **Cancel** is shown.
+Remove dead items (right-click menu) takes out the tracks whose files are gone. Tracks on a drive that isn't connected, or on a NAS that doesn't answer, are kept. Before anything is removed, Aulumic reports how many tracks it found and how many it keeps, and asks. While a drive wakes up, a small window with Cancel is shown.
 
 {12} **Transport controls:** Shuffle, Stop, Previous, Play/Pause, Next, Jump to Now Playing and Repeat, with the position bar above them.
 
@@ -155,20 +161,29 @@ Drag tracks or folders here from the library or from Windows Explorer; they are 
 
 ![Searching the library](09-library-search)
 
-While typing in the search bar, the library shows only what matches, with the albums and tracks found. With the tiles shown, the albums found appear as tiles.
+While typing in the search bar, the library shows only what matches, with the albums and tracks found. With the Composers group switched on, the composers of what was found are listed too. With the tiles shown, the albums found appear as tiles.
 
 ![The library as album tiles](11-library-tiles)
 
 **Album tiles:** A second way to look at the library: the albums as covers, with the album and the artist under each. The tree stays the way to choose what is shown.
 
-- **What is shown:** The albums under the node that is selected in the tree: a genre, an artist, a folder. A line above the tiles shows the path to it (*Folders > Music > Jazz*). Click a part of the path to go up to it; the first part and the cross behind the path show all albums. With the top node of a group selected, all albums are shown, and the line isn't there.
-- **Order:** Next to the search bar are two buttons, as above the playlist (in a narrow pane they are in the line above the tiles). The button with the name chooses the order: **Artist**, **Album**, **Year** (the oldest first) or **Added to library** (the newest first). The arrow button next to it reverses that order; the arrow points down while it is reversed.
+- **What is shown:** The albums under the node that is selected in the tree: a genre, an artist, a composer, a folder (with the albums of the Virtual Folders inside it). A line above the tiles shows the path to it (*Folders > Music > Jazz*). Click a part of the path to go up to it; the first part and the cross behind the path show all albums. With the top node of a group selected, all albums are shown, and the line isn't there.
+- **Order:** Next to the search bar are two buttons, as above the playlist (in a narrow pane they are in the line above the tiles). The button with the name chooses the order: Artist, Composer, Album, Year (the oldest first) or Added to library (the newest first). The arrow button next to it reverses that order; the arrow points down while it is reversed. By composer, the composer stands under each album; an album with several composers is listed as *Various composers*.
 - **Size:** Hold Ctrl and scroll the mouse wheel over the tiles, or choose it in Preferences > Appearance. The smallest size is a list: a small cover with the album and the artist beside it. A text that doesn't fit is cut short; resting the pointer on the tile shows all of it.
-- **Using a tile:** A tile stands for all tracks of its album. Double-click plays it (or shows it in the tree, as set for the double click in Preferences), drag it onto the playlist to add it, right-click for the menu: Play, Add to and Replace current playlist, **Show in tree**, Open folder, ReplayGain and Properties. Several tiles can be selected with Ctrl and Shift.
-- **Search:** The search bar fills the tiles with the albums found. An album that is there because of some of its tracks says how many were found; **Show in tree** then shows the tracks themselves.
-- **Typing a letter:** Jumps to the next tile that starts with it - the artist when the tiles are sorted by artist, else the album.
+- **Using a tile:** A tile stands for all tracks of its album. Double-click plays it (or shows it in the tree, as set for the double click in Preferences), drag it onto the playlist to add it, right-click for the menu: Play, Add to and Replace current playlist, Show in tree, Open folder, Tools (ReplayGain and the tag consistency check) and Properties. Several tiles can be selected with Ctrl and Shift.
+- **Search:** The search bar fills the tiles with the albums found. An album that is there because of some of its tracks says how many were found; the menu entry Show in tree then shows the tracks themselves.
+- **Typing a letter:** Jumps to the next tile that starts with it - the artist when the tiles are sorted by artist, the composer when sorted by composer, else the album.
 - **Width:** When the border between the library and the playlist is dragged while the tiles are shown, the tiles keep that width for themselves, and the tree keeps its own.
-- **Covers:** The tiles use the small covers made by the library scan, so no music drive is woken. An album without a cover gets a coloured tile.
+- **Covers:** The tiles use the small covers made by the library scan. An album without a cover gets a coloured tile.
+
+![The works of a classical album in the playlist](12-playlist-works)
+
+**Works:** In classical music an album holds a few large pieces, each cut into several tracks: the movements of a concerto or a symphony. In the playlist such tracks get a heading with the name of the work above the first of them, and show only their own part under it: *I. Allegro* under *Symphony No. 5*.
+
+- **Where the work comes from:** From the Work field of the tags (see Properties). Without it, from the titles, when two or more tracks in a row begin with the same text and a colon.
+- **Single pieces:** A piece of one track gets no heading; its title says it all.
+- **Select work:** In the right-click menu of a track, it selects all tracks of its work, to play, rate or add them together.
+- **Switching it off:** View > Work headings above the playlist. The flat list never has these headings.
 
 ![The light theme with a smaller banner](04-light-small-banner)
 
@@ -257,9 +272,9 @@ All shortcuts are also listed in Preferences > Shortcuts.
 
 # Preferences
 
-Open Preferences from the main menu, with the gear in the title bar, or with Ctrl+P. The settings are on nine pages, listed on the left: Library, Appearance, Playlists, Output, DSD, Resampler, Volume, System and Shortcuts. Every setting has a short description under its name. **OK** keeps the changes, **Cancel** drops them.
+Open Preferences from the main menu, with the gear in the title bar, or with Ctrl+P. The settings are on nine pages, listed on the left: Library, Appearance, Playlists, Output, DSD, Resampler, Volume, System and Shortcuts. Every setting has a short description under its name. OK keeps the changes, Cancel drops them.
 
-**Cards:** Settings that are set once and then left alone sit in cards at the bottom of a page. A card is one row with a title and a line that sums up what's inside; click it (or press the space bar on it) to open it right there, and again to close it. With all cards closed a page fits the window; open a few and it scrolls. Cards left open are open again next time.
+**Cards:** Settings that are set once and then left alone sit in cards at the bottom of a page. Click a card to open it, and again to close it; cards left open are open again next time.
 
 **Related settings:** Some pages end with buttons that lead to a neighbouring subject, for example from Output to the audio thread settings on the System page.
 
@@ -267,10 +282,10 @@ Open Preferences from the main menu, with the gear in the title bar, or with Ctr
 
 ![Preferences: Library](24-prefs-0)
 
-- **Library folders:** The folders that make up the music library. **Add folder...** adds one; **Remove** takes it out of the library (the files stay on disk).
+- **Library folders:** The folders that make up the music library. The Add folder button adds one; Remove takes one out of the library (the files stay on disk).
 - **Scan now:** Checks the library folders for new, changed or removed files. A cover that was changed in another program also updates the album thumbnail. Folders on a drive that is disconnected or asleep keep their tracks. The progress is shown on the page.
 - **Repair:** Rebuilds the library from scratch, including all album thumbnails. Try it when tracks are missing or the library looks wrong.
-- **Watch the library folders:** New and changed files show up in the library by themselves a few seconds later. Network folders aren't watched (some NAS would never get to sleep); press Refresh (F5) or Rescan (Ctrl+F5) for those.
+- **Watch the library folders:** New and changed files show up in the library by themselves a few seconds later. Network folders aren't watched; press Refresh (F5) or Rescan (Ctrl+F5) for those.
 - **Auto-scan on startup:** Checks the library for changes at every start.
 
 ## 2. Appearance page
@@ -282,7 +297,7 @@ Every page of Preferences is built the same way; the numbers are those in the pi
 - {1} **Pages:** The pages are listed at the left; click one to show it.
 - {2} **Settings:** Every setting has a short description under its name.
 - {3} **Cards:** Settings that are set once are in cards: click a card to open it, and again to close it.
-- {4} **OK:** Keeps the changes; **Cancel** (or Esc) drops them.
+- {4} **OK:** Keeps the changes; Cancel (or Esc) drops them.
 
 The settings of this page:
 
@@ -297,8 +312,8 @@ The settings of this page:
 
 - **Double click:** What double-clicking a library node does: play it at once, or only open or close it. For an album tile the second choice shows the album in the tree.
 - **Auto-collapse other nodes (accordion):** Closes the other open folders when one is opened.
-- **Show Artists, Albums, Genres:** Shows or hides these groups in the library pane.
-- **Show peak meter:** Shows the peak meter in the banner. It covers 60 dB: green in the lower half, amber higher up, red in the top part (above about -9 dB). The top block turns red for a moment when a sample was clipped.
+- **Show Artists, Composers, Albums, Genres:** Shows or hides these groups in the library pane. Composers is off at first.
+- **Show peak meter:** Shows the peak meter in the banner. Its top block turns red for a moment when a sample was clipped.
 
 ### Card: Text and tile size of the panes
 
@@ -328,7 +343,7 @@ The settings of this page:
 
 - **Play DSD natively:** Sends DSD to the DAC as DSD: over WASAPI packed as DoP, over ASIO as native DSD when the driver supports it (otherwise as DoP). When it is off, DSD is converted to PCM.
 - **DSD low-pass:** Applies a low-pass filter when DSD is converted to PCM.
-- **DSD gain:** The level of DSD converted to PCM. `+0.0 dB` keeps the original level; `+6.0 dB` brings DSD closer to the level of FLAC and WAV files. The gain is applied at the end, together with the volume. SACDs may peak up to about 3 dB above their reference level, so with `+6.0 dB` loud passages can exceed full scale; **Headroom** on *Automatic* (Volume page) then lowers the album just as far as needed.
+- **DSD gain:** The level of DSD converted to PCM. `+0.0 dB` keeps the original level; `+6.0 dB` brings DSD closer to the level of FLAC and WAV files. Loud passages can then exceed full scale; Headroom on *Automatic* (Volume page) lowers the album just as far as needed.
 - **DSD buffer size:** How much DSD audio is buffered ahead when DSD goes to the DAC as DSD (DoP, or native over ASIO). A dropout there is a pop, so it needs more than PCM.
 
 ## 6. Resampler page
@@ -359,33 +374,29 @@ These settings are used while PCM resampling is on. When it is off, the rows are
 - **ReplayGain mode:** Evens out the loudness between tracks. *Track* plays every song at the same loudness; *Album* plays whole albums at the same loudness and keeps the differences between their tracks.
 - **Headroom:** Room for peaks that would not fit into the output. One setting with two ways:
   - **Automatic:** The default. Lowers the level only where it is needed.
-  - **A fixed amount:** From `0.0 dB` to `-6.0 dB`. Lowers everything by that much; nothing is measured. Choose it to have every album lowered by the same amount. With ReplayGain on, it is added to the ReplayGain gain, and the loudest sample of the track (or album) never comes above this level. It is not applied when the volume is locked to 100 %.
+  - **A fixed amount:** From `0.0 dB` to `-6.0 dB`. Lowers everything by that much. It is not applied when the volume is locked to 100 %.
 - **Enable soft clipping limiter:** Gently rounds off peaks that would otherwise clip. It is not needed with Headroom on Automatic; it is of use with a fixed headroom.
 
 ### Card: ReplayGain scan
 
 ![The ReplayGain scan card, open](24-prefs-6-rgscan)
 
-- **Tracks at the same time:** How many tracks of an album the ReplayGain scanner measures at once. With 1 track the processor stays coolest; with 4 tracks an album is scanned about three and a half times as fast, but the processor gets warmer and its fan louder. The measured values are exactly the same.
+- **Tracks at the same time:** How many tracks of an album the ReplayGain scanner measures at once. More is faster, but the processor gets warmer. The measured values are the same.
 
 ### How automatic headroom works
 
-- **Why:** A loudly mastered recording can come out up to about 2.5 dB above full scale after upsampling, because the waveform between its samples peaks higher than the samples themselves. DSD converted to PCM with a DSD gain can do the same. Without headroom those peaks are clipped.
-- **What happens:** The peaks are measured during playback, and the level of the album is lowered just as far as its highest peak needs. Nothing is clipped or limited; the album simply plays a little quieter.
-- **Per album:** All tracks of an album get the same level (the tracks in one folder with the same album and album artist). A track without an album tag stands for itself.
-- **First play:** The level can come down a little a few times during the loudest tracks, each time gliding within 10 ms. The album's peak is remembered, so the next time it starts at the right level.
-- **Tone control:** A boost is counted in and lowered before it can clip, also without resampling; a cut costs no level. This part is found anew each time, not remembered.
-- **Never touched:** Quiet albums, anything played with the volume turned down far enough, and bit-perfect playback (no resampling, no gain, tone control off).
-- **Where it is kept:** In `Data\Library\headroom.adb`. Nothing is written to the music files. Delete that file to forget all remembered peaks.
-- **Where it is shown:** The signal path shows what is taken off, for example `Headroom -0.8 dB`. Automatic also works with the volume locked to 100 %.
+- **What it does:** Some albums come out above full scale after upsampling or after DSD is converted to PCM, and would clip. The peaks are measured during playback, and the album is lowered just as far as its highest peak needs. Nothing is clipped or limited.
+- **Per album:** All tracks of an album get the same level. The peak is remembered, so the next time the album starts at the right level.
+- **Never touched:** Quiet albums and bit-perfect playback.
+- **Where it is shown:** The signal path shows what is taken off, for example `Headroom -0.8 dB`.
 
 ## 8. System page
 
 ![Preferences: System](24-prefs-7)
 
-- **Keep music drives awake during playback:** Stops the drives with the playing music from falling asleep, so the next track starts without a delay. Only a tiny piece of the current and next track is read now and then; nothing is written.
-- **Animations:** Short fades and gliding movements: a highlight that fades in under the pointer, lists that glide when the mouse wheel is turned, menus and dialogs that fade in. They are only shown while *Animation effects* is switched on in the Windows settings (Accessibility > Visual effects). Turn the switch off to have everything change at once.
-- **Use the graphics card:** The graphics card draws the lists and other large areas, which keeps scrolling smooth, also on a 4K screen. Turn it off if parts of a window stay black or flicker with the graphics driver. The processor then draws everything, which works everywhere but is slower with large windows.
+- **Keep music drives awake during playback:** Stops the drives with the playing music from falling asleep, so the next track starts without a delay.
+- **Animations:** Short fades and gliding movements. They are only shown while *Animation effects* is switched on in the Windows settings. Turn the switch off to have everything change at once.
+- **Use the graphics card:** The graphics card draws the lists and other large areas, which keeps scrolling smooth. Turn it off if parts of a window stay black or flicker.
 
 ### Card: Audio thread
 
@@ -454,8 +465,8 @@ An auto-playlist has the general settings of every playlist ({1}, {2}, {3} and {
 
 - {5} **Smart rule template:** A ready-made set of rules, or *Custom* for own rules.
 - {6} **The rules:** The rules of this playlist. Click one to load it into the boxes below it.
-- {7} **Query builder:** Pick the tag, the operator and the value, then click **Add**.
-- {8} **Remove:** Takes the selected rule out of the list. **Rules** opens this help topic.
+- {7} **Query builder:** Pick the tag, the operator and the value, then click Add.
+- {8} **Remove:** Takes the selected rule out of the list. The Rules button opens this help topic.
 
 ### Combining rules (AND / OR)
 
@@ -503,19 +514,20 @@ The window can be resized or maximized: the file list, the fields, the Comment b
 
 ## File list
 
-{1} The selected tracks. Click a track to edit it, or select several (Shift, Ctrl or Ctrl+A) to edit them together. A dot marks a track with unsaved changes; a track whose tag cannot be read is marked with **!** and is never changed.
+{1} The selected tracks. Click a track to edit it, or select several (Shift, Ctrl or Ctrl+A) to edit them together. A dot marks a track with unsaved changes; a track whose tag cannot be read is marked with an exclamation mark and is never changed.
 
 ## 1. Tags tab
 
 The tabs {2} switch between the tags and the Inspector.
 
-- {3} **Fields:** Title, Artist, Album artist, Album, Genre, Year, Track, Disc, Composer, Performer and Comment (several lines).
+- {3} **Fields:** Title, Artist, Album artist, Album, Genre, Composer, Year, Track, Disc, Work, Performer and Comment (several lines).
+- **Work:** The large piece a track is a part of, such as the symphony whose movement it is. Give all its tracks the same text here (select them together); the playlist then shows them under a heading with that name.
 - **Several names:** For Artist, Album artist, Genre, Composer and Performer, separate several entries with a semicolon (;). For a performer, the instrument or role can be put in brackets behind the name, such as *Ida Feld (double bass)*; the banner shows it next to the name.
 - **Several tracks:** Fields that differ between the selected tracks show *Multiple values*; Title and Track stay unique per track. A value typed in a shared field is applied to all selected tracks. Only the changed fields are written.
-- {4} **Cover:** **Load...** chooses an image file, **Search the web** looks for the cover online, **Remove** takes the cover out of the selected files. An image file can also be dropped on the window or pasted with Ctrl+V.
-- {5} **Save:** Writes the changes. They're written in the background, so listening can go on. **Cancel** (or Esc) drops them. DFF files can be tagged too.
-- **Damaged tag:** A WAV, DSF or DFF file whose tag is damaged isn't saved, because whatever lies behind the damage would be lost. The line at the bottom says so and a **Repair tag...** button appears next to Cancel. It shows how many fields can be read, how many of them were found behind the damage and how many unreadable bytes go, and asks before anything happens. After Yes the fields show the recovered values and can be edited; **Save** writes the repaired tag. The audio isn't touched, and a copy of the old tag is kept in the folder `TagBackups` of the data folder.
-- **Undo repair:** For a single file whose tag was repaired, an **Undo repair...** button stands in the same place. After the question, **Save** puts the old tag back exactly as it was, with its damage; tag changes made since the repair are lost. The copy stays in `TagBackups`, so the tag can be repaired again later.
+- {4} **Cover:** The Load button chooses an image file, Search the web looks for the cover online, and Remove takes the cover out of the selected files. An image file can also be dropped on the window or pasted with Ctrl+V.
+- {5} **Save:** Writes the changes. They're written in the background, so listening can go on. Cancel (or Esc) drops them. DFF files can be tagged too.
+- **Damaged tag:** A WAV, DSF or DFF file whose tag is damaged isn't saved, because whatever lies behind the damage would be lost. A Repair tag button next to Cancel shows what can be recovered and asks first; Save then writes the repaired tag. A copy of the old tag is kept in the folder `TagBackups` of the data folder.
+- **Undo repair:** For a single file whose tag was repaired, an Undo repair button stands in the same place. Save then puts the old tag back exactly as it was; tag changes made since the repair are lost.
 
 ## 2. Inspector tab
 
@@ -523,29 +535,47 @@ The tabs {2} switch between the tags and the Inspector.
 
 The Inspector shows the technical details of the files; nothing can be changed here. It lists the audio format, the file (size, location, date added), the play statistics and every tag exactly as it is stored in the file. With several tracks selected it shows their number and total size.
 
+# Tag consistency
+
+Tag consistency lists what may need a look in the tags of a part of the library.
+
+![Tag consistency](49-tag-consistency)
+
+Open it for a selection with Tools > Check tag consistency in the right-click menu of the library, the tiles or the playlist, or for everything with Main menu > Tools > Check tag consistency of the library.
+
+- **The basics:** Tracks without an album, an artist, a title (only the file name) or a track number.
+- **An album that disagrees with itself:** Several album names in one folder; several album artists or years in one album; a track number twice; a gap in the track numbers.
+- **Composer:** An album where no track has a composer, or only some of them.
+- **Names:** Composers with the same surname that are written in more than one way, side by side with the number of tracks of each: *Johann Sebastian Bach (311) | J. S. Bach (48)*. For artists and genres: names that are the same once capitals, accents, spaces and punctuation are left out, such as *Dvorak* and *Dvořák*.
+- **Not every line is a mistake:** A gap can be an album of which only some tracks are there, and two composers can share a surname.
+- **Filter:** The box at the top right shows the findings of one kind, with the number of each.
+- **Order:** Click a column heading to sort by it, and again to reverse. Sorted by Finding, all lines of one album stand together.
+- **Open in Properties:** Double-click a line (or press Enter) to open its files in Properties, where they are changed and saved as usual. Several lines can be selected with Ctrl or Shift and opened together.
+- **Check again:** Reads the same part of the library anew.
+
 # Tone Control
 
 The Tone Control shapes the sound in five bands. Open it with Ctrl+T or the sliders icon next to the speaker icon.
 
 ![The Tone Control](46-tone-control){1=33,11.6 2=71,11.6 3=88,21.5 4=22,38.8 5=4.2,43.5 6=78.5,54.6 7=6,72}
 
-It is a five-band semi-parametric tone control (bass, low mid, mid, high mid and treble): each band has its own frequency and gain. Bass and treble are shelves: they raise or lower everything below or above their frequency. The three middle bands work around their frequency, and how far around it can be set.
+Each of the five bands (bass, low mid, mid, high mid and treble) has its own frequency and gain. Bass and treble raise or lower everything below or above their frequency; the three middle bands work around theirs.
 
-- {1} **Presets:** Shows the preset in use: its name, "Flat" when all bands are at 0 dB, or "Custom" for a setting that isn't saved. Click it to choose a preset, or **Flat** to set all bands to 0 dB. **Save as preset...** keeps the gains, frequencies and widths of the bands under a name; **Rename...** and **Delete...** work on the preset in use. A setting with all bands at 0 dB is Flat and can't be saved as a preset. A preset doesn't switch the tone control on or off, and choosing one glides in like any other change.
+- {1} **Presets:** Shows the preset in use: its name, "Flat" when all bands are at 0 dB, or "Custom" for a setting that isn't saved. Click it to choose a preset or Flat, or to save, rename or delete a preset. A preset doesn't switch the tone control on or off.
 - {2} **Enable:** Turns the tone control on or off. When it's off, it's out of the signal path completely and playback stays bit-perfect.
-- {3} **The curve:** The graph above the bands shows what the five bands do together, from 20 Hz to 20 kHz. It's worked out from the filters that are really used, so the curve shows what is heard. A dot marks each band that is set. When the tone control is off, the curve is grey: it shows the settings, but they aren't applied.
+- {3} **The curve:** Shows what the five bands do together, from 20 Hz to 20 kHz, with a dot for each band that is set. When the tone control is off, the curve is grey.
 - {4} **Level line:** A boost raises the peaks of the music. With Headroom set to Automatic (Preferences > Volume), the level is lowered just enough to keep them from clipping, and this line says by how much: "Level lowered by 1.4 dB to avoid clipping".
 - {5} **Frequency:** The centre frequency of each band.
-- {6} **Width:** How wide a middle band works around its frequency; click the word under the frequency to change it. **Narrow** is about one octave, to correct one spot; **Normal** is about two octaves; **Wide** is about three, a gentle change of a whole region. At the band's own frequency the gain is the same for all three. Bass and treble are shelves and have no width.
+- {6} **Width:** How wide a middle band works around its frequency; click the word under the frequency to change it: Narrow (about one octave), Normal (about two) or Wide (about three). Bass and treble have no width.
 - {7} **Gain:** Up to ±10.0 dB per band; 0 dB leaves a band out. Scroll the mouse wheel over a slider, or use the arrow keys when it has the focus.
 
-A change glides in over a fraction of a second, also when the tone control is switched on or off, so there is never a click while the music plays.
+A change glides in, so there is never a click while the music plays.
 
-When DSD goes out as DSD, the tone control and the volume control don't apply: a DSD stream is passed on as it is. The Tone Control window then says "disabled for DSD" in its title and its controls are greyed out; the settings are kept and work again with the next PCM track.
+When DSD goes out as DSD, the tone control and the volume control don't apply. The Tone Control window then says "disabled for DSD" in its title and its controls are greyed out.
 
 # ReplayGain scanner
 
-The ReplayGain scanner measures the loudness of music files with the built-in EBU R128 meter, so tracks and albums play at a similar level. Open it from the main menu (Tools > Calculate ReplayGain, for the whole library), or right-click items in the library or the playlist.
+The ReplayGain scanner measures the loudness of music files with the built-in EBU R128 meter, so tracks and albums play at a similar level. Open it from the main menu (Tools > Calculate ReplayGain for the library), or right-click items in the library or the playlist and choose Tools > Calculate ReplayGain.
 
 ## The scanning process
 
@@ -567,7 +597,7 @@ What counts as an album:
 
 ![The results of a scan](38-replaygain-results)
 
-Each file is listed with its track gain and peak, its album gain and peak (empty for a track without an album tag), or the reason it could not be measured (for example a disconnected drive, a moved file or a damaged file). Nothing is written to the files until **Save all** is clicked; the tags are then written in the background. **Cancel** drops the results.
+Each file is listed with its track gain and peak, its album gain and peak (empty for a track without an album tag), or the reason it could not be measured (for example a disconnected drive, a moved file or a damaged file). Nothing is written to the files until Save all is clicked; the tags are then written in the background. Cancel drops the results.
 
 # Virtual Folders
 
@@ -581,10 +611,10 @@ A Virtual Folder is a small link file (`.aullink`) inside a library folder that 
 
 ## Creating and managing Virtual Folders
 
-Right-click a folder in the library and choose **Create Virtual Folder...**, or right-click a Virtual Folder and choose **Edit Virtual Folder...** or **Remove Virtual Folder...**.
+Right-click a folder in the library and choose Create Virtual Folder, or right-click a Virtual Folder and choose Edit Virtual Folder or Remove Virtual Folder.
 
 - **Name:** The name in the library tree.
-- **Auto-find term:** The name or word to search for; press Enter to run **Auto-find** at once. Several searches in a row combine several artists or composers. If left empty, Auto-find uses the name.
+- **Auto-find term:** The name or word to search for; press Enter to run Auto-find at once. Several searches in a row combine several artists or composers. If left empty, Auto-find uses the name.
 - **Search in:** Artist / performer, Composer, Album / title, Comment / genre and Folder name.
 - **Auto-find:** Searches the library for folders whose tracks match every word; accents are ignored. Tracks in disc sub folders (such as `CD1`) are added as their album folder. New folders are added to the list and selected, so they are easy to check.
 - **Add folder...:** Choose a folder by hand, or drag folders from Windows Explorer into the list.
@@ -592,8 +622,10 @@ Right-click a folder in the library and choose **Create Virtual Folder...**, or 
 
 ## Common use cases
 
-- **Composer and performer:** For an orchestra folder, run **Auto-find** with the orchestra's name: every album where the orchestra is credited (as Artist, Album artist or Performer) is linked into it.
-- **Own collections:** For a collection such as "Late Night Favourites", create a Virtual Folder and link the albums with **Auto-find** or by dragging folders. The albums stay where they are and also appear in the collection.
+- **Composer and performer:** For an orchestra folder, run Auto-find with the orchestra's name: every album where the orchestra is credited (as Artist, Album artist or Performer) is linked into it.
+- **Own collections:** For a collection such as "Late Night Favourites", create a Virtual Folder and link the albums with Auto-find or by dragging folders. The albums stay where they are and also appear in the collection.
+
+A folder counts with the Virtual Folders inside it: playing or adding that folder takes the linked albums along, and its album tiles show them.
 
 # Cover Art Viewer
 
@@ -612,7 +644,7 @@ Artist Info shows a biography and a picture of an artist. To open it, click an a
 Next to the biography and the picture, it says how many albums and tracks of the artist are in the library. The information comes from Last.fm, Wikipedia and TheAudioDB (the artist's name is sent to these services) and is kept in the Data folder, so it's there right away next time. The biographies need a free Last.fm API key: enter it in Preferences > System > Artist information.
 
 - **Edit (F2):** Edit the biography; it is saved automatically.
-- **Picture (Ctrl+O):** Choose a picture, drop an image file on the window, or paste one with Ctrl+V. **Remove (Del)** deletes it.
+- **Picture (Ctrl+O):** Choose a picture, drop an image file on the window, or paste one with Ctrl+V. Remove (Del) deletes it.
 - **Search the web:** Opens a web search for the artist (and starts editing, so text can be pasted).
 - **Refresh (F5):** Reloads the information from the online sources. A chosen picture and an edited biography are kept; to get the online version back, remove the picture or empty the biography, then press F5.
 
@@ -620,7 +652,7 @@ Next to the biography and the picture, it says how many albums and tracks of the
 
 # Booklet Viewer
 
-When the playing album has a PDF booklet (in its folder, in a sub folder such as *Scans* or *Artwork*, or in the album folder above a *CD1* / *Disc 2* folder), the **Booklet** icon appears in the banner. Click it to read the booklet in the built-in viewer, which uses the PDF engine of Windows.
+When the playing album has a PDF booklet (in its folder, in a sub folder such as *Scans* or *Artwork*, or in the album folder above a *CD1* / *Disc 2* folder), the Booklet icon appears in the banner. Click it to read the booklet in the built-in viewer.
 
 ![The Booklet Viewer showing two pages side by side](45-booklet)
 
@@ -652,9 +684,9 @@ When the playing album has a PDF booklet (in its folder, in a sub folder such as
 
 ## III. Volume & dynamics
 
-- **64-bit floating-point volume:** Volume and all other PCM processing are calculated in 64-bit floating point, so the calculation itself adds no audible error. When the result has fewer bits than the calculation, it is dithered (TPDF). A digital volume control still lowers the signal inside the DAC's fixed number of bits: at -24 dB a 24-bit DAC has about 20 bits left for the music. For most listening that is plenty; for the last bit of resolution, lock the volume and use the DAC or amplifier.
+- **64-bit floating-point volume:** Volume and all other PCM processing are calculated in 64-bit floating point and dithered at the end, so the calculation itself adds no audible error. A digital volume control still uses fewer of the DAC's bits the further it is turned down; for the last bit of resolution, lock the volume and use the DAC or amplifier.
 - **ReplayGain and clipping:** Albums are mastered at very different levels. ReplayGain adjusts the playback level, so the volume doesn't have to be changed all the time. Raising a quiet track can push peaks above 0 dBFS, which causes clipping; the peak stored with the ReplayGain values and the Headroom setting prevent this.
-- **Inter-sample peaks and headroom:** Digital audio stores samples, but what is heard is the smooth wave through them, and between two samples that wave can be higher than both. Modern masters are often pushed until their samples touch full scale, so the wave itself goes above it. A resampler computes new samples on that wave and finds those peaks; they do not fit into the output format and would be cut off (clipping). Headroom on Automatic lowers the level of such an album by exactly the missing amount, usually a fraction of a dB and rarely more than 2.5 dB. Everything else stays as it is.
+- **Inter-sample peaks and headroom:** Digital audio stores samples, but what is heard is the smooth wave through them, and between two samples that wave can be higher than both. After resampling such peaks may not fit into the output and would be clipped. Headroom on Automatic lowers the level of such an album by exactly the missing amount, usually a fraction of a dB.
 
 ## IV. System performance
 
@@ -681,19 +713,21 @@ Aulumic keeps a log of each session: library scans, playback errors, files that 
 
 ![The log window](22-log)
 
-- **Show log:** Main menu > Tools > Show log... (or Ctrl+L). Warnings and errors are marked. **Copy**, **Save to file...** and **Clear** work on the whole log.
+- **Show log:** Main menu > Tools > Show log... (or Ctrl+L). Warnings and errors are marked. The buttons Copy, Save to file and Clear work on the whole log.
 - **Saved log:** If errors were logged, the log is saved as `AulumicNSLog_<date>.txt` in the Data folder at exit. If there were no errors, nothing is saved, unless *Always save the log* is on (Preferences > System > Log): then `AulumicNSLog.txt` is written at every exit.
-- **Dropouts:** If the music cuts out for a moment, check the log: it has a line "Dropout at about m:ss in the track", which means the output buffer ran empty. When a stream ends, a summary line shows the number of dropouts, the least music that was buffered ahead and the slowest buffer. A larger buffer size (Preferences > Output for PCM, Preferences > DSD for DSD sent as DSD) helps with dropouts. If there is a hiccup and the log shows no dropout, the cause lies outside Aulumic: the driver, USB or the DAC.
+- **Dropouts:** If the music cuts out for a moment, check the log for a line "Dropout at about m:ss in the track". A larger buffer size (Preferences > Output for PCM, Preferences > DSD for DSD sent as DSD) helps. If the log shows no dropout, the cause lies outside Aulumic: the driver, USB or the DAC.
 - **Black or flickering areas in a window:** Turn off *Use the graphics card* (Preferences > System), and please report the graphics card and its driver version.
 - **Debug Queue (Ctrl+D):** Shows what the player is doing: the play queue, the next track and the engine's state. Useful when reporting a problem.
 - **ShutdownTraceLog.txt:** Only written next to the program when an error occurs while it closes. Please include it and the log when reporting a problem.
-- **HangReport_<date>.txt:** Written next to the program when the window stops responding for 5 seconds (Windows shows "Not responding"). It lists what each part of the program was doing at that moment, and its last line says when the window responded again. If it stays frozen, end it in the Task Manager; the report is already written. Please include it when reporting a freeze.
+- **HangReport_<date>.txt:** Written next to the program when the window stops responding for 5 seconds. If it stays frozen, end it in the Task Manager; the report is already written. Please include it when reporting a freeze.
 
 # Data and settings
 
 ![Aulumic in the light theme](04-light-small-banner)
 
-Everything lives in a **Data** folder next to the program: the library, the play statistics (ratings, play counts, favourites), the playlists, the peaks remembered by the automatic headroom, the artist information and the settings (`AulumicNS.ini`). Album thumbnails are kept in a **Cache** folder. If the program folder can't be written to (for example in *Program Files*), `%APPDATA%\AulumicNS` is used instead.
+Everything lives in a Data folder next to the program: the library, the play statistics (ratings, play counts, favourites), the playlists, the peaks remembered by the automatic headroom, the artist information and the settings (`AulumicNS.ini`). Album thumbnails are kept in a Cache folder. If the program folder can't be written to (for example in *Program Files*), `%APPDATA%\AulumicNS` is used instead.
+
+**Library update:** After a new version that keeps more about each track, Aulumic asks at start whether to update the library. This reads the tags of all music files once and can take a while; music can go on playing. With No, the question comes again at the next start.
 
 The library and the playlists are saved at once after every change, so a crash or a power cut loses nothing. To move to another computer, copy the program together with its Data folder. To remove it, delete the program file with its Data and Cache folders. Nothing is installed anywhere else, and music files are only ever changed when tags or ReplayGain values are saved.
 
@@ -703,8 +737,8 @@ The library and the playlists are saved at once after every change, so a crash o
 
 ## Minimum requirements
 
-- **Operating system:** Windows 10 or Windows 11 (64-bit). The booklet viewer uses the PDF engine of Windows 10 and later. Text is set in Segoe UI Variable on Windows 11 and in Segoe UI on Windows 10.
-- **Graphics:** Any graphics card with a Windows 10 driver. Without a usable one the processor draws everything.
+- **Operating system:** Windows 10 or Windows 11 (64-bit).
+- **Graphics:** Any graphics card with a Windows 10 driver.
 - **Processor (CPU):** Any 64-bit (x86-64) dual-core processor. Resampling at the highest quality and DSD-to-PCM conversion at high rates need more processing power.
 - **Memory (RAM):** 4 GB.
 - **Screen resolution:** 1280 x 720.

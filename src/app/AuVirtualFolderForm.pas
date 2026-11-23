@@ -38,7 +38,7 @@ function CreateVirtualFolderForm(AOwner: TComponent; const ABaseDir, AName: stri
 implementation
 
 uses
-  uAppConsts, uAppStrings, uOSUtils, uMetaUtils, uAudioUtils;
+  uAppConsts, uAppStrings, uOSUtils, uMetaUtils, uAudioUtils, AuTagLoader;
 
 type
   { TVirtualFolderForm }
@@ -600,9 +600,21 @@ begin
   Result := True;
 end;
 
+{ the check of the name looks into the link's folder, whose drive may be asleep:
+  it is woken first, on a worker thread }
 procedure TVirtualFolderForm.SaveClick(Sender: TObject);
+var
+  Paths: TStringList;
 begin
-  if FBtnSave.Enabled and ValidateInput then ModalResult := mrOK;
+  if not FBtnSave.Enabled then Exit;
+  Paths := TStringList.Create;
+  try
+    Paths.Add(FBaseDir);
+    if not WakeDrivesWithWindow(Self, Paths, APP_TITLE) then Exit;
+  finally
+    Paths.Free;
+  end;
+  if ValidateInput then ModalResult := mrOK;
 end;
 
 end.

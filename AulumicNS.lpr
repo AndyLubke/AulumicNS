@@ -23,7 +23,7 @@ uses
   AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuTileGrid, AuExtra, AuTitleBar,
   AuFolderPicker, AuAppIcon,
   { the program }
-  AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uTonePresets, uAppLifetime,
+  AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uTonePresets, uLibraryCheck, AuLibraryCheck, uAppLifetime,
   uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuPlaylistPane, AuToneForm, AuVolumePopup,
   uCrashTracer, uHangWatch, uDriveKeepAlive, uInputBlock, uEngineStateManager, uFileLockRegistry, uMetadataPayloads, uMetaUtils,
   uOSUtils, uPlaybackIOWorker, {$IFDEF DEBUG}AuTouchProbe,{$ENDIF}

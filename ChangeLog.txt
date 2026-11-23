@@ -6,6 +6,70 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.18 (23 November 2026)
+-------------------------------------------------------------------------------
+
+Library
+  - A Composers group for the library tree: the composers from the composer
+    tag with their albums. A track with several composers is listed under
+    each of them, and recordings of the same work by different performers
+    stay apart. It is off at first: Preferences > Appearance > Main window >
+    Show Composers in library.
+  - With that group shown, a search also lists the composers of what it
+    found.
+  - The search no longer minds full stops and commas: "op 27" finds
+    "Op. 27", "js bach" finds "J.S. Bach", and the other way round.
+  - Work headings in the playlist: the tracks of a work (the movements of a
+    symphony, for example) get a heading of their own inside the album, and
+    show only their part of it: "I. Allegro" under "Symphony No. 5". The
+    work comes from the Work field, or from the titles when several tracks
+    in a row begin with the same text and a colon. View > Work headings
+    switches it off. "Select work" in the menu of a track selects all tracks of
+    its work.
+  - A Work field: the work a track is a part of (a symphony whose movements
+    are tracks) is read from the files, kept in the library and can be
+    edited in Properties, for one file or several at once. A library made
+    by an earlier version does not know the works yet: at the first start
+    the program asks whether to rebuild it, which reads the tags of all
+    files once. An earlier version can still open the library afterwards.
+  - Tag consistency: a new window that lists what may need a look in a part of
+    the library: tracks without an album, artist, title or track number;
+    albums whose tracks disagree (several album names, album artists or
+    years, a track number twice, a gap in the numbers); albums without a
+    composer; and composers, artists and genres written in more than one
+    way ("J. S. Bach" beside "Johann Sebastian Bach"). A filter shows one
+    kind at a time, and a click on a column heading sorts the list: by
+    Finding, all lines of one album stand together. A finding
+    opens its files in Properties, several findings together when more
+    than one is selected; the window itself changes nothing. It
+    works on what is selected (Tools in the popup menu of the library and
+    of the playlist) or on the whole library (Main menu > Tools).
+  - The popup menu of the library tree has a Show submenu for the Artists,
+    Composers, Albums and Genres groups (the same switches as in
+    Preferences), and Calculate ReplayGain moved into a Tools submenu, in
+    the library and the playlist.
+  - Album tiles can be ordered by composer. The composer is then shown under
+    each album; an album with several composers is listed as "Various
+    composers".
+
+Help
+  - The help covers everything that is new, and its text was shortened.
+
+Main window
+  - While nothing plays, the title bar shows the version number next to the
+    name.
+
+Fixes
+  - Saving or removing a virtual folder on a drive that has to wake up first
+    (an external USB disk, for example) no longer freezes the program. The
+    "Waiting for drive..." window is shown when it takes a while.
+  - Creating, editing or removing a virtual folder no longer starts a scan
+    of the whole library when the library folders are watched.
+  - A folder now includes the virtual folders in it, as the tree shows
+    them: its album tiles show their albums, and playing, adding or sending
+    the folder takes their tracks along.
+
+
 Version 1.1.0.17 (21 November 2026)
 -------------------------------------------------------------------------------
 

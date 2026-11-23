@@ -45,6 +45,7 @@ type
     // only the names, no counts or album lists
     FArtistSummaryCache : TStringList;
     FGenreSummaryCache  : TStringList;
+    FComposerSummaryCache: TStringList;
     FAlbumSummaryCache  : TStringList;
     FCachesValid        : boolean;
 
@@ -69,7 +70,7 @@ type
     // one is tested again with the condition of the question itself.
     FTrackIndexValid        : Boolean;
     FTrackIndexCount        : Integer;
-    FIdxFolder, FIdxArtist, FIdxGenre, FIdxAlbum: TStringList;
+    FIdxFolder, FIdxArtist, FIdxGenre, FIdxAlbum, FIdxComposer: TStringList;
     // Library folders that could not be reached during the last scan
     FUnavailableRoots       : TStringList;
 
@@ -85,6 +86,11 @@ type
 
     FPendingScanRequested   : boolean;
     FPendingScanFullRebuild : boolean;
+    // The running scan reads every file again (a rebuild)
+    FScanIsFull             : boolean;
+    // Every track's work is known: the library was read from its files by a
+    // program that knows the Work field (see the snapshot's works block)
+    FWorksKnown             : boolean;
     // Set by BeginShutdown; StartScan does nothing from then on
     FShuttingDown           : boolean;
 
@@ -203,6 +209,14 @@ type
     // Reads a .aullink file again after it was created / edited / deleted in
     // AulumicNS (a deleted file is removed from the library)
     procedure RefreshVirtualLink(const ALinkPath: string);
+    // The virtual folders (.aullink files) in AFolder and its sub folders,
+    // from the library (no disk access)
+    procedure GetVirtualLinksUnder(const AFolder: string; ALinks: TStrings);
+    // The tracks of a folder and its sub folders (APath may also be the
+    // .aullink file of a virtual folder) together with those the virtual
+    // folders in them lead to, as the tree shows them there. Each track once;
+    // a virtual folder is followed once, so links that point at each other end.
+    procedure GetTracksInFolderWithLinks(const APath: string; ATracks: TTrackList);
     // Library folder reachable? Drive letters via GetLogicalDrives (no disk
     // access), network folders from the last scan
     function  IsRootAvailable(const ARoot: string): Boolean;
@@ -222,6 +236,20 @@ type
       ATracks: TTrackList);
     procedure GetTracksByGenreAndAlbum(const GenreName, AlbumName: string;
       ATracks: TTrackList);
+
+    // The Composers group. The composers of the Composer tag (several,
+    // separated by ';', are each listed) and LBL_UNKNOWN_COMPOSER for the
+    // tracks without one. A composer's albums are named "Artist - Album" as
+    // in the Albums group, so recordings of one work by different performers
+    // stay apart; such a name goes back into GetTracksByComposerAndAlbum.
+    procedure GetUniqueComposers(ResultList: TStrings);
+    procedure GetTracksByComposer(const AComposer: string; ATracks: TTrackList);
+    procedure GetAlbumsByComposer(const AComposer: string; ResultList: TStrings);
+    procedure GetTracksByComposerAndAlbum(const AComposer, AAlbum: string;
+      ATracks: TTrackList);
+    // The composers of the tracks of a list (those a search found), each
+    // once, in the order of the Composers group; tracks without one add none
+    procedure GetComposersOfTracks(ATracks: TTrackList; ResultList: TStrings);
 
     // True when APath is in the library
     function ContainsTrack(const APath: string): Boolean;
@@ -269,6 +297,10 @@ type
     property OnScanProgress: TScanProgressEvent
       read FOnScanProgress write FOnScanProgress;
     property OnScanDone: TScanDoneEvent read FOnScanDone write FOnScanDone;
+    // The library was written by a version without the Work field (or a
+    // rebuild since then did not reach every folder): the works of its
+    // tracks are not known until it is rebuilt. Never for an empty library.
+    function NeedsRebuildForWorks: Boolean;
     property IsDirty: Boolean read FIsDirty write FIsDirty;
     property LastScanHadUnavailableRoots: Boolean read FLastScanHadUnavailableRoots;
 
@@ -281,7 +313,7 @@ implementation
 
 uses
   Windows, forms, contnrs, uAppStrings, uAppConsts, uEngineStateManager, uAudioUtils,
-  uMetaUtils, uOSUtils, AuLog,
+  uMetaUtils, uOSUtils, AuLog, LazUTF8,
   uLibraryQuery;     // EvaluateTrack (auto-playlist filter)
 
 const
@@ -290,8 +322,14 @@ const
   LIB_JOURNAL_MAGIC          = 'AUNSLJNL';
   LIB_JOURNAL_COMPACT_BYTES  = 4 * 1024 * 1024;
   JR_TRACK_PUT               = 1;
-  TRACK_TEXTS                = 11;     // the pooled texts of a track (without the path)
-  TRACK_MIN_BYTES            = 4 + TRACK_TEXTS * 4 + 5 * 4 + 3 * 8 + 1;
+  TRACK_TEXTS                = 12;     // the pooled texts of a track (without the path)
+  { the first of them are in a track's record of the snapshot and the journal;
+    the work (the last one) follows behind, see the snapshot's description }
+  TRACK_TEXTS_IN_RECORD      = 11;
+  TRACK_MIN_BYTES            = 4 + TRACK_TEXTS_IN_RECORD * 4 + 5 * 4 + 3 * 8 + 1;
+  { the block of the works behind the tracks of a snapshot ('WRK1') }
+  WORKS_BLOCK_MAGIC          = $314B5257;
+  WORKS_BLOCK_COMPLETE       = 1;      // its flag: every file was read for its work
 
 { TNameSet }
 
@@ -431,12 +469,18 @@ begin
   FGenreSummaryCache.Duplicates        := dupIgnore;
   FGenreSummaryCache.CaseSensitive     := False;
 
+  FComposerSummaryCache                := TStringList.Create;
+  FComposerSummaryCache.Sorted         := True;
+  FComposerSummaryCache.Duplicates     := dupIgnore;
+  FComposerSummaryCache.CaseSensitive  := False;
+
   FAlbumSummaryCache                   := TStringList.Create;
   FAlbumSummaryCache.Sorted            := True;
   FAlbumSummaryCache.Duplicates        := dupIgnore;
   FAlbumSummaryCache.CaseSensitive     := False;
 
   FCachesValid                         := False;
+  FWorksKnown                          := True;
 
   FLinks                               := TStringList.Create;
   FLinks.Sorted                        := True;
@@ -462,6 +506,7 @@ begin
   FIdxFolder                           := NewTrackIndexList;
   FIdxArtist                           := NewTrackIndexList;
   FIdxGenre                            := NewTrackIndexList;
+  FIdxComposer                         := NewTrackIndexList;
   FIdxAlbum                            := NewTrackIndexList;
   FTrackIndexValid                     := False;
 
@@ -491,10 +536,12 @@ begin
   FreeAndNil(FIdxFolder);
   FreeAndNil(FIdxArtist);
   FreeAndNil(FIdxGenre);
+  FreeAndNil(FIdxComposer);
   FreeAndNil(FIdxAlbum);
   FTrackDict.Free;
   FArtistSummaryCache.Free;
   FGenreSummaryCache.Free;
+  FComposerSummaryCache.Free;
   FAlbumSummaryCache.Free;
   FFolderIndex.Free;
   FLinks.Free;
@@ -702,8 +749,49 @@ begin
   end;
 end;
 
+// Whether S holds ATok when the full stops and commas of S are passed over
+// ("op 27" in "op. 27", "js" in "j.s. bach"). ATok has none itself.
+function ContainsPastStops(const ATok, S: string): Boolean;
+var
+  I, J, K, LT, LS: Integer;
+begin
+  Result := False;
+  LT := Length(ATok);
+  LS := Length(S);
+  if (LT = 0) or (LS < LT) then
+    Exit;
+  for I := 1 to LS do
+  begin
+    if S[I] <> ATok[1] then
+      Continue;
+    J := I;
+    K := 1;
+    while (J <= LS) and (K <= LT) do
+    begin
+      if S[J] = ATok[K] then
+      begin
+        Inc(J);
+        Inc(K);
+      end
+      else if (S[J] = '.') or (S[J] = ',') then
+        Inc(J)
+      else
+        Break;
+    end;
+    if K > LT then
+      Exit(True);
+  end;
+end;
+
 procedure TLibraryManager.SearchLibrary(const Query: string;
   MatchArtists, MatchAlbums, MatchGenres, MatchFolders: TStrings; MatchTracks: TTrackList);
+
+  // A word of the search in a text: as it is, or with the text's full stops
+  // and commas passed over
+  function Has(const ATok, S: string): Boolean; inline;
+  begin
+    Result := (Pos(ATok, S) > 0) or ContainsPastStops(ATok, S);
+  end;
 
   procedure GetTokens(const S: string; TargetList: TStringList);
   var
@@ -726,6 +814,14 @@ procedure TLibraryManager.SearchLibrary(const Query: string;
         TargetList.Add(Temp);
         Break;
       end;
+    end;
+    // Full stops and commas are not part of a word ("op." = "op", "j.s." =
+    // "js"); a word made of nothing else stays as typed
+    for P := 0 to TargetList.Count - 1 do
+    begin
+      Word := StringReplace(StringReplace(TargetList[P], '.', '', [rfReplaceAll]), ',', '', [rfReplaceAll]);
+      if Word <> '' then
+        TargetList[P] := Word;
     end;
   end;
 
@@ -783,14 +879,14 @@ begin
           CTok := CleanTokens[J];
 
           TokenFound :=
-            (Pos(CTok, Track^.CleanTitle) > 0) or
-            (Pos(CTok, Track^.CleanArtist) > 0) or
-            (Pos(CTok, Track^.CleanAlbumArtist) > 0) or
-            (Pos(CTok, Track^.CleanComposer) > 0) or
-            (Pos(CTok, Track^.CleanPerformer) > 0) or
-            (Pos(CTok, Track^.CleanAlbum) > 0) or
-            (Pos(CTok, Track^.CleanGenre) > 0) or
-            (Pos(CTok, Track^.CleanFolder) > 0);
+            Has(CTok, Track^.CleanTitle) or
+            Has(CTok, Track^.CleanArtist) or
+            Has(CTok, Track^.CleanAlbumArtist) or
+            Has(CTok, Track^.CleanComposer) or
+            Has(CTok, Track^.CleanPerformer) or
+            Has(CTok, Track^.CleanAlbum) or
+            Has(CTok, Track^.CleanGenre) or
+            Has(CTok, Track^.CleanFolder);
 
           if not TokenFound then
           begin
@@ -937,8 +1033,15 @@ end;
                        Composer, Performer, DurationStr, Comment, DateStr),
                        TrackNumber, DiscNumber, Year, SampleRate, BitDepth,
                        LastModified, FileSize, DateAdded, HasReplayGain
-  Journal record JR_TRACK_PUT: the same track fields with the texts inline;
-  replayed over the snapshot (an existing path is replaced, else added). }
+    works            : WORKS_BLOCK_MAGIC, a flag byte (WORKS_BLOCK_COMPLETE),
+                       per track of the list above one text id (its work).
+                       A reader that does not know the block stops before it,
+                       so the tracks stay readable for it; a snapshot without
+                       the block was written by such a program (WorksKnown).
+  Journal record JR_TRACK_PUT: the same track fields with the texts inline,
+  and the work as one more text behind the numbers (missing in a record
+  written without it); replayed over the snapshot (an existing path is
+  replaced, else added). }
 
 function TrackText(const T: TTrackInfo; I: Integer): string;
 begin
@@ -953,8 +1056,9 @@ begin
     7: Result := T.Performer;
     8: Result := T.DurationStr;
     9: Result := T.Comment;
+   10: Result := T.DateStr;
   else
-    Result := T.DateStr;
+    Result := T.Work;
   end;
 end;
 
@@ -971,8 +1075,9 @@ begin
     7: T.Performer   := V;
     8: T.DurationStr := V;
     9: T.Comment     := V;
+   10: T.DateStr     := V;
   else
-    T.DateStr := V;
+    T.Work := V;
   end;
 end;
 
@@ -1162,10 +1267,15 @@ begin
     begin
       T := PTrackInfo(FTracks[I]);
       Rest.Str(T^.FilePath);
-      for K := 0 to TRACK_TEXTS - 1 do
+      for K := 0 to TRACK_TEXTS_IN_RECORD - 1 do
         Rest.U32(Pool.Intern(TrackText(T^, K)));
       WriteTrackNumbers(Rest, T^);
     end;
+    { the works, behind what a reader without them reads }
+    Rest.U32(WORKS_BLOCK_MAGIC);
+    if FWorksKnown then Rest.U8(WORKS_BLOCK_COMPLETE) else Rest.U8(0);
+    for I := 0 to FTracks.Count - 1 do
+      Rest.U32(Pool.Intern(PTrackInfo(FTracks[I])^.Work));
     { the pool first: the reader needs it for the ids }
     Pool.WriteTo(W);
     Result := W.Bytes;
@@ -1190,8 +1300,11 @@ var
   PTrack: PTrackInfo;
   Ids: TTrackTextIds;
   Cache: TCleanCache;
+  InOrder: array of PTrackInfo;   // the tracks in the order of the snapshot (nil: left out)
+  WorkId: Cardinal;
 begin
   Cache := nil;
+  InOrder := nil;
   Pool := TDbStrPool.Create;
   R    := TDbReader.Create(ABody);
   try
@@ -1215,13 +1328,15 @@ begin
     end;
     N := R.Count(TRACK_MIN_BYTES);
     FTracks.Capacity := N;
+    SetLength(InOrder, N);
     for I := 0 to N - 1 do
     begin
+      InOrder[I] := nil;
       New(PTrack);
       try
         PTrack^ := Default(TTrackInfo);
         PTrack^.FilePath := R.Str;
-        for K := 0 to TRACK_TEXTS - 1 do
+        for K := 0 to TRACK_TEXTS_IN_RECORD - 1 do
         begin
           Ids[K] := R.U32;
           SetTrackText(PTrack^, K, Pool.Str(Ids[K]));
@@ -1235,7 +1350,23 @@ begin
       if PTrack^.FilePath = '' then
         Dispose(PTrack)
       else
+      begin
         FTracks.Add(PTrack);
+        InOrder[I] := PTrack;
+      end;
+    end;
+    { the works of these tracks. Without the block the snapshot was written
+      by a program that does not know them: nothing is known about them
+      (an empty library has nothing to know). }
+    FWorksKnown := N = 0;
+    if (not R.AtEnd) and (R.U32 = WORKS_BLOCK_MAGIC) then
+    begin
+      FWorksKnown := (R.U8 and WORKS_BLOCK_COMPLETE) <> 0;
+      for I := 0 to N - 1 do
+      begin
+        WorkId := R.U32;
+        if InOrder[I] <> nil then InOrder[I]^.Work := Pool.Str(WorkId);
+      end;
     end;
   finally
     R.Free;
@@ -1266,9 +1397,11 @@ begin
             Continue;                      // a record of a newer version
           T := Default(TTrackInfo);
           T.FilePath := R.Str;
-          for K := 0 to TRACK_TEXTS - 1 do
+          for K := 0 to TRACK_TEXTS_IN_RECORD - 1 do
             SetTrackText(T, K, R.Str);
           ReadTrackNumbers(R, T);
+          if not R.AtEnd then
+            T.Work := R.Str;
           if T.FilePath = '' then
             Continue;
           PrepareDerived(T);
@@ -1307,9 +1440,10 @@ begin
   try
     W.U8(JR_TRACK_PUT);
     W.Str(Track^.FilePath);
-    for K := 0 to TRACK_TEXTS - 1 do
+    for K := 0 to TRACK_TEXTS_IN_RECORD - 1 do
       W.Str(TrackText(Track^, K));
     WriteTrackNumbers(W, Track^);
+    W.Str(Track^.Work);
     FJournal.Append(W.Bytes);
   finally
     W.Free;
@@ -1349,6 +1483,7 @@ begin
     FLinks.Clear;
     FDatabaseLoadFailed := False;
     FGeneration := 0;
+    FWorksKnown := True;        // (a library that is not there has nothing to rebuild)
 
     TPhase := GetTickCount64;
     if Loaded then
@@ -1542,6 +1677,7 @@ begin
   AppStateManager.PushState(esLibraryBusy);
 
   FIsScanning    := True;
+  FScanIsFull    := FullRebuild;
   FScannerThread := TLibraryScannerThread.Create(FCriticalSection, @DoScanProgress,
                         FScanFolders, FTracks, not FullRebuild);
 
@@ -1610,8 +1746,11 @@ begin
         begin
           ScanFailed := True;
         end
-        else if DeadScanner.HasChanges or (OldTrackCount <> NewTrackCount) then
+        else if DeadScanner.HasChanges or (OldTrackCount <> NewTrackCount) or
+                (FScanIsFull and not FWorksKnown) then
         begin
+          // (a rebuild for the works takes the new records also when nothing
+          // else differs: the work is what was read anew)
           FIsDirty            := True;
           LHasChanges         := True;
         end;
@@ -1705,6 +1844,13 @@ begin
       FLastScanHadUnavailableRoots :=
         (Assigned(DeadScanner.RootsLostDuringScan) and (DeadScanner.RootsLostDuringScan.Count > 0)) or
         (Assigned(DeadScanner.RootsOfflineAtStart) and (DeadScanner.RootsOfflineAtStart.Count > 0));
+
+      // A rebuild that read every folder knows the work of every track
+      if FScanIsFull and (not ScanFailed) and (not FLastScanHadUnavailableRoots) and (not FWorksKnown) then
+      begin
+        FWorksKnown := True;
+        FIsDirty    := True;
+      end;
 
       if Assigned(DeadScanner.RootsLostDuringScan) then
         for I := 0 to DeadScanner.RootsLostDuringScan.Count - 1 do
@@ -1869,6 +2015,16 @@ begin
     ATracks.Sort(@CompareTrackInfo);
 end;
 
+function TLibraryManager.NeedsRebuildForWorks: Boolean;
+begin
+  FCriticalSection.Enter;
+  try
+    Result := (not FWorksKnown) and (FTracks.Count > 0);
+  finally
+    FCriticalSection.Leave;
+  end;
+end;
+
 function TLibraryManager.GetLoadSummary: string;
 begin
   Result := SafeFormat(FMT_LOG_DB_LOADED_DETAIL,
@@ -1918,6 +2074,7 @@ begin
       Track^.Genre       := NormalizeSemicolons(UpdatedData.Genre);
       Track^.Composer    := NormalizeSemicolons(UpdatedData.Composer);
       Track^.Performer   := NormalizeSemicolons(UpdatedData.Performer);
+      Track^.Work        := Trim(UpdatedData.Work);
       Track^.DateStr     := Trim(UpdatedData.DateStr);
 
       ParsedYear := StrToIntDef(Copy(Track^.DateStr, 1, 4), 0);
@@ -2555,6 +2712,160 @@ begin
   ATracks.Sort(@CompareTrackInfo);
 end;
 
+// Whether a track belongs to a name of the Composers group
+function ComposerHas(Track: PTrackInfo; const AName: string): Boolean;
+begin
+  if Trim(Track^.Composer) = '' then
+    Result := SameText(Trim(AName), LBL_UNKNOWN_COMPOSER)
+  else
+    Result := ContainsDelimitedItem(Track^.Composer, Trim(AName));
+end;
+
+// The album of a track as a composer's node lists it: "Artist - Album" (the
+// album artist, else the artist)
+function ComposerAlbumOf(Track: PTrackInfo): string;
+var
+  Art, Alb: string;
+begin
+  Alb := Trim(Track^.Album);
+  if Alb = '' then
+    Alb := LBL_UNKNOWN_ALBUM;
+  Art := Trim(Track^.AlbumArtist);
+  if Art = '' then
+    Art := Trim(Track^.Artist);
+  if Art = '' then
+    Art := LBL_UNKNOWN_ARTIST;
+  Result := Art + ' - ' + Alb;
+end;
+
+procedure TLibraryManager.GetUniqueComposers(ResultList: TStrings);
+begin
+  FCriticalSection.Enter;
+  try
+    ValidateCaches;
+    ResultList.Assign(FComposerSummaryCache);
+  finally
+    FCriticalSection.Leave;
+  end;
+end;
+
+procedure TLibraryManager.GetTracksByComposer(const AComposer: string; ATracks: TTrackList);
+var
+  I, K: Integer;
+  Track: PTrackInfo;
+  Hits: TFPList;
+begin
+  ATracks.Clear;
+  FCriticalSection.Enter;
+  try
+    Hits := TrackCandidates(FIdxComposer, AComposer);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
+    begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
+      Track := PTrackInfo(FTracks[I]);
+      if (Track <> nil) and ComposerHas(Track, AComposer) then
+        ATracks.Add(Track^);
+    end;
+  finally
+    FCriticalSection.Leave;
+  end;
+  // Copies, so sorted after the lock is released
+  ATracks.Sort(@CompareTrackInfo);
+end;
+
+procedure TLibraryManager.GetAlbumsByComposer(const AComposer: string; ResultList: TStrings);
+var
+  I, K: Integer;
+  Track: PTrackInfo;
+  Hits: TFPList;
+  Names: TNameSet;
+  Sorted: TStringList;
+begin
+  Names := TNameSet.Create;
+  Sorted := TStringList.Create;
+  try
+    Sorted.Sorted        := True;
+    Sorted.Duplicates    := dupIgnore;
+    Sorted.CaseSensitive := False;
+    FCriticalSection.Enter;
+    try
+      Hits := TrackCandidates(FIdxComposer, AComposer);
+      if Hits <> nil then
+      for K := 0 to Hits.Count - 1 do
+      begin
+        I := PtrInt(Hits[K]);
+        if I >= FTracks.Count then
+          Continue;
+        Track := PTrackInfo(FTracks[I]);
+        if (Track <> nil) and ComposerHas(Track, AComposer) then
+          Names.Note(ComposerAlbumOf(Track));
+      end;
+    finally
+      FCriticalSection.Leave;
+    end;
+    // Only the distinct names go into the language-aware sorted list
+    Names.AddTo(Sorted);
+    ResultList.Assign(Sorted);
+  finally
+    Sorted.Free;
+    Names.Free;
+  end;
+end;
+
+procedure TLibraryManager.GetComposersOfTracks(ATracks: TTrackList; ResultList: TStrings);
+var
+  I: Integer;
+  Names: TNameSet;
+  Sorted: TStringList;
+begin
+  Names := TNameSet.Create;
+  Sorted := TStringList.Create;
+  try
+    Sorted.Sorted        := True;
+    Sorted.Duplicates    := dupIgnore;
+    Sorted.CaseSensitive := False;
+    for I := 0 to ATracks.Count - 1 do
+      Names.NoteItems(ATracks[I]^.Composer);
+    Names.AddTo(Sorted);
+    ResultList.Assign(Sorted);
+  finally
+    Sorted.Free;
+    Names.Free;
+  end;
+end;
+
+procedure TLibraryManager.GetTracksByComposerAndAlbum(const AComposer, AAlbum: string;
+  ATracks: TTrackList);
+var
+  I, K: Integer;
+  Track: PTrackInfo;
+  Hits: TFPList;
+begin
+  ATracks.Clear;
+  FCriticalSection.Enter;
+  try
+    Hits := TrackCandidates(FIdxComposer, AComposer);
+    if Hits <> nil then
+    for K := 0 to Hits.Count - 1 do
+    begin
+      I := PtrInt(Hits[K]);
+      if I >= FTracks.Count then
+        Continue;
+      Track := PTrackInfo(FTracks[I]);
+      if (Track <> nil) and ComposerHas(Track, AComposer) and
+         SameText(ComposerAlbumOf(Track), Trim(AAlbum)) then
+        ATracks.Add(Track^);
+    end;
+  finally
+    FCriticalSection.Leave;
+  end;
+  // Copies, so sorted after the lock is released
+  ATracks.Sort(@CompareTrackInfo);
+end;
+
 procedure TLibraryManager.ClearCaches;
 begin
   FArtistSummaryCache.Clear;
@@ -2562,6 +2873,9 @@ begin
 
   FGenreSummaryCache.Clear;
   FGenreSummaryCache.Capacity := 0;
+
+  FComposerSummaryCache.Clear;
+  FComposerSummaryCache.Capacity := 0;
 
   FAlbumSummaryCache.Clear;
   FAlbumSummaryCache.Capacity := 0;
@@ -2586,6 +2900,7 @@ begin
   FIdxFolder.Clear;
   FIdxArtist.Clear;
   FIdxGenre.Clear;
+  FIdxComposer.Clear;
   FIdxAlbum.Clear;
   FTrackIndexValid := False;
 end;
@@ -2672,6 +2987,10 @@ begin
     PutItems(FIdxArtist, Track^.AlbumArtist);
     PutItems(FIdxArtist, Track^.Artist);
     PutItems(FIdxGenre, Track^.Genre);
+    if Trim(Track^.Composer) = '' then
+      Put(FIdxComposer, LBL_UNKNOWN_COMPOSER)
+    else
+      PutItems(FIdxComposer, Track^.Composer);
     Put(FIdxAlbum, AlbumCompositeOf(Track));
   end;
   FTrackIndexCount := FTracks.Count;
@@ -2853,6 +3172,159 @@ begin
     ParseAulLinkFile(ALinkPath, ATargets);
 end;
 
+procedure TLibraryManager.GetVirtualLinksUnder(const AFolder: string; ALinks: TStrings);
+var
+  Dir: string;
+  I: Integer;
+begin
+  ALinks.Clear;
+  Dir := IncludeTrailingPathDelimiter(AFolder);
+  FCriticalSection.Enter;
+  try
+    for I := 0 to FLinks.Count - 1 do
+      if StartsText(Dir, FLinks[I]) then
+        ALinks.Add(FLinks[I]);
+  finally
+    FCriticalSection.Leave;
+  end;
+end;
+
+procedure TLibraryManager.GetTracksInFolderWithLinks(const APath: string; ATracks: TTrackList);
+var
+  Keys, Followed, Folders, Links, Targets: TStringList;
+  Buckets: array of TTrackList;
+  I, J, At, Best: Integer;
+  Track: PTrackInfo;
+  LastDir: Pointer;
+
+  function NewSet: TStringList;
+  begin
+    Result := TStringList.Create;
+    Result.UseLocale := False;
+    Result.CaseSensitive := True;
+    Result.Sorted := True;
+    Result.Duplicates := dupIgnore;
+  end;
+
+  function KeyOf(const AFolder: string): string;
+  begin
+    Result := UTF8LowerCase(IncludeTrailingPathDelimiter(ExcludeTrailingPathDelimiter(AFolder)));
+  end;
+
+  // A folder whose tracks belong to the result; its place in Folders is the
+  // order of its tracks in the result
+  procedure TakeFolder(const AFolder: string);
+  var
+    Key: string;
+  begin
+    Key := KeyOf(AFolder);
+    if Keys.Find(Key, At) then
+      Exit;
+    Keys.AddObject(Key, TObject(PtrInt(Folders.Count)));
+    Folders.Add(AFolder);
+  end;
+
+  procedure FollowLink(const ALink: string);
+  var
+    M: Integer;
+  begin
+    if Followed.Find(UTF8LowerCase(ALink), At) then
+      Exit;
+    Followed.Add(UTF8LowerCase(ALink));
+    GetVirtualLinkTargets(ALink, Targets);
+    for M := 0 to Targets.Count - 1 do
+      TakeFolder(Targets[M]);
+  end;
+
+  // The first folder taken that ADir is, or lies in (-1: none)
+  function FolderOf(const ADir: string): Integer;
+  var
+    Key: string;
+    P, N: Integer;
+  begin
+    Result := -1;
+    Key := KeyOf(ADir);
+    for P := 1 to Length(Key) do
+      if (Key[P] = PathDelim) and Keys.Find(Copy(Key, 1, P), At) then
+      begin
+        N := PtrInt(Keys.Objects[At]);
+        if (Result < 0) or (N < Result) then
+          Result := N;
+      end;
+  end;
+
+begin
+  ATracks.Clear;
+  if APath = '' then
+    Exit;
+  Keys := NewSet;
+  Followed := NewSet;
+  Folders := TStringList.Create;
+  Links := TStringList.Create;
+  Targets := TStringList.Create;
+  Buckets := nil;
+  try
+    // The folders first, from the names alone: the folder itself (or the
+    // targets of the virtual folder), then what the virtual folders in each
+    // of them lead to; those join the end of the list
+    if EndsText('.aullink', APath) then
+      FollowLink(APath)
+    else
+      TakeFolder(APath);
+    I := 0;
+    while I < Folders.Count do
+    begin
+      GetVirtualLinksUnder(ExcludeTrailingPathDelimiter(Folders[I]), Links);
+      for J := 0 to Links.Count - 1 do
+        FollowLink(Links[J]);
+      Inc(I);
+    end;
+
+    // Then the tracks, in one walk over the library however many folders
+    // there are (a walk per folder took seconds for a virtual folder with a
+    // hundred targets). Tracks of one folder mostly follow each other and
+    // share the string of their folder, so the folder is looked up once.
+    SetLength(Buckets, Folders.Count);
+    LastDir := nil;
+    Best := -1;
+    FCriticalSection.Enter;
+    try
+      for I := 0 to FTracks.Count - 1 do
+      begin
+        Track := PTrackInfo(FTracks[I]);
+        if (I = 0) or (Pointer(Track^.FolderDir) <> LastDir) then
+        begin
+          LastDir := Pointer(Track^.FolderDir);
+          Best := FolderOf(Track^.FolderDir);
+        end;
+        if Best < 0 then
+          Continue;
+        if Buckets[Best] = nil then
+          Buckets[Best] := TTrackList.Create;
+        Buckets[Best].Add(Track^);
+      end;
+    finally
+      FCriticalSection.Leave;
+    end;
+
+    // Copies, so sorted after the lock is released: folder by folder
+    for I := 0 to High(Buckets) do
+      if Buckets[I] <> nil then
+      begin
+        Buckets[I].Sort(@CompareTrackInfo);
+        ATracks.AddList(Buckets[I]);
+      end;
+  finally
+    for I := 0 to High(Buckets) do
+      Buckets[I].Free;
+    Targets.Free;
+    Links.Free;
+    Folders.Free;
+    Followed.Free;
+    Keys.Free;
+  end;
+end;
+
 procedure TLibraryManager.RefreshVirtualLink(const ALinkPath: string);
 var
   Targets: TStringList;
@@ -2978,7 +3450,7 @@ end;
 // every change of the library.
 procedure TLibraryManager.ValidateCaches;
 var
-  Albums, Artists, Genres: TNameSet;
+  Albums, Artists, Genres, Composers: TNameSet;
   I: Integer;
   Track: PTrackInfo;
   Art, Alb: string;
@@ -2990,6 +3462,7 @@ begin
   Albums  := TNameSet.Create;
   Artists := TNameSet.Create;
   Genres  := TNameSet.Create;
+  Composers := TNameSet.Create;
   try
     for I := 0 to FTracks.Count - 1 do
     begin
@@ -3011,12 +3484,16 @@ begin
         Artists.Note(LBL_UNKNOWN_ARTIST);
       if not Genres.NoteItems(Track^.Genre) then
         Genres.Note(LBL_UNKNOWN_GENRE);
+      if not Composers.NoteItems(Track^.Composer) then
+        Composers.Note(LBL_UNKNOWN_COMPOSER);
     end;
 
     Albums.AddTo(FAlbumSummaryCache);
     Artists.AddTo(FArtistSummaryCache);
     Genres.AddTo(FGenreSummaryCache);
+    Composers.AddTo(FComposerSummaryCache);
   finally
+    Composers.Free;
     Genres.Free;
     Artists.Free;
     Albums.Free;

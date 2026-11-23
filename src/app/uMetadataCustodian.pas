@@ -900,6 +900,44 @@ var
       WriteField(APrimaryID, AAltID, AValue);
   end;
 
+  // The work: the field WORK of a Vorbis comment; in an ID3 tag a TXXX frame
+  // (TXX in v2.2) with the description WORK. Every such field or frame is
+  // replaced by one; an empty value removes them.
+  procedure WriteWorkField(const AValue: string);
+  var
+    Idx: Integer;
+    F: TFrameElement;
+    Desc, Val, FrameID: string;
+    NewFrame: TID3Frame;
+  begin
+    if IsVorbis then
+    begin
+      WriteField(TAG_WORK, '', AValue);
+      Exit;
+    end;
+    if not (ReaderObj.Tags is TID3Tags) then
+      Exit;
+    for Idx := ReaderObj.Tags.Count - 1 downto 0 do
+    begin
+      F := ReaderObj.Tags.Frames[Idx];
+      if Assigned(F) and (F is TID3Frame) and (SameText(F.ID, 'TXXX') or SameText(F.ID, 'TXX')) and
+         TID3Frame(F).SplitTextPair(Desc, Val) and SameText(Trim(Desc), TAG_WORK) then
+        ReaderObj.Tags.Remove(F);
+    end;
+    if AValue = '' then
+      Exit;
+    if IsV22 then FrameID := 'TXX' else FrameID := 'TXXX';
+    NewFrame := TID3Frame.Create(FrameID);
+    try
+      NewFrame.Tagger   := ReaderObj.Tags;
+      NewFrame.AsString := TAG_WORK + #0 + AValue;
+      ReaderObj.Tags.Add(NewFrame);
+    except
+      NewFrame.Free;
+      raise;
+    end;
+  end;
+
   // A changed track or disc number keeps the total that was
   // already in the file ('5/12' edited to 6 becomes '6/12').
   function NumberWithTotal(const APrimaryID, AAltID: string; ANumber: Integer): string;
@@ -1028,6 +1066,8 @@ begin
         WriteListField(CompID, AltCompID, NormalizeSemicolons(P.Current.Composer));
       if P.Current.Performer <> P.Original.Performer then
         WriteListField(PerfID, AltPerfID, NormalizeSemicolons(P.Current.Performer));
+      if P.Current.Work <> P.Original.Work then
+        WriteWorkField(Trim(P.Current.Work));
 
       if P.Current.Track <> P.Original.Track then
         WriteField(TrackID, AltTrackID, NumberWithTotal(TrackID, AltTrackID, P.Current.Track));
@@ -1506,6 +1546,7 @@ begin
         Job^.TagEditor.Current.Genre       := TempMeta.Genre;
         Job^.TagEditor.Current.Composer    := TempMeta.Composer;
         Job^.TagEditor.Current.Performer   := TempMeta.Performer;
+        Job^.TagEditor.Current.Work        := TempMeta.Work;
         Job^.TagEditor.Current.DateStr     := TempMeta.DateStr;
         Job^.TagEditor.Current.Track       := TempMeta.TrackNumber;
         Job^.TagEditor.Current.Disc        := TempMeta.DiscNumber;
@@ -1543,6 +1584,7 @@ begin
           UpdatedTrk.Genre       := Job^.TagEditor.Current.Genre;
           UpdatedTrk.Composer    := Job^.TagEditor.Current.Composer;
           UpdatedTrk.Performer   := Job^.TagEditor.Current.Performer;
+          UpdatedTrk.Work        := Job^.TagEditor.Current.Work;
           UpdatedTrk.DateStr     := Job^.TagEditor.Current.DateStr;
           UpdatedTrk.TrackNumber := Job^.TagEditor.Current.Track;
           UpdatedTrk.DiscNumber  := Job^.TagEditor.Current.Disc;

@@ -33,11 +33,13 @@ uses
   AuGfx, AuTheme, AuIcons, AuControls, AuMenus, AuTileGrid, uLibraryTypes;
 
 type
-  TTileSort = (tsArtist, tsAlbum, tsYear, tsAdded);
+  { (stored by its number: new orders are added at the end) }
+  TTileSort = (tsArtist, tsAlbum, tsYear, tsAdded, tsComposer);
 
   TLibTile = record
     Key: string;                      // what makes it one album (see the unit's head)
     Title, Artist: string;            // as shown
+    Composer: string;                 // the one composer of its tracks ('' none, LBL_VARIOUS_COMPOSERS several)
     RawArtist, RawAlbum: string;      // the tags (the key of the thumbnail)
     FolderDir: string;                // the folder of its first track
     Hash: string;                     // the thumbnail's file name, made when needed
@@ -169,7 +171,9 @@ type
   end;
 
 const
-  TILE_SORT_NAMES: array[TTileSort] of string = ('Artist', 'Album', 'Year', 'Added to library');
+  TILE_SORT_NAMES: array[TTileSort] of string = ('Artist', 'Album', 'Year', 'Added to library', 'Composer');
+  { the orders as the menu lists them }
+  TILE_SORT_MENU: array[0..4] of TTileSort = (tsArtist, tsComposer, tsAlbum, tsYear, tsAdded);
   LBL_ALL_ALBUMS = 'All albums';
 
 implementation
@@ -179,6 +183,7 @@ uses
 
 const
   LBL_VARIOUS_ARTISTS = 'Various artists';
+  LBL_VARIOUS_COMPOSERS = 'Various composers';
   { the thumbnails kept in memory may take this much: beyond it they are all
     let go and the ones in view are read again }
   THUMB_MEMORY = 48 * 1024 * 1024;
@@ -494,12 +499,14 @@ end;
 
 procedure TLibraryTiles.SortClick(Sender: TObject);
 var
+  I: Integer;
   K: TTileSort;
   It: TAuMenuItem;
 begin
   FSortMenu.Clear;
-  for K := Low(TTileSort) to High(TTileSort) do
+  for I := 0 to High(TILE_SORT_MENU) do
   begin
+    K := TILE_SORT_MENU[I];
     It := FSortMenu.Add(TILE_SORT_NAMES[K], @SortItemClick, icNone, '', Ord(K));
     It.Checked := K = FSort;
   end;
@@ -672,6 +679,22 @@ function TLibraryTiles.CompareTiles(A, B: Integer): Integer;
     Result := CompareLibraryNamesNatural(FTiles[A].Title, FTiles[B].Title);
   end;
 
+  { the albums of one composer together; those of several composers and
+    those without one after all names }
+  function ByComposer: Integer;
+
+    function Rank(const S: string): Integer;
+    begin
+      if S = '' then Result := 2
+      else if S = LBL_VARIOUS_COMPOSERS then Result := 1
+      else Result := 0;
+    end;
+
+  begin
+    Result := Rank(FTiles[A].Composer) - Rank(FTiles[B].Composer);
+    if Result = 0 then Result := CompareLibraryNames(FTiles[A].Composer, FTiles[B].Composer);
+  end;
+
   { an album without a year after those with one }
   function ByYear: Integer;
   var
@@ -704,6 +727,12 @@ begin
         if Result = 0 then Result := ByArtist;
         if Result = 0 then Result := ByTitle;
       end;
+    tsComposer:
+      begin
+        Result := ByComposer;
+        if Result = 0 then Result := ByTitle;     // (recordings of one work side by side)
+        if Result = 0 then Result := ByArtist;
+      end;
     tsAdded:
       begin
         Result := CompareValue(FTiles[B].Added, FTiles[A].Added);     // the newest first
@@ -735,7 +764,7 @@ var
   Idx: array of Integer;
   I, N, FoundAt: Integer;
   T: PTrackInfo;
-  Alb, Art, LastKey: string;
+  Alb, Art, LastKey, Comp: string;
   Cur: PLibTile;
   ArtistFixed: Boolean;
   KeepSel: TStringList;
@@ -799,11 +828,19 @@ begin
         if not ArtistFixed then Cur^.Artist := OneLine(T^.Artist);
         Cur^.Year := T^.Year;
         Cur^.Added := T^.DateAdded;
+        Cur^.Composer := OneLine(T^.Composer);
       end
       else
       begin
         { the same file twice (it came from two sources) }
         if (Cur^.PathCount > 0) and (Cur^.Paths[Cur^.PathCount - 1] = T^.FilePath) then Continue;
+        { tracks without a composer do not make an album one of several composers }
+        Comp := OneLine(T^.Composer);
+        if Comp <> '' then
+        begin
+          if Cur^.Composer = '' then Cur^.Composer := Comp
+          else if not SameText(Comp, Cur^.Composer) then Cur^.Composer := LBL_VARIOUS_COMPOSERS;
+        end;
         if (not ArtistFixed) and not SameText(OneLine(T^.Artist), Cur^.Artist) then
         begin
           Cur^.Artist := LBL_VARIOUS_ARTISTS;
@@ -836,6 +873,12 @@ end;
 
 { ---- the grid's questions ---- }
 
+{ a tile's composer as shown }
+function ComposerText(T: PLibTile): string;
+begin
+  if T^.Composer = '' then Result := LBL_UNKNOWN_COMPOSER else Result := T^.Composer;
+end;
+
 procedure TLibraryTiles.GridInfo(Sender: TObject; Index: Integer; out Info: TAuTileInfo);
 var
   T: PLibTile;
@@ -854,6 +897,8 @@ begin
   end
   else if (FSort = tsYear) and (T^.Year > 0) then
     Info.Sub := Trim(IntToStr(T^.Year) + '  ' + T^.Artist)
+  else if FSort = tsComposer then
+    Info.Sub := ComposerText(T)
   else
     Info.Sub := T^.Artist;
   Info.ArtKey := T^.RawAlbum + T^.RawArtist;
@@ -872,7 +917,9 @@ begin
   Result := '';
   T := Tile(Index);
   if T = nil then Exit;
-  if FSort = tsArtist then Result := T^.Artist else Result := T^.Title;
+  if FSort = tsArtist then Result := T^.Artist
+  else if FSort = tsComposer then Result := ComposerText(T)
+  else Result := T^.Title;
 end;
 
 function TLibraryTiles.GridArt(Sender: TObject; Index: Integer; var ABudget: Integer;

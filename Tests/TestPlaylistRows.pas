@@ -36,6 +36,8 @@ type
     procedure TimeStrToSecsReadsMinutesAndHours;
     procedure GroupDurationInMinutesOrHours;
     procedure GroupKeyByFolderOrAlbum;
+    procedure AWorkIsNamedInFrontOfTheColon;
+    procedure WorksAreTracksInARowWithOneWork;
     procedure DeadRowsOnlyOnDrivesThatAnswer;
   end;
 
@@ -145,6 +147,90 @@ begin
   AssertEquals('Just under an hour', Format(FMT_DURATION_MS, [59, 59]), FormatGroupDuration(3599));
   AssertEquals('Hours', Format(FMT_DURATION_HM, [1, 5]), FormatGroupDuration(3900));
   AssertEquals('Nothing', Format(FMT_DURATION_MS, [0, 0]), FormatGroupDuration(0));
+end;
+
+procedure TTestRowRules.AWorkIsNamedInFrontOfTheColon;
+var
+  W, P: string;
+begin
+  AssertTrue('Work and part', SplitWorkTitle('Symphony No. 5 in C minor, Op. 67: I. Allegro con brio', W, P));
+  AssertEquals('Symphony No. 5 in C minor, Op. 67', W);
+  AssertEquals('I. Allegro con brio', P);
+  AssertTrue('The first colon counts', SplitWorkTitle('Act 1: Scene 2: Aria', W, P));
+  AssertEquals('Act 1', W);
+  AssertEquals('Scene 2: Aria', P);
+  AssertFalse('No colon', SplitWorkTitle('So What', W, P));
+  AssertEquals('Nothing given back', '', W + P);
+  AssertFalse('A colon without a space is a time or a ratio', SplitWorkTitle('Take 5:30', W, P));
+  AssertFalse('Nothing behind it', SplitWorkTitle('Symphony No. 5: ', W, P));
+  AssertFalse('Too short to be a work', SplitWorkTitle('II: Adagio', W, P));
+  AssertFalse('An empty title', SplitWorkTitle('', W, P));
+end;
+
+{ which tracks of a group get a work heading, and what is left of their
+  titles under it }
+procedure TTestRowRules.WorksAreTracksInARowWithOneWork;
+var
+  R: TWorkRows;
+
+  procedure Add(const ATitle, AWork: string; ADisc: Integer = 1);
+  begin
+    SetLength(R, Length(R) + 1);
+    R[High(R)] := Default(TWorkRow);
+    R[High(R)].Title := ATitle;
+    R[High(R)].Work := AWork;
+    R[High(R)].Disc := ADisc;
+  end;
+
+begin
+  R := nil;
+  FindWorks(R);                                          // nothing: no error
+
+  { the work from the titles }
+  Add('Symphony No. 5: I. Allegro', '');
+  Add('Symphony No. 5: II. Andante', '');
+  Add('symphony no. 5: III. Scherzo', '');               // the case may differ
+  Add('Overture', '');                                   // a piece of one track
+  Add('Symphony No. 7: I. Poco sostenuto', '');
+  Add('Symphony No. 7: II. Allegretto', '');
+  FindWorks(R);
+  AssertEquals('The first work', 'Symphony No. 5', R[0].Heading);
+  AssertEquals('Its part', 'I. Allegro', R[0].Part);
+  AssertEquals('No heading inside it', '', R[1].Heading);
+  AssertEquals('II. Andante', R[1].Part);
+  AssertEquals('III. Scherzo', R[2].Part);
+  AssertEquals('A single piece has no heading', '', R[3].Heading);
+  AssertEquals('And its whole title', '', R[3].Part);
+  AssertEquals('The second work', 'Symphony No. 7', R[4].Heading);
+  AssertEquals('II. Allegretto', R[5].Part);
+
+  { the work from the tag: also where the titles do not name it; the titles
+    stay whole unless they all name the same work in front of the colon }
+  R := nil;
+  Add('Allegro', 'Sonata in A');
+  Add('Adagio', 'Sonata in A');
+  Add('Sonate Nr. 2: I. Allegro', 'Sonata no. 2');
+  Add('Sonate Nr. 2: II. Largo', 'Sonata no. 2');
+  Add('Prelude: Lento', 'A Single Piece');
+  FindWorks(R);
+  AssertEquals('From the tag', 'Sonata in A', R[0].Heading);
+  AssertEquals('The plain title stays', '', R[0].Part);
+  AssertEquals('The tag''s name, not the title''s', 'Sonata no. 2', R[2].Heading);
+  AssertEquals('The part where the titles agree', 'I. Allegro', R[2].Part);
+  AssertEquals('II. Largo', R[3].Part);
+  AssertEquals('One track with a work: no heading', '', R[4].Heading);
+  AssertEquals('And its whole title', '', R[4].Part);
+
+  { a work does not run over to another disc, and two titles that only look
+    alike are no work }
+  R := nil;
+  Add('Suite: I', '', 1);
+  Add('Suite: II', '', 2);
+  Add('Live: One', '', 2);
+  Add('Other: Two', '', 2);
+  FindWorks(R);
+  AssertEquals('Not across the discs', '', R[0].Heading + R[1].Heading);
+  AssertEquals('Different texts in front of the colon', '', R[2].Heading + R[3].Heading);
 end;
 
 procedure TTestRowRules.GroupKeyByFolderOrAlbum;

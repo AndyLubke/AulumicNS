@@ -74,6 +74,11 @@ type
     FolderDir: string;
     TitleText: string;      // the track format, made by Rebuild / RefreshTexts
     ArtistText: string;     // the track's artist behind the title ('' = not shown)
+    Work: string;           // the work of its tag ('' = none)
+    WorkKnown: Boolean;     // Work was asked from the library (FillWorks asks once)
+    WorkHead: string;       // a work heading belongs above this track ('' = none; FindGroupWorks)
+    PartTitle: string;      // its title under that heading ('' = the whole title)
+    WorkFirst, WorkLast: Integer;   // the entries of its work (-1: in no work)
     Plays: Integer;         // flat list columns, from the library and the user stats (FillStats)
     LastPlayed, Added: Int64;
   end;
@@ -103,6 +108,7 @@ type
     FTop: TAuPanel;
     FEntries: array of TPlEntry;
     FCount: Integer;
+    FWorkHeadings: Boolean;
     FHeaders: array of TPlHeader;
     FHeaderCount: Integer;
     FHeaderOf: array of Integer;       // entry -> header (-1 flat)
@@ -164,6 +170,9 @@ type
     function DisplayNumber(E: Integer): string;
     procedure Changed;
     procedure BuildTexts;
+    procedure FindGroupWorks;
+    function DiscLeadAt(I: Integer): Boolean;
+    procedure SetWorkHeadings(V: Boolean);
   public
     BtnPlaylist: TAuDropButton;
     BtnView, BtnSort: TAuButton;
@@ -261,6 +270,13 @@ type
     property SortMode: TPlSortMode read FSortMode;
     property SortReverse: Boolean read FSortReverse;
     property ReadOnly: Boolean read FReadOnly;
+    { the tracks of a work (a symphony's movements) under a heading of their
+      own inside the album, with the work left out of their titles }
+    property WorkHeadings: Boolean read FWorkHeadings write SetWorkHeadings;
+    { the entries of the work entry E belongs to (False: it is in no work) }
+    function WorkOfEntry(E: Integer; out AFirst, ALast: Integer): Boolean;
+    { selects them, with the first as the focused one (False: no work) }
+    function SelectWork(E: Integer): Boolean;
     property IsDemo: Boolean read FDemo;
     property OnLookup: TPlLookupEvent read FOnLookup write FOnLookup;
     { the entries changed (added, removed, moved, cleared) }
@@ -1073,6 +1089,7 @@ begin
   Result.SampleRate := E.SampleRate;
   Result.BitDepth := E.BitDepth;
   Result.FileNameOnly := ExtractFileName(E.FilePath);
+  Result.Work := E.Work;
 end;
 
 { the rating of a track by its tags (RowRatingFingerprint) }
@@ -1101,6 +1118,7 @@ begin
   Result.AlbumArtist := CleanTag(T.AlbumArtist);
   Result.Album := CleanTag(T.Album);
   Result.Genre := CleanTag(T.Genre);
+  Result.Work := CleanTag(T.Work);
   Result.Year := T.Year;
   Result.TrackNum := T.TrackNumber;
   Result.DiscNum := T.DiscNumber;
@@ -1132,6 +1150,7 @@ begin
     T.AlbumArtist := NormalizeSemicolons(M.AlbumArtist);
     T.Album := M.Album;
     T.Genre := M.Genre;
+    T.Work := M.Work;
     T.Year := M.Year;
     T.TrackNumber := M.TrackNumber;
     T.DiscNumber := M.DiscNumber;
@@ -1216,6 +1235,7 @@ begin
   begin
     KeepWindowAlive;
     New_[I] := EntryFromTrack(Tracks[I]^);
+    New_[I].WorkKnown := True;          // (a library record)
   end;
   InsertEntries(New_, Tracks.Count, InsertAt);
 end;
@@ -1343,6 +1363,7 @@ begin
       Id := FEntries[I].Id;
       Sq := FEntries[I].Seq;
       FEntries[I] := EntryFromTrack(T);
+      FEntries[I].WorkKnown := True;
       FEntries[I].Id := Id;
       FEntries[I].Seq := Sq;
       Changes := True;
@@ -1913,10 +1934,12 @@ begin
   begin
     KeepWindowAlive;
     MetaOf(FEntries[I]);
+    { under a work heading the title is the track's part of the work }
+    if FEntries[I].PartTitle <> '' then Ctx.Meta.Title := FEntries[I].PartTitle;
     if TrackStats then StatsOf(I, False);
-    if Fmt = '' then FEntries[I].TitleText := FEntries[I].Title
+    if Fmt = '' then FEntries[I].TitleText := Ctx.Meta.Title
     else FEntries[I].TitleText := CleanTag(FormatTrackInfo(Fmt, Ctx));
-    if FEntries[I].TitleText = '' then FEntries[I].TitleText := FEntries[I].Title;
+    if FEntries[I].TitleText = '' then FEntries[I].TitleText := Ctx.Meta.Title;
     SetArtistText(I, TrackHasArtist);
   end;
   { headers }
@@ -1942,6 +1965,103 @@ begin
     end;
     FHeaders[I].Rating := AverageRating(Total, N);
   end;
+end;
+
+{ a "Disc n" heading belongs above entry I }
+function TPlaylistPane.DiscLeadAt(I: Integer): Boolean;
+var
+  H: Integer;
+begin
+  Result := False;
+  if (I < 0) or (I >= FCount) then Exit;
+  H := FHeaderOf[I];
+  Result := (H >= 0) and FHeaders[H].MultiDisc and (FEntries[I].DiscNum > 0) and
+    ((FHeaders[H].First = I) or (FEntries[I - 1].DiscNum <> FEntries[I].DiscNum));
+end;
+
+{ The works inside each group (uPlaylistRows.FindWorks): which tracks get a
+  work heading and which part of their title is shown under it. The work of
+  a track comes from the library; an entry that was loaded from a stored
+  playlist is asked for it once. Nothing in a flat list, with the headings
+  switched off or in the demo. }
+procedure TPlaylistPane.FindGroupWorks;
+var
+  H, I, K: Integer;
+  Rows: TWorkRows;
+  T: TTrackInfo;
+begin
+  for I := 0 to FCount - 1 do
+  begin
+    FEntries[I].WorkHead := '';
+    FEntries[I].PartTitle := '';
+    FEntries[I].WorkFirst := -1;
+    FEntries[I].WorkLast := -1;
+  end;
+  if (not FWorkHeadings) or (FGroupMode = gmFlat) or FDemo then Exit;
+  for I := 0 to FCount - 1 do
+    if not FEntries[I].WorkKnown then
+    begin
+      KeepWindowAlive;
+      FEntries[I].WorkKnown := True;
+      if Assigned(FOnLookup) and FOnLookup(FEntries[I].FilePath, T) then FEntries[I].Work := CleanTag(T.Work);
+    end;
+  Rows := nil;
+  for H := 0 to FHeaderCount - 1 do
+  begin
+    if FHeaders[H].Count < 2 then Continue;
+    SetLength(Rows, FHeaders[H].Count);
+    for K := 0 to FHeaders[H].Count - 1 do
+    begin
+      I := FHeaders[H].First + K;
+      Rows[K].Title := FEntries[I].Title;
+      Rows[K].Work := FEntries[I].Work;
+      Rows[K].Disc := FEntries[I].DiscNum;
+    end;
+    FindWorks(Rows);
+    for K := 0 to FHeaders[H].Count - 1 do
+    begin
+      I := FHeaders[H].First + K;
+      FEntries[I].WorkHead := Rows[K].Heading;
+      FEntries[I].PartTitle := Rows[K].Part;
+      if Rows[K].First >= 0 then
+      begin
+        FEntries[I].WorkFirst := FHeaders[H].First + Rows[K].First;
+        FEntries[I].WorkLast := FHeaders[H].First + Rows[K].Last;
+      end;
+    end;
+  end;
+end;
+
+function TPlaylistPane.WorkOfEntry(E: Integer; out AFirst, ALast: Integer): Boolean;
+begin
+  AFirst := -1;
+  ALast := -1;
+  Result := (E >= 0) and (E < FCount) and (FEntries[E].WorkFirst >= 0) and
+    (FEntries[E].WorkLast < FCount) and (FEntries[E].WorkLast >= FEntries[E].WorkFirst);
+  if not Result then Exit;
+  AFirst := FEntries[E].WorkFirst;
+  ALast := FEntries[E].WorkLast;
+end;
+
+function TPlaylistPane.SelectWork(E: Integer): Boolean;
+var
+  A, B, I, R: Integer;
+begin
+  Result := WorkOfEntry(E, A, B);
+  if not Result then Exit;
+  SelectEntry(A, True, False);
+  for I := A + 1 to B do
+  begin
+    R := RowOfEntry(I);
+    if R >= 0 then List.Selected[R] := True;
+  end;
+end;
+
+procedure TPlaylistPane.SetWorkHeadings(V: Boolean);
+begin
+  if V = FWorkHeadings then Exit;
+  FWorkHeadings := V;
+  Rebuild;
 end;
 
 { the groups and the rows from the entries; nothing is selected afterwards
@@ -2002,6 +2122,7 @@ begin
   finally
     Paths.Free;
   end;
+  FindGroupWorks;
   BuildTexts;
   { the rows }
   List.BeginUpdate;
@@ -2014,11 +2135,9 @@ begin
         List.AddHeader(-(H + 1), 2);
       KeepWindowAlive;
       R := List.AddItem(I);
-      { a "Disc n" heading above the first track of each disc of a group
-        with several discs }
-      if (H >= 0) and FHeaders[H].MultiDisc and (FEntries[I].DiscNum > 0) and
-         ((FHeaders[H].First = I) or (FEntries[I - 1].DiscNum <> FEntries[I].DiscNum)) then
-        List.SetLead(R, True);
+      { above a track: a "Disc n" heading for the first track of each disc of
+        a group with several discs, and the heading of the work it begins }
+      List.SetLeadLines(R, Ord(DiscLeadAt(I)) + Ord(FEntries[I].WorkHead <> ''));
     end;
   finally
     List.EndUpdate;
@@ -2324,15 +2443,25 @@ var
   E: Integer;
   F: TGfxFont;
   T: string;
-  TW: Single;
+  TW, SH: Single;
 begin
   E := List.Data[Row];
   if (E < 0) or (E >= FCount) then Exit;
-  T := Format('Disc %d', [FEntries[E].DiscNum]);
-  F := UIFont(List.TextSize - 1, True);
-  TW := Ceil(TextWidth(T, F));
-  G.Text(T, X, Y + S(3), TW + S(4), H - S(3), F, clTextDim, 0, 1);
-  G.FillRect(X + TW + S(12), Y + S(3) + (H - S(3)) / 2, Math.Max(0, W - TW - S(12)), 1, WithAlpha(clText, 30));
+  { one strip per heading: the disc first, the work under it }
+  SH := List.LeadHeight;
+  if DiscLeadAt(E) then
+  begin
+    T := Format('Disc %d', [FEntries[E].DiscNum]);
+    F := UIFont(List.TextSize - 1, True);
+    TW := Ceil(TextWidth(T, F));
+    G.Text(T, X, Y + S(3), TW + S(4), SH - S(3), F, clTextDim, 0, 1);
+    G.FillRect(X + TW + S(12), Y + S(3) + (SH - S(3)) / 2, Math.Max(0, W - TW - S(12)), 1, WithAlpha(clText, 30));
+    Y := Y + SH;
+  end;
+  { the work: its name, in the weight of the titles under it but bold }
+  if FEntries[E].WorkHead <> '' then
+    G.Text(FEntries[E].WorkHead, X + S(16), Y + S(3), Math.Max(0, W - S(16)), SH - S(3),
+      UIFont(List.TextSize, True), clText, 0, 1);
 end;
 
 { a click on the stars sets the rating (a header: all its tracks) }

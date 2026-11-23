@@ -37,6 +37,7 @@ type
     procedure TracksWithoutAnAlbumTagAreATilePerFolder;
     procedure TheSameFileTwiceCountsOnce;
     procedure TheTilesFollowTheChosenOrder;
+    procedure ByComposerKeepsRecordingsOfAWorkTogether;
     procedure ASearchCountsTheTracksFound;
     procedure TheSelectionSurvivesReadingTheSameAgain;
   end;
@@ -180,6 +181,37 @@ begin
   AssertEquals('by year, without a year last', 'Delta|Charlie|Alpha|Bravo', Titles);
   FTiles.Sort := tsAdded;
   AssertEquals('the newest first', 'Delta|Alpha|Bravo|Charlie', Titles);
+end;
+
+{ the order by composer: an album's composer is the one its tracks name
+  (tracks without one do not count), several make it "Various composers";
+  those and the albums without a composer come last }
+procedure TTestLibraryTiles.ByComposerKeepsRecordingsOfAWorkTogether;
+
+  procedure AddC(const AFolder, AFile, AArtist, AAlbum, AComposer: string; ATrack: Integer);
+  begin
+    Add(AFolder, AFile, AArtist, AArtist, AAlbum, 1, ATrack);
+    FTracks[FTracks.Count - 1]^.Composer := AComposer;
+  end;
+
+begin
+  AddC('m:\1', '1.flac', 'Lang', 'Goldberg L', 'Bach', 1);
+  AddC('m:\2', '1.flac', 'Gould', 'Goldberg G', 'bach', 1);
+  AddC('m:\3', '1.flac', 'Pianist', 'Recital', 'Bach', 1);
+  AddC('m:\3', '2.flac', 'Pianist', 'Recital', '', 2);
+  AddC('m:\3', '3.flac', 'Pianist', 'Recital', 'Liszt', 3);
+  AddC('m:\4', '1.flac', 'Band', 'Songs', '', 1);
+  AddC('m:\5', '1.flac', 'Trio', 'Trios', '', 1);
+  AddC('m:\5', '2.flac', 'Trio', 'Trios', 'Arensky', 2);
+  FTiles.Sort := tsComposer;
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False);
+  AssertEquals('by composer, then album; several and none last',
+    'Trios|Goldberg G|Goldberg L|Recital|Songs', Titles);
+  AssertEquals('named by a later track', 'Arensky', FTiles.Tile(0)^.Composer);
+  AssertEquals('two composers', 'Various composers', FTiles.Tile(3)^.Composer);
+  AssertEquals('none', '', FTiles.Tile(4)^.Composer);
+  FTiles.Reverse := True;
+  AssertEquals('backwards', 'Songs|Recital|Goldberg L|Goldberg G|Trios', Titles);
 end;
 
 procedure TTestLibraryTiles.ASearchCountsTheTracksFound;

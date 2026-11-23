@@ -36,6 +36,7 @@ type
     AlbumArtist : string;
     Composer    : string;
     Performer   : string;
+    Work        : string;
     Album       : string;
     Genre       : string;
     Track       : Integer;

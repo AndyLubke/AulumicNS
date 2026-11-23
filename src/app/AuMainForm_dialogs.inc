@@ -57,8 +57,7 @@ begin
     else FStatus.StatusText := '';
   end;
   { the folder watcher saw the writer's own changes: no library scan for them }
-  FWatchMuteUntil := GetTickCount64 + OWN_WRITES_GRACE_MS;
-  if FWatcher <> nil then FWatcher.Discard;
+  MuteWatcherForOwnWrites;
   if (FLibrary <> nil) and FLibrary.IsDirty then FLibrary.SaveDatabase;
   FPl.ClearThumbCache;
   if not FPl.ReadOnly then FPl.SyncWithLibrary
@@ -132,6 +131,104 @@ begin
   APaths.Clear;
   Sel := FPl.SelectedEntries;
   for I := 0 to High(Sel) do APaths.Add(FPl.Entry(Sel[I]).FilePath);
+end;
+
+{ ---- Tag consistency ---- }
+
+{ The part of the library that is selected (in the tile view without a
+  selection: what the tiles show), or all of it when that is a group itself.
+  The part is remembered as its files, not as nodes: the tree is built again
+  when tags are saved from the window. }
+procedure TMainForm.MnCheckTags(Sender: TObject);
+var
+  Nodes: TAuTreeNodeArray;
+  Scope: string;
+  Paths: TStringList;
+begin
+  if FLibrary = nil then Exit;
+  Nodes := nil;
+  if FLib.TileMode and (FLib.Tiles.Grid.SelCount = 0) then
+  begin
+    if FLib.Tree.FocusedNode <> nil then
+    begin
+      SetLength(Nodes, 1);
+      Nodes[0] := FLib.Tree.FocusedNode;
+    end;
+  end
+  else
+    Nodes := FLib.ActionNodes;
+  Scope := '';
+  Paths := nil;
+  if Length(Nodes) > 0 then
+  begin
+    Paths := TStringList.Create;
+    LibraryPaths(Nodes, Paths);
+    if Paths.Count = 0 then
+      FreeAndNil(Paths)
+    else if FLib.TileMode and (FLib.Tiles.Grid.SelCount > 0) then
+      Scope := 'The selected albums'
+    else
+    begin
+      Scope := StringReplace(FLib.Tree.NodePath(Nodes[0]), #1, ' > ', [rfReplaceAll]);
+      if Length(Nodes) > 1 then Scope := Scope + SafeFormat(' and %d more', [Length(Nodes) - 1]);
+    end;
+  end;
+  if Paths = nil then Scope := 'The whole library';
+  CheckTagsOf(Paths, Scope);
+end;
+
+{ Main menu > Tools: the whole library }
+procedure TMainForm.MnCheckTagsAll(Sender: TObject);
+begin
+  if FLibrary <> nil then CheckTagsOf(nil, 'The whole library');
+end;
+
+{ the playlist's menu: the selected tracks }
+procedure TMainForm.MnPlCheckTags(Sender: TObject);
+var
+  Paths: TStringList;
+begin
+  if FLibrary = nil then Exit;
+  Paths := TStringList.Create;
+  PlaylistPaths(Paths);
+  if Paths.Count = 0 then
+  begin
+    Paths.Free;
+    Exit;
+  end;
+  CheckTagsOf(Paths, 'The selected tracks of the playlist');
+end;
+
+{ the window for these files (it takes the list over; nil: the whole library) }
+procedure TMainForm.CheckTagsOf(APaths: TStringList; const AScope: string);
+begin
+  FreeAndNil(FCheckPaths);
+  FCheckPaths := APaths;
+  try
+    ShowLibraryCheck(Self, AScope, @CheckCollect, @EditFileProperties);
+  finally
+    FreeAndNil(FCheckPaths);
+  end;
+end;
+
+{ the tracks of that part as the library has them now }
+procedure TMainForm.CheckCollect(ATracks: TTrackList);
+var
+  I: Integer;
+  T: TTrackInfo;
+begin
+  ATracks.Clear;
+  if FLibrary = nil then Exit;
+  if FCheckPaths = nil then
+  begin
+    FLibrary.GetAllTracks(ATracks);
+    Exit;
+  end;
+  for I := 0 to FCheckPaths.Count - 1 do
+  begin
+    KeepWindowAlive;
+    if FLibrary.TryGetTrack(FCheckPaths[I], T) then ATracks.Add(T);
+  end;
 end;
 
 { the library's context menu }
@@ -306,7 +403,8 @@ end;
   drive (uDriveKeepAlive.DriveWakeProc), as a click on a cover runs it
   (WakeDrivesWithWindow). Three waits: 1.5 s (no window; a key pressed
   meanwhile does nothing, the timers run, the busy cursor is up), 7 s with
-  Escape once the window is there, 3 s with Escape before it. Then an
+  Escape once the window is there, 3 s with Escape before it. Then a file
+  written to a disk that takes 1.5 s (SaveTextFileWithWindow), and an
   hourglass that was left behind: the UI timer must take it away. Writes the
   report and closes; exit code = failures. ---- }
 
@@ -346,6 +444,8 @@ var
   Fails, Forms0: Integer;
   T0, Took: QWord;
   Ok: Boolean;
+  SaveFile, SaveErr: string;
+  Saved: TFileSaveResult;
 
   procedure Check(ACond: Boolean; const AText: string);
   begin
@@ -418,6 +518,30 @@ begin
     Check(Took < 1500, 'at once');
     Check((Screen.Cursor = crDefault) and not InputBlocked, 'cursor and input are back');
 
+    { a small file written to a disk that takes its time: the write runs on a
+      worker, the window stays alive }
+    GTestWakeMs := 1500;
+    FileSaveProc := @TestSlowWake;
+    SaveFile := FWaitTestFile + '.save.tmp';
+    FWaitTestStep := 4;
+    FWaitTestTicks := 0;
+    FWaitTestBusy := False;
+    FWaitTestTimer.Interval := 600;
+    FWaitTestTimer.Enabled := True;
+    T0 := GetTickCount64;
+    Saved := SaveTextFileWithWindow(Self, SaveFile, '', 'made-up', APP_TITLE, SaveErr);
+    Took := GetTickCount64 - T0;
+    FWaitTestTimer.Enabled := False;
+    FileSaveProc := nil;
+    R.Add(SafeFormat('--- a file saved to a disk that takes 1500 ms: returned after %d ms', [Took]));
+    Check(Saved = fsrSaved, 'the file was saved');
+    Check(FileExists(SaveFile), 'and is there');
+    Check((Took >= 1400) and (Took < 2600), 'in about the disk''s time');
+    Check(FWaitTestTicks >= 1, 'a timer ran meanwhile (the window was alive)');
+    Check(FWaitTestBusy, 'busy cursor up and input blocked during the write');
+    Check((Screen.Cursor = crDefault) and not InputBlocked, 'cursor and input are back');
+    SysUtils.DeleteFile(SaveFile);
+
     { an hourglass that was left behind (and a BeginBusy without its EndBusy):
       the UI timer takes both away }
     R.Add('--- a stray hourglass');
@@ -437,6 +561,7 @@ begin
     Check(Screen.Cursor = crDefault, 'a later action ends without an hourglass');
   finally
     DriveWakeProc := nil;
+    FileSaveProc := nil;
     FWaitTestTimer.Free;
     FWaitTestTimer := nil;
     { the two workers that were stopped still sleep: let them end }

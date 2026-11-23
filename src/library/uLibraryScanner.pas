@@ -291,7 +291,7 @@ var
   ExistingDateAdded: Int64;
   UpperAllTags, CleanFolderDir: string;
   LTitle, LAlbum, LArtist, LAlbumArtist, LGenre, LComposer, LPerformer: string;
-  LDuration, LComment, LDateStr: string;
+  LDuration, LComment, LDateStr, LWork: string;
   LTrackNum, LDiscNum, LYear, LSampleRate, LBitDepth: Integer;
   IdFolder, IdAlbum, IdArtist, IdAlbumArtist, IdGenre, IdComposer, IdPerformer, IdOther: Cardinal;
 begin
@@ -331,6 +331,7 @@ begin
   LGenre      := NormalizeSemicolons(SanitizeTagField(AMeta.Genre, 512));
   LComposer   := NormalizeSemicolons(SanitizeTagField(AMeta.Composer, 512));
   LPerformer  := NormalizeSemicolons(SanitizeTagField(AMeta.Performer, 512));
+  LWork       := SanitizeTagField(AMeta.Work, 512);
   LDuration   := SanitizeTagField(AMeta.DurationStr, 32);
   LComment    := SanitizeTagField(AMeta.Comment, 4096);
   LDateStr    := SanitizeTagField(AMeta.DateStr, 32);
@@ -360,6 +361,7 @@ begin
   PTrack^.DurationStr := PooledText(LDuration, IdOther);
   PTrack^.Comment     := PooledText(LComment, IdOther);
   PTrack^.DateStr     := PooledText(LDateStr, IdOther);
+  PTrack^.Work        := PooledText(LWork, IdOther);
 
   LTitle       := '';
   LAlbum       := '';
@@ -371,6 +373,7 @@ begin
   LDuration    := '';
   LComment     := '';
   LDateStr     := '';
+  LWork        := '';
 
   PTrack^.TrackNumber  := LTrackNum;
   PTrack^.DiscNumber   := LDiscNum;

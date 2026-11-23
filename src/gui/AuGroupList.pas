@@ -39,7 +39,7 @@ type
     Lines: Integer;       // header: one or two text lines
     Collapsed: Boolean;
     Selected: Boolean;
-    Lead: Boolean;        // item: a strip above it (OnDrawLead)
+    Lead: Byte;           // item: this many strips above it (OnDrawLead; 0 = none)
   end;
 
   TAuRowArray = array of Integer;
@@ -145,6 +145,9 @@ type
     function HeaderHeight(ALines: Integer): Integer;
     { a strip above item R for the owner to paint (OnDrawLead) }
     procedure SetLead(R: Integer; V: Boolean);
+    { the same with a number of strips, each LeadHeight high (0 = none) }
+    procedure SetLeadLines(R: Integer; ALines: Integer);
+    function LeadLines(R: Integer): Integer;
     function LeadHeight: Integer;
     { the whole row can be seen (not cut off, not under a pinned header) }
     function RowInView(R: Integer): Boolean;
@@ -270,8 +273,7 @@ begin
   begin
     if R > 0 then Result := S(10) else Result := 0;
   end
-  else if FRows[R].Lead then Result := LeadHeight
-  else Result := 0;
+  else Result := FRows[R].Lead * LeadHeight;
 end;
 
 function TAuGroupList.LeadHeight: Integer;
@@ -281,9 +283,20 @@ end;
 
 procedure TAuGroupList.SetLead(R: Integer; V: Boolean);
 begin
-  if (R < 0) or (R >= FCount) or (FRows[R].Kind <> rkItem) or (FRows[R].Lead = V) then Exit;
-  FRows[R].Lead := V;
+  SetLeadLines(R, Ord(V));
+end;
+
+procedure TAuGroupList.SetLeadLines(R: Integer; ALines: Integer);
+begin
+  ALines := EnsureRange(ALines, 0, 4);
+  if (R < 0) or (R >= FCount) or (FRows[R].Kind <> rkItem) or (FRows[R].Lead = ALines) then Exit;
+  FRows[R].Lead := ALines;
   Changed;
+end;
+
+function TAuGroupList.LeadLines(R: Integer): Integer;
+begin
+  if (R < 0) or (R >= FCount) then Result := 0 else Result := FRows[R].Lead;
 end;
 
 procedure TAuGroupList.BeginUpdate;
@@ -324,7 +337,7 @@ begin
   FRows[Result].Lines := EnsureRange(ALines, 1, 2);
   FRows[Result].Collapsed := False;
   FRows[Result].Selected := False;
-  FRows[Result].Lead := False;
+  FRows[Result].Lead := 0;
   Inc(FCount);
   FDirty := True;
 end;
@@ -346,7 +359,7 @@ begin
   FRows[Result].Lines := 1;
   FRows[Result].Collapsed := False;
   FRows[Result].Selected := False;
-  FRows[Result].Lead := False;
+  FRows[Result].Lead := 0;
   Inc(FCount);
   FDirty := True;
 end;
@@ -932,8 +945,9 @@ begin
   begin
     R := FVis[V];
     Y := FVisY[V] - FTop;
-    if FRows[R].Lead and Assigned(FOnDrawLead) and (Y - LeadHeight < ClientHeight) then
-      FOnDrawLead(Self, G, R, S(30), Y - LeadHeight, VW - S(30) - MenuGutter - S(4), LeadHeight, []);
+    if (FRows[R].Lead > 0) and Assigned(FOnDrawLead) and (Y - FRows[R].Lead * LeadHeight < ClientHeight) then
+      FOnDrawLead(Self, G, R, S(30), Y - FRows[R].Lead * LeadHeight, VW - S(30) - MenuGutter - S(4),
+        FRows[R].Lead * LeadHeight, []);
     if Y >= ClientHeight then Break;
     PaintRow(R, Y);
     Inc(V);

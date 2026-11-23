@@ -76,6 +76,7 @@ type
     PlaylistFontSize    : integer;
 
     ShowLibArtist       : Boolean;
+    ShowLibComposer     : Boolean;
     ShowLibAlbum        : Boolean;
     ShowLibGenre        : Boolean;
 
@@ -88,7 +89,7 @@ type
     DoubleClickAction   : integer;
     LibraryTiles        : boolean;   // the library pane shows tiles, not the tree
     LibraryTileSize     : integer;   // 0 = a list .. 3 = large tiles
-    LibraryTileSort     : integer;   // artist, album, year, added
+    LibraryTileSort     : integer;   // artist, album, year, added, composer
     LibraryTileSortRev  : boolean;   // that order backwards
     AutoRescanLibrary   : boolean;
     DarkMode            : boolean;
@@ -99,6 +100,7 @@ type
     CursorFollowsPlayback: Boolean;
     // An album header stays at the top of the playlist while its tracks scroll
     StickyHeaders       : Boolean;
+    WorkHeadings        : Boolean;   // the playlist: the tracks of a work under a heading of their own
     // Lower rows in the playlist and the library tree
     CompactRows         : Boolean;
     ShowPeakmeter       : boolean;
@@ -192,6 +194,7 @@ const
   KEY_PLAYLISTFONTSIZE  = 'PlayListFontSize';
 
   KEY_SHOW_LIB_ARTIST   = 'ShowLibArtist';
+  KEY_SHOW_LIB_COMPOSER = 'ShowLibComposer';
   KEY_SHOW_LIB_ALBUM    = 'ShowLibAlbum';
   KEY_SHOW_LIB_GENRE    = 'ShowLibGenre';
 
@@ -200,6 +203,7 @@ const
   KEY_TRACK_FORMAT      = 'DefaultTrackFormat';
   KEY_CURSOR_FOLLOWS    = 'CursorFollowsPlayback';
   KEY_STICKY_HEADERS    = 'StickyHeaders';
+  KEY_WORK_HEADINGS     = 'WorkHeadings';
   KEY_COMPACT_ROWS      = 'CompactRows';
 
   KEY_DEVICE_ID         = 'OutputDeviceID';
@@ -763,6 +767,7 @@ begin
 
   Data.DarkMode          := FIniFile.ReadBool(SEC_UI, KEY_DARK_MODE, True);
   Data.ShowLibArtist     := FIniFile.ReadBool(SEC_UI, KEY_SHOW_LIB_ARTIST, True);
+  Data.ShowLibComposer   := FIniFile.ReadBool(SEC_UI, KEY_SHOW_LIB_COMPOSER, False);
   Data.ShowLibAlbum      := FIniFile.ReadBool(SEC_UI, KEY_SHOW_LIB_ALBUM,  True);
   Data.ShowLibGenre      := FIniFile.ReadBool(SEC_UI, KEY_SHOW_LIB_GENRE,  True);
 
@@ -771,6 +776,7 @@ begin
   Data.DefaultTrackFormat  := FIniFile.ReadString(SEC_UI, KEY_TRACK_FORMAT,  TRACK_FORMAT_OPTIONS[0].DataStr);
   Data.CursorFollowsPlayback := FIniFile.ReadBool(SEC_UI, KEY_CURSOR_FOLLOWS, True);
   Data.StickyHeaders := FIniFile.ReadBool(SEC_UI, KEY_STICKY_HEADERS, True);
+  Data.WorkHeadings  := FIniFile.ReadBool(SEC_UI, KEY_WORK_HEADINGS, True);
   Data.CompactRows   := FIniFile.ReadBool(SEC_UI, KEY_COMPACT_ROWS, False);
 
   Data.ShowPeakMeter := FIniFile.ReadBool(SEC_UI, KEY_SHOWPEAKMETER, True);
@@ -1037,7 +1043,7 @@ begin
   Data.DefaultGroupingMode          := SettingsAdjust(Data.DefaultGroupingMode,          0, High(GROUPING_MODE_OPTIONS));
   Data.DoubleClickAction            := SettingsAdjust(Data.DoubleClickAction,            0, High(DBLCLICK_OPTIONS));
   Data.LibraryTileSize              := SettingsAdjust(Data.LibraryTileSize,              0, 3);
-  Data.LibraryTileSort              := SettingsAdjust(Data.LibraryTileSort,              0, 3);
+  Data.LibraryTileSort              := SettingsAdjust(Data.LibraryTileSort,              0, 4);
 end;
 
 procedure TAppSettings.Save(AForm: TForm);
@@ -1157,6 +1163,7 @@ begin
   FIniFile.WriteBool(SEC_UI, KEY_DARK_MODE,            Data.DarkMode);
 
   FIniFile.WriteBool(SEC_UI, KEY_SHOW_LIB_ARTIST,      Data.ShowLibArtist);
+  FIniFile.WriteBool(SEC_UI, KEY_SHOW_LIB_COMPOSER,    Data.ShowLibComposer);
   FIniFile.WriteBool(SEC_UI, KEY_SHOW_LIB_ALBUM,       Data.ShowLibAlbum);
   FIniFile.WriteBool(SEC_UI, KEY_SHOW_LIB_GENRE,       Data.ShowLibGenre);
 
@@ -1165,6 +1172,7 @@ begin
   FIniFile.WriteString(SEC_UI, KEY_TRACK_FORMAT,       Data.DefaultTrackFormat);
   FIniFile.WriteBool(SEC_UI, KEY_CURSOR_FOLLOWS,       Data.CursorFollowsPlayback);
   FIniFile.WriteBool(SEC_UI, KEY_STICKY_HEADERS,       Data.StickyHeaders);
+  FIniFile.WriteBool(SEC_UI, KEY_WORK_HEADINGS,        Data.WorkHeadings);
   FIniFile.WriteBool(SEC_UI, KEY_COMPACT_ROWS,         Data.CompactRows);
 
   FIniFile.WriteBool(SEC_UI, KEY_SHOWPEAKMETER,        Data.ShowPeakMeter);

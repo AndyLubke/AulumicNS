@@ -126,6 +126,13 @@ type
   // (see FileAccessCancelProc)
   TFileAccessCancelProc = function(AThreadHandle: THandle): Boolean;
 
+  // How SaveTextFileAside ended
+  TFileSaveResult = (
+    fsrSaved,      // the file is written
+    fsrFailed,     // it could not be written (the error text says why)
+    fsrStopped     // the wait was stopped; whether the file was written is not known
+  );
+
 // The drive of a path as the wake functions group it: 'C:' or '\\NAS\Music'
 // ('' for a relative path)
 function DriveOfPath(const APath: string): string;
@@ -173,6 +180,19 @@ function WakeDrives(APaths: TStrings; AOnWait: TDriveWaitFunc;
 // on a worker thread while AOnWait runs as above. False when AOnWait stopped
 // it (AOffline is then empty).
 function FindOfflineDrives(APaths, AOffline: TStrings; AOnWait: TDriveWaitFunc): Boolean;
+
+// UI thread. Writes AText (its bytes as they are) as the file AFile on a
+// worker thread while AOnWait runs as above: a disk that has to spin up holds
+// a write for many seconds, also when a read just before it was answered from
+// the cache of Windows. AReplaces <> '': that file is deleted once AFile is
+// written (a file saved under another name). fsrFailed: AError says why.
+// fsrStopped: AOnWait stopped the wait and the worker is set aside
+// (SetThreadAside). LastWakeReport gets the time of a write that ran to its end.
+function SaveTextFileAside(const AFile, AReplaces, AText: string; AOnWait: TDriveWaitFunc;
+  out AError: string): TFileSaveResult;
+// The same for deleting AFile. fsrSaved = the file is gone (also when it was
+// not there).
+function DeleteFileAside(const AFile: string; AOnWait: TDriveWaitFunc): TFileSaveResult;
 
 // Drives that answered a moment ago. Waking a drive costs a
 // worker thread and, for a network drive, a name lookup and a connection to
@@ -227,6 +247,9 @@ var
   // helper thread with the helper's handle of the thread (nil = the normal
   // one: CancelSynchronousIo)
   FileAccessCancelProc: TFileAccessCancelProc = nil;
+  // Tests only: called on the worker of SaveTextFileAside with the file's
+  // path before it is written (a disk that takes its time)
+  FileSaveProc: TDriveWakeProc = nil;
   // UI thread. What the last WakeDrives that ran to its end
   // spent its time on, per drive (for the log; '' = nothing had to be woken)
   LastWakeReport: string = '';
@@ -453,6 +476,20 @@ type
   public
     constructor Create(APaths: TStrings; AMode: TDriveWakeMode);
     destructor Destroy; override;
+  end;
+
+  { TTextFileSaver: the worker of SaveTextFileAside and DeleteFileAside (no
+    file to write: FFile = ''). It touches only its own fields; they are read
+    only after the thread has ended. }
+  TTextFileSaver = class(TThread)
+  private
+    FFile, FReplaces, FText, FError: string;
+    FSaved: Boolean;
+    FTookMs: QWord;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(const AFile, AReplaces, AText: string);
   end;
 
   { TFileAccessCanceller: aborts the file access of one thread that
@@ -1021,7 +1058,7 @@ end;
 // Starts AWaker and waits until its thread has ended, calling AOnWait every
 // DRIVE_WAKE_POLL_MS. True = ended (the caller frees AWaker). False = AOnWait
 // stopped the wait: AWaker is set aside (SetThreadAside).
-function RunWaker(AWaker: TDriveWaker; AOnWait: TDriveWaitFunc): Boolean;
+function RunWaker(AWaker: TThread; AOnWait: TDriveWaitFunc): Boolean;
 begin
   AWaker.Start;
   repeat
@@ -1162,6 +1199,100 @@ begin
   begin
     AOffline.AddStrings(Waker.FOffline);
     Waker.Free;
+  end;
+end;
+
+{ TTextFileSaver }
+
+constructor TTextFileSaver.Create(const AFile, AReplaces, AText: string);
+begin
+  inherited Create(True);
+  FreeOnTerminate := False;
+  FFile     := AFile;
+  FReplaces := AReplaces;
+  FText     := AText;
+end;
+
+procedure TTextFileSaver.Execute;
+var
+  Stream: TFileStream;
+  Began : QWord;
+begin
+  Began := GetTickCount64;
+  try
+    if Assigned(FileSaveProc) then
+      FileSaveProc(FFile);
+    if Terminated then
+      Exit;
+    if FFile <> '' then
+    begin
+      Stream := TFileStream.Create(LongPath(FFile), fmCreate);
+      try
+        if FText <> '' then
+          Stream.WriteBuffer(FText[1], Length(FText));
+      finally
+        Stream.Free;
+      end;
+      FSaved := True;
+      NoteDriveAnswered(FFile);
+    end;
+    if (FReplaces <> '') and (not Terminated) and (not SameText(FReplaces, FFile)) then
+    begin
+      if FileExists(LongPath(FReplaces)) then
+        SysUtils.DeleteFile(LongPath(FReplaces));
+      if FFile = '' then
+      begin
+        FSaved := not FileExists(LongPath(FReplaces));
+        NoteDriveAnswered(FReplaces);
+      end;
+    end;
+  except
+    on E: Exception do
+      FError := E.Message;
+  end;
+  FTookMs := GetTickCount64 - Began;
+end;
+
+function SaveTextFileAside(const AFile, AReplaces, AText: string; AOnWait: TDriveWaitFunc;
+  out AError: string): TFileSaveResult;
+var
+  Saver: TTextFileSaver;
+begin
+  PruneSetAside;
+  AError := '';
+  LastWakeReport := '';
+  Saver := TTextFileSaver.Create(AFile, AReplaces, AText);
+  if not RunWaker(Saver, AOnWait) then
+    Exit(fsrStopped);
+  try
+    if Saver.FSaved then
+      Result := fsrSaved
+    else
+      Result := fsrFailed;
+    AError := Saver.FError;
+    LastWakeReport := 'Writing "' + AFile + '": ' + IntToStr(Saver.FTookMs) + ' ms.';
+  finally
+    Saver.Free;
+  end;
+end;
+
+function DeleteFileAside(const AFile: string; AOnWait: TDriveWaitFunc): TFileSaveResult;
+var
+  Saver: TTextFileSaver;
+begin
+  PruneSetAside;
+  LastWakeReport := '';
+  Saver := TTextFileSaver.Create('', AFile, '');
+  if not RunWaker(Saver, AOnWait) then
+    Exit(fsrStopped);
+  try
+    if Saver.FSaved then
+      Result := fsrSaved
+    else
+      Result := fsrFailed;
+    LastWakeReport := 'Deleting "' + AFile + '": ' + IntToStr(Saver.FTookMs) + ' ms.';
+  finally
+    Saver.Free;
   end;
 end;
 

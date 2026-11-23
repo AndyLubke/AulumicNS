@@ -41,6 +41,7 @@ type
     Genre         : string;
     Composer      : string;
     Performer     : string;
+    Work          : string;      // the work (symphony, sonata ...) the track is a part of
     TrackNumber   : integer;
     DiscNumber    : integer;
     LastModified  : int64;

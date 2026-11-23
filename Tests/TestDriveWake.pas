@@ -70,6 +70,11 @@ type
     procedure UnknownNameIsNotChecked;
     procedure ShareThatDoesNotAnswerIsNotTouched;
     procedure ShareThatDoesNotAnswerIsOffline;
+    procedure TextFileIsSavedOnAWorker;
+    procedure SavedFileReplacesAnother;
+    procedure SaveThatFailsSaysWhy;
+    procedure StoppedSaveReturnsAtOnce;
+    procedure FileIsDeletedOnAWorker;
   end;
 
 implementation
@@ -88,6 +93,20 @@ begin
   InterLockedIncrement(WakeCalls);
   Sleep(WakeDelayMs);
   Result := WakeResult;
+end;
+
+function FileBytes(const AFile: string): string;
+var
+  S: TFileStream;
+begin
+  Result := '';
+  S := TFileStream.Create(AFile, fmOpenRead or fmShareDenyNone);
+  try
+    SetLength(Result, S.Size);
+    if S.Size > 0 then S.ReadBuffer(Result[1], S.Size);
+  finally
+    S.Free;
+  end;
 end;
 
 var
@@ -241,6 +260,7 @@ end;
 procedure TTestDriveWake.TearDown;
 begin
   DriveWakeProc   := nil;
+  FileSaveProc    := nil;
   DriveAnswerProc := nil;
   FileAccessCancelProc := nil;
   // A cancelled worker is freed here at the latest
@@ -733,6 +753,78 @@ begin
   end;
 end;
 
+// A small text file is written off the calling thread, byte for byte
+procedure TTestDriveWake.TextFileIsSavedOnAWorker;
+const
+  // Typed: a UTF-8 string, compared byte for byte
+  CONTENT: string = 'Bach'#13#10'..\Händel'#13#10;
+var
+  Err, F: string;
+begin
+  F := FDir + 'Link.aullink';
+  FileSaveProc := @SlowWake;     // the disk takes its time
+  WakeDelayMs  := 200;
+  AssertTrue('Saved', SaveTextFileAside(F, '', CONTENT, @OnWait, Err) = fsrSaved);
+  AssertEquals('No error', '', Err);
+  AssertEquals('The bytes as given', CONTENT, FileBytes(F));
+  AssertTrue('The wait ran meanwhile', FWaitCalls >= 3);
+  AssertTrue('The time is reported', Pos('Writing', LastWakeReport) = 1);
+  AssertTrue('The drive is noted as awake', DriveAnsweredRecently(F));
+
+  AssertTrue('An empty file', SaveTextFileAside(F, '', '', @OnWait, Err) = fsrSaved);
+  AssertEquals('Written anew, empty', '', FileBytes(F));
+end;
+
+// Saved under another name: the old file goes once the new one is written
+procedure TTestDriveWake.SavedFileReplacesAnother;
+var
+  Err: string;
+begin
+  AssertTrue('Old', SaveTextFileAside(FDir + 'Old.aullink', '', 'A', @OnWait, Err) = fsrSaved);
+  AssertTrue('New', SaveTextFileAside(FDir + 'New.aullink', FDir + 'Old.aullink', 'B', @OnWait, Err) = fsrSaved);
+  AssertFalse('The old file is gone', FileExists(FDir + 'Old.aullink'));
+  AssertEquals('The new one', 'B', FileBytes(FDir + 'New.aullink'));
+  // The same name: nothing is deleted
+  AssertTrue('Same', SaveTextFileAside(FDir + 'New.aullink', FDir + 'NEW.aullink', 'C', @OnWait, Err) = fsrSaved);
+  AssertEquals('Still there', 'C', FileBytes(FDir + 'New.aullink'));
+end;
+
+procedure TTestDriveWake.SaveThatFailsSaysWhy;
+var
+  Err: string;
+begin
+  AssertTrue('Failed', SaveTextFileAside(FDir + 'No such folder\Link.aullink', '', 'A', @OnWait, Err) = fsrFailed);
+  AssertTrue('With a reason', Err <> '');
+end;
+
+// Cancel: the caller gets control back at once, the worker ends by itself
+procedure TTestDriveWake.StoppedSaveReturnsAtOnce;
+var
+  Err, F: string;
+  Start: QWord;
+begin
+  F := FDir + 'Slow.aullink';
+  FileSaveProc := @SlowWake;
+  WakeDelayMs  := 1500;
+  FCancelAfter := 3;
+  Start := GetTickCount64;
+  AssertTrue('Stopped', SaveTextFileAside(F, '', 'A', @OnWait, Err) = fsrStopped);
+  AssertTrue('At once', GetTickCount64 - Start < 1000);
+  // The worker sees that it was stopped before it writes
+  FinishSetAsideThreads(5000);
+  AssertFalse('Nothing was written', FileExists(F));
+end;
+
+procedure TTestDriveWake.FileIsDeletedOnAWorker;
+var
+  Err, F: string;
+begin
+  F := FDir + 'Gone.aullink';
+  AssertTrue('Written', SaveTextFileAside(F, '', 'A', @OnWait, Err) = fsrSaved);
+  AssertTrue('Deleted', DeleteFileAside(F, @OnWait) = fsrSaved);
+  AssertFalse('Gone', FileExists(F));
+  AssertTrue('A file that is not there counts as gone', DeleteFileAside(F, @OnWait) = fsrSaved);
+end;
 initialization
   RegisterTest(TTestDriveWake);
 

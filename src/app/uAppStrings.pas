@@ -62,6 +62,12 @@ const
   LBL_UNKNOWN_ARTIST          = 'Unknown Artist';
   LBL_UNKNOWN_ALBUM           = 'Unknown Album';
   LBL_UNKNOWN_GENRE           = 'Unknown Genre';
+  LBL_UNKNOWN_COMPOSER        = 'Unknown Composer';
+  TITLE_LIBRARY_OLD_FORMAT    = 'Library update';
+  MSG_LIBRARY_OLD_FORMAT      = 'This library was made by an earlier version of Aulumic and has to be updated.' +
+                                sLineBreak + sLineBreak +
+                                'Do you want to update it now? This reads the tags of all music files and can take a while; ' +
+                                'music can go on playing.';
   LBL_UNKNOWN_DEVICE          = 'Unknown Device';
   LBL_ARTIST_INFO_UNAVAILABLE = 'No artist information available.';
 
@@ -160,7 +166,7 @@ const
   FMT_ERR_UNEXPECTED          = 'An unexpected error occurred:' + sLineBreak + sLineBreak +
                                 '%s' + sLineBreak + sLineBreak +
                                 'The details have been written to the log.';
-  FMT_ERR_SHORTCUT_FILESAVE   = 'Could not save the shortcut: ' + sLineBreak + 'Error: %s';
+  FMT_ERR_SHORTCUT_FILESAVE   = 'Could not save the virtual folder: ' + sLineBreak + 'Error: %s';
   FMT_ERR_PL_EXPORT           = 'Failed to export playlist:' + sLineBreak + 'Error: %s';
   FMT_CONFIRM_DELETE_ONE_PL   = 'Are you sure you want to delete %s?';
   FMT_CONFIRM_DELETE_MULTI_PL = 'Are you sure you want to delete %d selected playlists?';
@@ -233,7 +239,7 @@ const
   ERR_EDIT_RENAMEFAIL         = 'Could not rename the playlist file. It may be locked or open in another program.';
   ERR_EDIT_VALIDNUMBER        = 'Numeric field requires valid numbers (e.g. 1990 OR 1995).';
   ERR_EDIT_VALIDDATE          = 'Date format error. Use: 14d, 2w, 1m, or 1y.';
-  ERR_SHORTCUT_DELETE         = 'Could not delete the shortcut. It may be locked by another program.';
+  ERR_SHORTCUT_DELETE         = 'Could not delete the virtual folder. It may be locked by another program.';
   // 7F. File, Playlist, Decoder & Resampler Errors
   ERR_READING_FILE_PREFIX     = 'Error reading file: ';
   MSG_TAG_EDITOR_READ_FAILED  = 'The tags of this file could not be read. It will not be changed when the tags are saved.';

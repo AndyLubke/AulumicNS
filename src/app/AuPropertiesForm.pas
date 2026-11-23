@@ -35,6 +35,19 @@ function CreatePropertiesForm(AOwner: TComponent; var AData: TList; ALibrary: TL
 { screenshot mode: the tab shown (0 Tags, 1 Inspector) }
 procedure SelectPropertiesTab(AForm: TAuForm; ATab: Integer);
 
+{ For tests, on a form of CreatePropertiesForm. A field is named by its
+  caption ('Title', 'Album artist', 'Work' ...). }
+{ these rows of the file list become the selection }
+procedure PropertiesSelectRows(AForm: TAuForm; const ARows: array of Integer);
+{ what a field shows, its grey hint, and whether it can be edited }
+function PropertiesFieldText(AForm: TAuForm; const ACaption: string): string;
+function PropertiesFieldHint(AForm: TAuForm; const ACaption: string): string;
+function PropertiesFieldEnabled(AForm: TAuForm; const ACaption: string): Boolean;
+{ a text typed into a field }
+procedure PropertiesTypeField(AForm: TAuForm; const ACaption, AText: string);
+{ the record of a file (owned by the form) }
+function PropertiesRecord(AForm: TAuForm; AIndex: Integer): PTagEditNodeData;
+
 implementation
 
 uses
@@ -44,7 +57,7 @@ uses
 
 type
   TTagField = (tfTitle, tfArtist, tfAlbumArtist, tfAlbum, tfGenre, tfYear, tfTrack, tfDisc,
-    tfComposer, tfPerformer, tfComment);
+    tfComposer, tfPerformer, tfWork, tfComment);
   TTagFields = set of TTagField;
 
   { TPropertiesForm }
@@ -135,7 +148,10 @@ const
   COVER_PREVIEW_PX = 1024;   // the cover as the dialog decodes it for its preview
   MAX_COVER_BYTES = 15 * BYTES_PER_MB;
   FIELD_CAPTIONS: array[TTagField] of string = ('Title', 'Artist', 'Album artist', 'Album', 'Genre',
-    'Year', 'Track', 'Disc', 'Composer', 'Performer', 'Comment');
+    'Year', 'Track', 'Disc', 'Composer', 'Performer', 'Work', 'Comment');
+  { the fields in the order of the Tab key (as they are placed) }
+  FIELD_TAB_ORDER: array[0..11] of TTagField = (tfTitle, tfArtist, tfAlbumArtist, tfAlbum, tfGenre,
+    tfComposer, tfYear, tfTrack, tfDisc, tfWork, tfPerformer, tfComment);
   FIELD_HINTS: array[TTagField] of string = (
     'The title of the track.',
     'The performing artist(s). Separate several with ";".',
@@ -147,6 +163,7 @@ const
     'The disc number.',
     'The composer(s). Separate several with ";".',
     'The performer(s), e.g. soloists. Separate several with ";".',
+    'The work this track is a part of, e.g. a symphony whose movements are tracks.',
     'A comment (several lines).');
 
 {$PUSH}{$Q-}{$R-}
@@ -229,6 +246,75 @@ begin
   if not (AForm is TPropertiesForm) then Exit;
   TPropertiesForm(AForm).FTabs.TabIndex := ATab;
   TPropertiesForm(AForm).TabChange(nil);
+end;
+
+{ ---- for tests ---- }
+
+function FieldByCaption(const ACaption: string; out AField: TTagField): Boolean;
+var
+  F: TTagField;
+begin
+  for F := Low(TTagField) to High(TTagField) do
+    if SameText(FIELD_CAPTIONS[F], ACaption) then
+    begin
+      AField := F;
+      Exit(True);
+    end;
+  AField := tfTitle;
+  Result := False;
+end;
+
+procedure PropertiesSelectRows(AForm: TAuForm; const ARows: array of Integer);
+var
+  I: Integer;
+  P: TPropertiesForm;
+begin
+  if not (AForm is TPropertiesForm) then Exit;
+  P := TPropertiesForm(AForm);
+  P.FList.ClearSelection;
+  for I := 0 to High(ARows) do P.FList.Selected[ARows[I]] := True;
+  P.SyncUIToSelection;
+end;
+
+function PropertiesFieldText(AForm: TAuForm; const ACaption: string): string;
+var
+  F: TTagField;
+begin
+  Result := '';
+  if (AForm is TPropertiesForm) and FieldByCaption(ACaption, F) then Result := TPropertiesForm(AForm).FieldText(F);
+end;
+
+function PropertiesFieldHint(AForm: TAuForm; const ACaption: string): string;
+var
+  F: TTagField;
+begin
+  Result := '';
+  if (AForm is TPropertiesForm) and FieldByCaption(ACaption, F) then
+    Result := TPropertiesForm(AForm).FEdits[F].Placeholder;
+end;
+
+function PropertiesFieldEnabled(AForm: TAuForm; const ACaption: string): Boolean;
+var
+  F: TTagField;
+begin
+  Result := (AForm is TPropertiesForm) and FieldByCaption(ACaption, F) and TPropertiesForm(AForm).FEdits[F].Enabled;
+end;
+
+procedure PropertiesTypeField(AForm: TAuForm; const ACaption, AText: string);
+var
+  F: TTagField;
+  P: TPropertiesForm;
+begin
+  if not ((AForm is TPropertiesForm) and FieldByCaption(ACaption, F)) then Exit;
+  P := TPropertiesForm(AForm);
+  P.SetFieldText(F, AText);
+  { (a text set by the program tells nobody: the change as a key press makes it) }
+  P.EditorChange(P.FEdits[F]);
+end;
+
+function PropertiesRecord(AForm: TAuForm; AIndex: Integer): PTagEditNodeData;
+begin
+  if AForm is TPropertiesForm then Result := TPropertiesForm(AForm).Item(AIndex) else Result := nil;
 end;
 
 { ---- TPropertiesForm ---- }
@@ -321,7 +407,7 @@ begin
   FPageInspector.Visible := False;
 
   for F := Low(TTagField) to High(TTagField) do Field(F);
-  for F := Low(TTagField) to High(TTagField) do FEdits[F].TabOrder := Ord(F);
+  for I := 0 to High(FIELD_TAB_ORDER) do FEdits[FIELD_TAB_ORDER[I]].TabOrder := I;
 
   { the cover }
   FCoverLbl := AddLabel(FTags, 'Cover', 0, 0, COVER_W, True);
@@ -436,7 +522,7 @@ end;
 procedure TPropertiesForm.Layout;
 var
   K: Single;
-  Wd, Ht, PW, PH, FW, CX, Y, MemoH, BY, Half, Third: Integer;
+  Wd, Ht, PW, PH, FW, CX, Y, MemoH, BY, Half, RH, Small: Integer;
   Scrolls: Boolean;
 
   procedure Place(C: TControl; X, AY, W, H: Integer);
@@ -475,7 +561,6 @@ begin
   CX := FW + 28;
   MemoH := Math.Max(COMMENT_H, PH - TAGS_MIN_H + COMMENT_H);
   Half := (FW - 16) div 2;
-  Third := (FW - 32) div 3;
   Y := 0;
   PlaceField(tfTitle, 0, Y, FW);
   Inc(Y, 66);
@@ -485,11 +570,16 @@ begin
   PlaceField(tfAlbum, 0, Y, Half);
   PlaceField(tfGenre, Half + 16, Y, FW - Half - 16);
   Inc(Y, 66);
-  PlaceField(tfYear, 0, Y, Third);
-  PlaceField(tfTrack, Third + 16, Y, Third);
-  PlaceField(tfDisc, 2 * (Third + 16), Y, FW - 2 * (Third + 16));
-  Inc(Y, 66);
+  { the composer, and the three short fields in the other half (the year
+    the widest of them) }
   PlaceField(tfComposer, 0, Y, Half);
+  RH := FW - Half - 16;
+  Small := Math.Max(44, (RH - 16) * 23 div 100);
+  PlaceField(tfYear, Half + 16, Y, RH - 16 - 2 * Small);
+  PlaceField(tfTrack, Half + 16 + RH - 2 * Small - 8, Y, Small);
+  PlaceField(tfDisc, Half + 16 + RH - Small, Y, Small);
+  Inc(Y, 66);
+  PlaceField(tfWork, 0, Y, Half);
   PlaceField(tfPerformer, Half + 16, Y, FW - Half - 16);
   Inc(Y, 66);
   PlaceField(tfComment, 0, Y, FW);
@@ -608,6 +698,7 @@ var
       tfDisc: if AD^.Current.Disc > 0 then Result := IntToStr(AD^.Current.Disc) else Result := '';
       tfComposer: Result := AD^.Current.Composer;
       tfPerformer: Result := AD^.Current.Performer;
+      tfWork: Result := AD^.Current.Work;
     else
       Result := AD^.Current.Comment;
     end;
@@ -877,6 +968,7 @@ begin
       tfDisc: D^.Current.Disc := ExtractTagNumber(T);
       tfComposer: D^.Current.Composer := T;
       tfPerformer: D^.Current.Performer := T;
+      tfWork: D^.Current.Work := T;
       tfComment: D^.Current.Comment := T;
     end;
     D^.IsModified :=
@@ -885,6 +977,7 @@ begin
       (D^.Current.Genre <> D^.Original.Genre) or (D^.Current.DateStr <> D^.Original.DateStr) or
       (D^.Current.Track <> D^.Original.Track) or (D^.Current.Composer <> D^.Original.Composer) or
       (D^.Current.Performer <> D^.Original.Performer) or (D^.Current.Comment <> D^.Original.Comment) or
+      (D^.Current.Work <> D^.Original.Work) or
       (D^.Current.Disc <> D^.Original.Disc);
   end;
   MarkRows;

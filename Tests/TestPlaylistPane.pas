@@ -40,6 +40,7 @@ type
     procedure TheSelectionFollowsTheTrackThatStarts;
     procedure TheHeaderStaysPinnedWhileItsTracksScroll;
     procedure DiscsGetAHeadingAndGuestsTheirName;
+    procedure WorksGetAHeadingAndShortTitles;
     procedure ASortedViewKeepsTheOrderAdded;
     procedure EveryClosedAlbumIsRemembered;
     procedure AFlatListHasColumnsAndSortsByThem;
@@ -344,6 +345,109 @@ begin
   FPane.Rebuild;
   AssertEquals('Not in a flat list', '', FPane.Entry(5).ArtistText);
   AssertEquals('A flat list has no disc headings', 0, GapAbove(2));
+end;
+
+{ The tracks of a work get a heading above the first of them and show only
+  their part of it; a disc heading and a work heading stand one above the
+  other; switched off, in a flat list and for entries loaded from a stored
+  playlist (the work is asked from the library once) }
+procedure TTestPlaylistPane.WorksGetAHeadingAndShortTitles;
+const
+  TITLES: array[1..6] of string = ('Symphony No. 5: I. Allegro', 'Symphony No. 5: II. Andante',
+    'Allegro', 'Adagio', 'Overture', 'Encore');
+  WORKS: array[1..6] of string = ('', '', 'Sonata in A', 'Sonata in A', '', '');
+var
+  I, Lead: Integer;
+  T: TTrackInfo;
+  Stored: TPlaylistEntries;
+
+  function GapAbove(E: Integer): Integer;
+  begin
+    Result := FPane.List.RowRect(FPane.RowOfEntry(E)).Top - FPane.List.RowRect(FPane.RowOfEntry(E) - 1).Bottom;
+  end;
+
+begin
+  FTracks.Clear;
+  for I := 1 to 6 do
+  begin
+    T := Default(TTrackInfo);
+    T.FilePath := Format('C:\Music\Album\%.2d Track.flac', [I]);
+    T.FolderDir := ExtractFileDir(T.FilePath);
+    T.Title := TITLES[I];
+    T.Work := WORKS[I];
+    T.Artist := 'An Artist';
+    T.AlbumArtist := 'An Artist';
+    T.Album := 'Album';
+    T.TrackNumber := I;
+    { the sonata begins the second disc }
+    if I <= 2 then T.DiscNumber := 1 else T.DiscNumber := 2;
+    FTracks.Add(T);
+  end;
+  FForm.HandleNeeded;
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  FPane.WorkHeadings := True;
+  FPane.AddTracks(FTracks);
+  FPane.List.SetBounds(0, 40, 800, 560);
+  FPane.List.HandleNeeded;
+  Lead := FPane.List.LeadHeight;
+  AssertEquals('The library was not asked for tracks that came from it', 0, FLookups);
+
+  AssertEquals('The work of the titles', 'Symphony No. 5', FPane.Entry(0).WorkHead);
+  AssertEquals('Its first part', 'I. Allegro', FPane.Entry(0).TitleText);
+  AssertEquals('Its second part', 'II. Andante', FPane.Entry(1).TitleText);
+  AssertEquals('No heading inside the work', '', FPane.Entry(1).WorkHead);
+  AssertEquals('The work of the tag', 'Sonata in A', FPane.Entry(2).WorkHead);
+  AssertEquals('Its plain titles stay', 'Allegro', FPane.Entry(2).TitleText);
+  AssertEquals('A piece of one track', '', FPane.Entry(4).WorkHead);
+  AssertEquals('Overture', FPane.Entry(4).TitleText);
+
+  AssertEquals('Disc 1 and the symphony: two strips', 2 * Lead, GapAbove(0));
+  AssertEquals('None inside the work', 0, GapAbove(1));
+  AssertEquals('Disc 2 and the sonata: two strips', 2 * Lead, GapAbove(2));
+  AssertEquals('None above a single piece', 0, GapAbove(4));
+
+  { the entries of a work, for "Select work" }
+  AssertTrue('The second movement is in a work', FPane.WorkOfEntry(1, I, Lead));
+  AssertEquals('From its first track', 0, I);
+  AssertEquals('To its last', 1, Lead);
+  AssertFalse('A single piece is in none', FPane.WorkOfEntry(4, I, Lead));
+  AssertFalse('Nor an entry that is not there', FPane.WorkOfEntry(99, I, Lead));
+  AssertTrue('Selected', FPane.SelectWork(3));
+  AssertEquals('Both tracks of the sonata', 2, Length(FPane.SelectedEntries));
+  AssertEquals('The first of them', 2, FPane.SelectedEntries[0]);
+  AssertEquals('And the second', 3, FPane.SelectedEntries[1]);
+  AssertFalse('Nothing to select for a single piece', FPane.SelectWork(5));
+  Lead := FPane.List.LeadHeight;
+
+  { with a format around the title the part is what the format gets }
+  FPane.SetView(gmAlbum, '%album%', '%artist% - %title%', '', False);
+  FPane.Rebuild;
+  AssertEquals('An Artist - II. Andante', FPane.Entry(1).TitleText);
+
+  { switched off: the titles whole, only the disc headings }
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  FPane.WorkHeadings := False;
+  AssertEquals('No work heading', '', FPane.Entry(0).WorkHead);
+  AssertEquals('The whole title', 'Symphony No. 5: I. Allegro', FPane.Entry(0).TitleText);
+  AssertEquals('The disc heading alone', Lead, GapAbove(0));
+
+  { a flat list has neither }
+  FPane.WorkHeadings := True;
+  FPane.SetView(gmFlat, '', '%title%', '', False);
+  FPane.Rebuild;
+  AssertEquals('No heading in a flat list', '', FPane.Entry(0).WorkHead);
+  AssertEquals('No strip', 0, GapAbove(2));
+
+  { entries of a stored playlist do not carry the work: the library is asked,
+    once per track }
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  Stored := FPane.ToEntries;
+  FLookups := 0;
+  FPane.LoadEntries(Stored);
+  AssertEquals('The work of the tag came from the library', 'Sonata in A', FPane.Entry(2).WorkHead);
+  AssertEquals('One question per track', 6, FLookups);
+  FPane.Rebuild;
+  AssertEquals('And none at the next rebuild', 6, FLookups);
 end;
 
 { A sort is a view: the groups are shown in its order, the entries are

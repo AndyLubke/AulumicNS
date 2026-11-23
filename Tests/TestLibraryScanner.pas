@@ -46,13 +46,14 @@ type
     procedure RefreshNoticesAddedChangedAndDeletedFiles;
     procedure RefreshWithoutChangesReportsNoChanges;
     procedure FullRebuildRereadsUnchangedFiles;
+    procedure ARebuildFillsTheWorksOfAnOlderLibrary;
     procedure ReplayGainNeedsAnAlbumGainOnlyWithAnAlbumTag;
   end;
 
 implementation
 
 uses
-  DateUtils, uLibraryDatabase, uAppConsts, uAppStrings, TestHelpers;
+  DateUtils, uLibraryDatabase, uAppConsts, uAppStrings, uDbStore, TestHelpers;
 
 { TTestLibraryScanner }
 
@@ -144,6 +145,89 @@ begin
   AssertTrue('Three', FLib.TryGetTrack(FMusic + '\Album B\01 - Three.wav', T));
   AssertEquals('No album tag: the library''s placeholder', LBL_UNKNOWN_ALBUM, T.Album);
   AssertTrue('Without an album tag the track gain is all there is', T.HasReplayGain);
+end;
+
+// The snapshot as a version without the Work field wrote it: without the
+// block of the works behind its tracks (the magic, a flag byte and one text
+// id per track)
+procedure StripWorksBlock(const AFile: string; ATracks: Integer);
+var
+  Gen: QWord;
+  Body: TBytes;
+  Err: string;
+begin
+  if not LoadSnapshot(AFile, 'AUNSLIBR', Gen, Body, Err) then
+    raise Exception.Create('The snapshot could not be read: ' + Err);
+  SetLength(Body, Length(Body) - (4 + 1 + 4 * ATracks));
+  if not SaveSnapshot(AFile, 'AUNSLIBR', Gen, Body, Err) then
+    raise Exception.Create('The snapshot could not be written: ' + Err);
+end;
+
+// A scan reads the work from the tag. A library written without the works
+// (by an earlier version) says so, keeps saying so after a save and after a
+// refresh, and knows them again after a rebuild.
+procedure TTestLibraryScanner.ARebuildFillsTheWorksOfAnOlderLibrary;
+var
+  One: string;
+  T: TTrackInfo;
+
+  procedure Reopen;
+  begin
+    FreeAndNil(FLib);
+    FLib := TLibraryManager.Create(FDir + 'library.adb');
+    FLib.OnScanDone     := @ScanDone;
+    FLib.OnScanProgress := @ScanProgress;
+    FLib.LoadDatabase;
+  end;
+
+begin
+  One := FMusic + '\Album A\01 - One.wav';
+  AddWavId3Tag(One, ['TALB', 'Album A', 'TXXX', 'WORK'#0'Symphony No. 9']);
+  RunScan;
+  AssertTrue('Found', FLib.TryGetTrack(One, T));
+  AssertEquals('The work from the tag', 'Symphony No. 9', T.Work);
+  AssertFalse('A library made here knows its works', FLib.NeedsRebuildForWorks);
+  FLib.SaveDatabase;
+
+  Reopen;
+  AssertFalse('Nor does a reload ask for a rebuild', FLib.NeedsRebuildForWorks);
+  AssertTrue('Found again', FLib.TryGetTrack(One, T));
+  AssertEquals('The work from the snapshot', 'Symphony No. 9', T.Work);
+
+  // the same library as an earlier version wrote it
+  FLib.IsDirty := False;
+  FreeAndNil(FLib);
+  StripWorksBlock(FDir + 'library.adb', 3);
+  Reopen;
+  AssertEquals('The tracks are all there', 3, FLib.GetTrackCount);
+  AssertTrue('It has to be rebuilt', FLib.NeedsRebuildForWorks);
+  AssertTrue('Found', FLib.TryGetTrack(One, T));
+  AssertEquals('No work is known', '', T.Work);
+  AssertEquals('The other fields are', 'Album A', T.Album);
+
+  // saved by this version: the question stays
+  FLib.IsDirty := True;
+  FLib.SaveDatabase;
+  Reopen;
+  AssertTrue('Still to be rebuilt after a save', FLib.NeedsRebuildForWorks);
+
+  // a refresh reads no unchanged file
+  RunScan;
+  AssertTrue('Still to be rebuilt after a refresh', FLib.NeedsRebuildForWorks);
+  AssertTrue('Found', FLib.TryGetTrack(One, T));
+  AssertEquals('Still no work', '', T.Work);
+
+  // the rebuild
+  RunScan(True);
+  AssertTrue('The rebuild counts as a change', FLastChange);
+  AssertFalse('Rebuilt', FLib.NeedsRebuildForWorks);
+  AssertTrue('Found', FLib.TryGetTrack(One, T));
+  AssertEquals('The work is back', 'Symphony No. 9', T.Work);
+  FLib.SaveDatabase;
+  Reopen;
+  AssertFalse('And it stays so', FLib.NeedsRebuildForWorks);
+  AssertTrue('Found', FLib.TryGetTrack(One, T));
+  AssertEquals('The work after the reload', 'Symphony No. 9', T.Work);
 end;
 
 procedure TTestLibraryScanner.FirstScanFindsEveryFile;
