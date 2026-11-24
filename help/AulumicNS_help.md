@@ -93,7 +93,7 @@ From top to bottom; the numbers are those in the picture:
 - **Playlist:** New playlist, the Playlist Manager, import and export, expand or collapse all albums, remove dead items and clear the playlist.
 - **View:** The switches that are changed now and then, without opening Preferences: dark or light mode and the accent colour under Theme, Compact rows, Peak meter, Keep album headers in view, Cursor follows playback and Library as tiles. A tick shows what is on.
 - **Tools:** Properties, Calculate ReplayGain for the library and Check tag consistency of the library (both for everything in the library; the same two for a selection are in the right-click menus), the log and the Debug Queue.
-- **Below these:** Preferences, Help, About and Quit.
+- **Below these:** Preferences, Help, About and Quit. The About window has a Check for updates button: a click asks GitHub for the latest version. When a newer one is there, a box offers to open its download page.
 
 {2} **Preferences:** The gear at the right of the title bar opens Preferences (also with Ctrl+P), where all settings are.
 
@@ -126,7 +126,7 @@ From top to bottom; the numbers are those in the picture:
 - **While sorted or reversed:** Albums can't be dragged to another place, and added music finds its own place.
 - **Remembered:** Each playlist keeps its choice. The buttons aren't there in a flat list, which is sorted by its column headings.
 
-{8} **View & edit:** The View button changes how the playlist is grouped and shown; the pencil {9} opens the Playlist Manager. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list. Work headings, at the bottom of that menu, switches the headings of works on or off for all playlists.
+{8} **View & edit:** The View button changes how the playlist is grouped and shown; the pencil {9} opens the Playlist Manager. Album header format and Track format each offer a few common formats and Choose fields, which opens the boxes described under Playlist Editor. The album header format can only be chosen while the playlist is grouped By album, and the track format not in a flat list. Work headings, at the bottom of that menu, switches the headings of works on or off for all playlists.
 
 {10} **Library pane:** The music collection, grouped by folder, artist, album or genre, as a tree or as album tiles {5}. Right-click (or click the three dots on a row) for more options, such as playing or adding to a playlist (Replace current playlist empties the playlist first), Auto-collapse other nodes, Virtual Folders, Tools (ReplayGain and the tag consistency check for the selection) or Properties. If a library folder sits on a drive that isn't connected, it's dimmed and marked (not available); its tracks stay in the library.
 
@@ -274,7 +274,7 @@ All shortcuts are also listed in Preferences > Shortcuts.
 
 Open Preferences from the main menu, with the gear in the title bar, or with Ctrl+P. The settings are on nine pages, listed on the left: Library, Appearance, Playlists, Output, DSD, Resampler, Volume, System and Shortcuts. Every setting has a short description under its name. OK keeps the changes, Cancel drops them.
 
-**Cards:** Settings that are set once and then left alone sit in cards at the bottom of a page. Click a card to open it, and again to close it; cards left open are open again next time.
+**Cards:** Settings that are set once and then left alone sit in cards at the bottom of a page. Click a card to open it, and again to close it.
 
 **Related settings:** Some pages end with buttons that lead to a neighbouring subject, for example from Output to the audio thread settings on the System page.
 
@@ -324,7 +324,8 @@ The settings of this page:
 
 ![Preferences: Playlists](24-prefs-2)
 
-- **Playlists grouping, Album header format, Track format:** The defaults of the playlists; each playlist can override them in the Playlist Editor.
+- **Playlists grouping:** The default grouping of the playlists; each playlist can override it in the Playlist Editor.
+- **Album header format, Track format:** The fields of the album headers and of the track lines: up to four, one per box, in the order of the line. The line under the boxes shows an example. Each playlist can override them.
 - **Keep album headers in view:** While scrolling through an album, its header stays at the top of the playlist.
 - **Cursor follows playback:** When a track starts, the selection moves to it, and it scrolls into view if it wasn't visible. This only happens in the playlist that is playing; a playlist that is being browsed meanwhile stays where it is. Switch it off to keep the selection where it was put.
 
@@ -412,8 +413,9 @@ These settings help Windows give audio playback priority over other tasks. Leave
 
 - **Always save the log:** Writes the log to `AulumicNSLog.txt` in the Data folder at every exit (the file is replaced each time). Without this switch a log is only saved after an error, as `AulumicNSLog_<date>.txt`. Turn it on to report a problem or to see what the last session did.
 
-### Card: Artist information
+### Card: Internet
 
+- **Check for updates at start:** Asks GitHub once at every start whether a newer version is available. When there is one, a box offers to open its download page; Skip this version keeps the box away until a later version is released. Off by default.
 - **Last.fm API key:** Artist Info gets its biographies from Last.fm, and Last.fm asks every program for a key. Aulumic has none built in, so a personal key is needed.
   - **Getting one:** It's free. Create an API account at last.fm/api and paste its "API key" into this field.
   - **Without a key:** Biographies already downloaded are still shown.
@@ -448,24 +450,24 @@ Double-click a playlist (or press Enter) to show it.
 
 The Playlist Editor opens when a playlist is created or edited.
 
-![The Playlist Editor of a standard playlist](33-playlist-editor){1=84,25.7 2=84,39.2 3=84,55.2 4=84,69.3}
+![The Playlist Editor of a standard playlist](33-playlist-editor){1=84,15.9 2=84,25.8 3=90,43.6 4=90,65.2}
 
 ## General settings
 
 - {1} **Playlist name:** The name of the playlist. "Default" is reserved.
 - {2} **Grouping:** By album, By folder or Flat list. *Use global preferences* follows the setting in Preferences > Playlists.
-- {3} **Album header format:** The layout of the album headers (only when grouped By album).
-- {4} **Track format:** The layout of the tracks.
+- {3} **Album header format:** The fields of the album headers, up to four, in the order of the line (only when grouped By album). With every box on (nothing), the playlist follows Preferences.
+- {4} **Track format:** The fields of the track lines, chosen the same way.
 
 ## Auto-playlist rules
 
-![The Playlist Editor of an auto-playlist](34-autoplaylist-editor){1=84,14.4 2=84,22 3=84,30.9 4=84,38.7 5=84,53 6=84,67 7=76.8,77.9 8=61.5,85}
+![The Playlist Editor of an auto-playlist](34-autoplaylist-editor){1=84,10.3 2=84,16.8 3=90,28.4 4=90,42.5 5=84,55.6 6=75,62.1 7=84,71.2 8=61.5,80.5}
 
 An auto-playlist has the general settings of every playlist ({1}, {2}, {3} and {4}, see above) and is built from one or more rules; each rule checks one tag.
 
-- {5} **Smart rule template:** A ready-made set of rules, or *Custom* for own rules.
-- {6} **The rules:** The rules of this playlist. Click one to load it into the boxes below it.
-- {7} **Query builder:** Pick the tag, the operator and the value, then click Add.
+- {5} **Rules:** A ready-made set of rules, or *Custom* for own rules.
+- {6} **Query builder:** Pick the tag, the operator and the value, then click Add.
+- {7} **The rules:** The rules of this playlist. Click one to load it into the boxes above it.
 - {8} **Remove:** Takes the selected rule out of the list. The Rules button opens this help topic.
 
 ### Combining rules (AND / OR)
@@ -641,7 +643,7 @@ Artist Info shows a biography and a picture of an artist. To open it, click an a
 
 ![Artist Info](41-artist-info)
 
-Next to the biography and the picture, it says how many albums and tracks of the artist are in the library. The information comes from Last.fm, Wikipedia and TheAudioDB (the artist's name is sent to these services) and is kept in the Data folder, so it's there right away next time. The biographies need a free Last.fm API key: enter it in Preferences > System > Artist information.
+Next to the biography and the picture, it says how many albums and tracks of the artist are in the library. The information comes from Last.fm, Wikipedia and TheAudioDB (the artist's name is sent to these services) and is kept in the Data folder, so it's there right away next time. The biographies need a free Last.fm API key: enter it in Preferences > System > Internet.
 
 - **Edit (F2):** Edit the biography; it is saved automatically.
 - **Picture (Ctrl+O):** Choose a picture, drop an image file on the window, or paste one with Ctrl+V. Remove (Del) deletes it.

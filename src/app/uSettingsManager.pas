@@ -105,6 +105,10 @@ type
     CompactRows         : Boolean;
     ShowPeakmeter       : boolean;
     LastFMApiKey        : string;
+    // Ask once after the start whether a newer version is available
+    CheckUpdatesAtStart : Boolean;
+    // The version the user chose not to be told about at start ('' = none)
+    SkippedVersion      : string;
 
     // --- APPEARANCE, OUTPUT & OTHER STATE ---
     ThemeMode           : integer;   // 0 dark, 1 light, 2 follow Windows (DarkMode follows it)
@@ -119,8 +123,10 @@ type
     WasapiDeviceID      : string;    // the device of each interface; Audio.DeviceID
     AsioDriverID        : string;    // is the one of the chosen interface
     WatchFolders        : boolean;
+    // Where Preferences was left, until the program closes (not stored): the
+    // page, and the cards that are open (ids, comma separated)
     PrefsPage           : integer;
-    PrefsCards          : string;    // the cards of Preferences that are open (ids, comma separated)
+    PrefsCards          : string;
     TonePresets         : TTonePresets;  // the saved settings of the tone control
     LastAddDir          : string;    // the folder of the last "Add Files / Folder"
     RGScanThreads       : integer;   // ReplayGain scan: tracks measured at once (1 .. RG_MAX_THREADS)
@@ -158,7 +164,7 @@ var
 
 implementation
 
-uses Windows, uAppStrings, uAppConsts, ALAudioTypes, uOSUtils, Math, AuTheme;
+uses Windows, uAppStrings, uAppConsts, ALAudioTypes, uOSUtils, Math, AuTheme, uPlaylistFormat, uUpdateCheck;
 
 const
   SEC_MAIN              = 'Main';
@@ -252,6 +258,8 @@ const
   KEY_SHOWPEAKMETER       = 'ShowPeakMeter';
 
   KEY_LASTFM_API_KEY      = 'LastFmAPIKey';
+  KEY_CHECK_UPDATES       = 'CheckUpdatesAtStart';
+  KEY_SKIPPED_VERSION     = 'SkippedVersion';
 
   KEY_TONE_DIRECT         = 'ToneDirect';
   KEY_TONE_BASS           = 'ToneBass';
@@ -772,8 +780,8 @@ begin
   Data.ShowLibGenre      := FIniFile.ReadBool(SEC_UI, KEY_SHOW_LIB_GENRE,  True);
 
   Data.DefaultGroupingMode := FIniFile.ReadInteger(SEC_UI, KEY_GROUPING_MODE, VAL_DEF_GROUPING_MODE);
-  Data.DefaultHeaderFormat := FIniFile.ReadString(SEC_UI, KEY_HEADER_FORMAT, HEADER_FORMAT_OPTIONS[0].DataStr);
-  Data.DefaultTrackFormat  := FIniFile.ReadString(SEC_UI, KEY_TRACK_FORMAT,  TRACK_FORMAT_OPTIONS[0].DataStr);
+  Data.DefaultHeaderFormat := FIniFile.ReadString(SEC_UI, KEY_HEADER_FORMAT, FMT_DEFAULT[fkHeader]);
+  Data.DefaultTrackFormat  := FIniFile.ReadString(SEC_UI, KEY_TRACK_FORMAT,  FMT_DEFAULT[fkTrack]);
   Data.CursorFollowsPlayback := FIniFile.ReadBool(SEC_UI, KEY_CURSOR_FOLLOWS, True);
   Data.StickyHeaders := FIniFile.ReadBool(SEC_UI, KEY_STICKY_HEADERS, True);
   Data.WorkHeadings  := FIniFile.ReadBool(SEC_UI, KEY_WORK_HEADINGS, True);
@@ -781,12 +789,14 @@ begin
 
   Data.ShowPeakMeter := FIniFile.ReadBool(SEC_UI, KEY_SHOWPEAKMETER, True);
   // No key is built in (the source is public): the user's own
-  // key, entered in Preferences > System > Artist information. While none is
+  // key, entered in Preferences > System > Internet. While none is
   // set, a key file next to the program file is taken over; Save then keeps
   // it in the settings, so the file is only needed once.
   Data.LastFmApiKey  := Trim(FIniFile.ReadString(SEC_ADVANCED, KEY_LASTFM_API_KEY, ''));
   if Data.LastFmApiKey = '' then
     Data.LastFmApiKey := ReadLastFmKeyFile(ExtractFilePath(ParamStr(0)) + FILE_LASTFM_KEY);
+  Data.CheckUpdatesAtStart := FIniFile.ReadBool(SEC_ADVANCED, KEY_CHECK_UPDATES, False);
+  Data.SkippedVersion := Trim(FIniFile.ReadString(SEC_ADVANCED, KEY_SKIPPED_VERSION, ''));
 
   Data.Audio.UseHighResTimer  := FIniFile.ReadBool(SEC_AUDIO, KEY_USE_HIGHRES_TIMER, True);
   Data.Audio.OptimizeAffinity := FIniFile.ReadBool(SEC_AUDIO, KEY_OPTIMIZE_AFFINITY, True);
@@ -809,8 +819,9 @@ begin
   Data.WatchFolders := FIniFile.ReadBool(SEC_LIBRARY, KEY_WATCH_FOLDERS, True);
   Data.RGScanThreads := FIniFile.ReadInteger(SEC_ADVANCED, KEY_RG_SCAN_THREADS, 1);
   Data.AlwaysSaveLog := FIniFile.ReadBool(SEC_ADVANCED, KEY_ALWAYS_SAVE_LOG, False);
-  Data.PrefsPage    := FIniFile.ReadInteger(SEC_UI, KEY_PREFS_PAGE, 0);
-  Data.PrefsCards   := FIniFile.ReadString(SEC_UI, KEY_PREFS_CARDS, '');
+  { Preferences opens on its first page with every card closed }
+  Data.PrefsPage    := 0;
+  Data.PrefsCards   := '';
   LoadTonePresets;
   Data.LastAddDir   := FIniFile.ReadString(SEC_UI, KEY_LAST_ADD_DIR, '');
   SyncOutputDevice;
@@ -865,20 +876,6 @@ procedure TAppSettings.SanitizeValues;
     end;
   end;
 
-  function IsValidStrOption(const Value: string; const Options: array of TFormatDef): Boolean;
-  var
-    I: Integer;
-  begin
-    Result := False;
-    if Trim(Value) = '' then
-      Exit(False);
-
-    for I := Low(Options) to High(Options) do
-    begin
-      if (Options[I].DataStr <> '') and SameText(Value, Options[I].DataStr) then
-        Exit(True);
-    end;
-  end;
 
 const
   MIN_TOOL_SIZE = 200;          // a tool window is never remembered smaller ...
@@ -899,6 +896,7 @@ const
 
 var
   ToneW, ToneH, I: Integer;
+  SkipV: TVersionNumbers;
 
   procedure SaneToolSize(var W, H: Integer);
   begin
@@ -966,11 +964,14 @@ begin
   if Trim(Data.ActivePlaylist) = '' then
     Data.ActivePlaylist := LBL_DEFAULT_PLAYLIST;
 
-  if not IsValidStrOption(Data.DefaultHeaderFormat, HEADER_FORMAT_OPTIONS) then
-    Data.DefaultHeaderFormat := HEADER_FORMAT_OPTIONS[0].DataStr;
+  { a skipped version is a version number or nothing }
+  if not ParseVersion(Data.SkippedVersion, SkipV) then Data.SkippedVersion := '';
 
-  if not IsValidStrOption(Data.DefaultTrackFormat, TRACK_FORMAT_OPTIONS) then
-    Data.DefaultTrackFormat := TRACK_FORMAT_OPTIONS[0].DataStr;
+  if not IsFieldFormat(fkHeader, Data.DefaultHeaderFormat) then
+    Data.DefaultHeaderFormat := FMT_DEFAULT[fkHeader];
+
+  if not IsFieldFormat(fkTrack, Data.DefaultTrackFormat) then
+    Data.DefaultTrackFormat := FMT_DEFAULT[fkTrack];
 
   Data.Volume := SettingsAdjust(Data.Volume, VAL_MIN_VOLUME, VAL_MAX_VOLUME);
 
@@ -1178,6 +1179,8 @@ begin
   FIniFile.WriteBool(SEC_UI, KEY_SHOWPEAKMETER,        Data.ShowPeakMeter);
   // The key the user entered (empty = none, see Load)
   FIniFile.WriteString(SEC_ADVANCED, KEY_LASTFM_API_KEY, Data.LastFmApiKey);
+  FIniFile.WriteBool(SEC_ADVANCED, KEY_CHECK_UPDATES, Data.CheckUpdatesAtStart);
+  FIniFile.WriteString(SEC_ADVANCED, KEY_SKIPPED_VERSION, Data.SkippedVersion);
 
   FIniFile.WriteBool(SEC_AUDIO, KEY_USE_HIGHRES_TIMER, Data.Audio.UseHighResTimer);
   FIniFile.WriteBool(SEC_AUDIO, KEY_OPTIMIZE_AFFINITY, Data.Audio.OptimizeAffinity);
@@ -1197,8 +1200,9 @@ begin
   FIniFile.WriteBool(SEC_LIBRARY, KEY_WATCH_FOLDERS, Data.WatchFolders);
   FIniFile.WriteInteger(SEC_ADVANCED, KEY_RG_SCAN_THREADS, Data.RGScanThreads);
   FIniFile.WriteBool(SEC_ADVANCED, KEY_ALWAYS_SAVE_LOG, Data.AlwaysSaveLog);
-  FIniFile.WriteInteger(SEC_UI, KEY_PREFS_PAGE,     Data.PrefsPage);
-  FIniFile.WriteString(SEC_UI, KEY_PREFS_CARDS,     Data.PrefsCards);
+  { no longer stored: the keys of a settings file that has them are taken out }
+  FIniFile.DeleteKey(SEC_UI, KEY_PREFS_PAGE);
+  FIniFile.DeleteKey(SEC_UI, KEY_PREFS_CARDS);
   FIniFile.WriteString(SEC_UI, KEY_LAST_ADD_DIR,    Data.LastAddDir);
 
   AtomicSaveIniFile;

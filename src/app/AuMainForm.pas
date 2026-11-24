@@ -41,12 +41,12 @@ uses
   Windows, Classes, SysUtils, Math, Controls, Forms, ExtCtrls, LCLType, LMessages, Dialogs,
   AuGfx, AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuForms, AuExtra, AuTree, AuGroupList,
   AuAppIcon, AuTitleBar, AuSingle, AuSettings, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuLibraryCheck, AuTileGrid, AuPlaylistPane,
-  AuToneForm, AuVolumePopup, AuLog, AuDialogs, AuPrefs, AuPlaylistManager, AuPlaylistEditor,
+  AuToneForm, AuVolumePopup, AuLog, AuDialogs, AuPrefs, AuPlaylistManager, AuPlaylistEditor, uPlaylistFormat,
   ALAudioTypes, ALMetadata, uAppConsts, uAppStrings, uSettingsManager, uPlaybackManager,
   uAudioUtils, uMetaUtils, uOSUtils, uLibraryTypes, uLibraryManager, uUserStatsManager,
   uLibraryWatcher, uEngineStateManager, uPlaylistStore, uPlaylistFile, uPlaylistRows,
   uPlaylistImport, uAutoPlaylist, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuReplayGainForm, AuVirtualFolderForm,
-  AuSignalPath, uCrashTracer, AuResample, uTonePresets{$IFDEF DEBUG}, AuTouchProbe{$ENDIF};
+  AuSignalPath, uCrashTracer, AuResample, uTonePresets, uUpdateCheck{$IFDEF DEBUG}, AuTouchProbe{$ENDIF};
 
 type
   { TMainForm }
@@ -112,6 +112,9 @@ type
     FCtxNode: TAuTreeNode;       // the node of the library context menu
     FCtxTile: Integer;           // the tile of the library context menu
     FStartupScanDone: Boolean;
+    FUpdateCheck: TUpdateCheck;      // the check for a newer version at start, nil when done
+    FUpdateCheckTick: QWord;         // when it began
+    FUpdateFound: string;            // the version the New version box is shown for
     FActivePlaySeconds: Double;  // play counting
     FIsScrobbled: Boolean;
     FScrobblePath: string;
@@ -263,6 +266,8 @@ type
     procedure MnViewGroup(Sender: TObject);
     procedure MnViewHeader(Sender: TObject);
     procedure MnViewTrack(Sender: TObject);
+    procedure AddFormatItems(ASub: TAuMenu; AKind: TFmtKind; const AOwn: string; AClick: TNotifyEvent);
+    procedure ChoosePlaylistFormats;
     procedure AddToPlaylistMenu(AMenu: TAuMenu; AClick: TNotifyEvent);
     function AddToTarget(Sender: TObject): string;
     procedure AddTracksToPlaylist(const AName: string; ATracks: TTrackList);
@@ -288,6 +293,9 @@ type
     function LibLookup(const APath: string; out ATrack: TTrackInfo): Boolean;
     procedure RequestLibraryScan(FullRebuild, SilentQueue: Boolean);
     procedure AskLibraryRebuild(Data: PtrInt);
+    function UpdateOwnVersion: string;
+    procedure CheckUpdateAtStart;
+    procedure ShowUpdateAtStart(Data: PtrInt);
     procedure LibraryScanProgress(Sender: TObject; const ScanMsg: string;
       const CurrentFolder: string; TrackCount, TotalTracks: Integer);
     procedure LibraryScanDone(Sender: TObject; HasChanges: Boolean);
@@ -449,7 +457,7 @@ implementation
 uses
   AuAudioTypes, ALAudioEngine, AuFolderPicker, AuLogForm, AuDebugQueue, uSettingsLog,
   AuCoverViewer, AuArtistInfo, AuBooklet, AuHelp, uHangWatch, uDriveKeepAlive, ALHeadroom,
-  AuAbout, uVersionHelper, uInputBlock;
+  AuAbout, uVersionHelper, uInputBlock, AuFormatBoxes;
 
 { the list font sizes of the settings are 6 .. 20; the panes use pixels }
 function PaneTextPx(FontSize: Integer): Single;
@@ -956,6 +964,7 @@ begin
     { the library after the playback (the play count of the last track) }
     FreeLibrary;
     FreeAndNil(FPlaylists);
+  ReleaseUpdateCheck(FUpdateCheck);
     {$IFDEF DEBUG}
     FreeAndNil(FShotForm);
     FreeAndNil(FShotStore);
@@ -2332,6 +2341,7 @@ var
   Dir, Card: string;
   WasOn: Boolean;
   CheckList: TTrackList;
+  BoxesA, BoxesB: TFormatBoxes;
 begin
   Result := nil;
   AName := '';
@@ -2430,7 +2440,8 @@ begin
         end;
     13: begin
           AName := '33-playlist-editor';
-          Result := CreatePlaylistEditorForm(Self, 'Evening', -1, '', '', '', False, True);
+          Result := CreatePlaylistEditorForm(Self, 'Evening', -1, '[%first_albumartist% • ][%year% • ]%album%', '',
+            '', False, True);
         end;
     14: begin
           AName := '34-autoplaylist-editor';
@@ -2661,6 +2672,18 @@ begin
           finally
             CheckList.Free;
           end;
+        end;
+    38: begin
+          { the formats of one playlist (View > ... > Choose fields) }
+          AName := '50-playlist-formats';
+          Result := CreateFormatsForm(Self, 'Evening', '[%composer% • ]%album%[ • %year%]', '',
+            AppSettings.Data.DefaultHeaderFormat, AppSettings.Data.DefaultTrackFormat, True, True,
+            BoxesA, BoxesB);
+        end;
+    39: begin
+          { the New version box (a made-up number) }
+          AName := '51-update-prompt';
+          Result := CreateUpdatePromptForm(Self, '1.2.0.25');
         end;
   end;
 end;

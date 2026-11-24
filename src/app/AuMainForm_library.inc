@@ -137,7 +137,14 @@ begin
   { the playlist's texts (date added, statistics) again only
     when the library changed (after every scan it would be, with a very
     large playlist, a pause of 0.1 .. 0.2 s for nothing) }
-  if HasChanges then FPl.RefreshRatings;
+  if HasChanges then
+  begin
+    { an auto-playlist is what its query finds in the library: with tracks
+      added, removed or changed it is built again (selection and playing
+      track are kept, as after a tag edit) }
+    if FPl.ReadOnly and (FShownPl <> '') then ShowPlaylist(FShownPl, True);
+    FPl.RefreshRatings;
+  end;
   { a new library folder may be reachable now }
   if HasChanges then RestartWatcher;
   {$IF DEFINED(DEBUG) or DEFINED(MEMTEST)}
@@ -731,6 +738,61 @@ begin
   end;
   if FShuttingDown then Exit;
   RequestLibraryScan(True, False);
+end;
+
+{ the version the check at start compares with (see VersionForUpdateCheck) }
+function TMainForm.UpdateOwnVersion: string;
+begin
+  Result := VersionForUpdateCheck;
+end;
+
+{ The check for a newer version that began at start: its answer, looked at
+  from the UI timer. An answer that comes later than UPDATE_START_WAIT_MS is
+  not used, so the box never comes up in the middle of something. }
+procedure TMainForm.CheckUpdateAtStart;
+const
+  UPDATE_START_WAIT_MS = 10000;
+var
+  Late: Boolean;
+  State: TUpdateState;
+  Latest: string;
+begin
+  Late := GetTickCount64 - FUpdateCheckTick > UPDATE_START_WAIT_MS;
+  if not (FUpdateCheck.Finished or Late) then Exit;
+  State := usFailed;
+  Latest := '';
+  if FUpdateCheck.Finished then
+  begin
+    State := FUpdateCheck.State;
+    Latest := FUpdateCheck.Latest;
+  end;
+  ReleaseUpdateCheck(FUpdateCheck);
+  if Late then
+  begin
+    AddLog('[Update] The check at start got no answer in time.');
+    Exit;
+  end;
+  case State of
+    usFailed: AddLog('[Update] The check at start got no answer.');
+    usUpToDate: AddLog('[Update] Checked at start: up to date.');
+    usNewer:
+      if UpdateWanted(Latest, UpdateOwnVersion, AppSettings.Data.SkippedVersion) then
+      begin
+        AddLog('[Update] Checked at start: version ' + Latest + ' is available.');
+        FUpdateFound := Latest;
+        Application.QueueAsyncCall(@ShowUpdateAtStart, 0);
+      end
+      else
+        AddLog('[Update] Checked at start: version ' + Latest + ' is available (skipped).');
+  end;
+end;
+
+procedure TMainForm.ShowUpdateAtStart(Data: PtrInt);
+begin
+  if FShuttingDown or (FUpdateFound = '') then Exit;
+  { not on top of another window that is open; the next start asks again }
+  if Application.ModalLevel > 0 then Exit;
+  PromptNewVersion(Self, FUpdateFound);
 end;
 
 procedure TMainForm.MnRescan(Sender: TObject);

@@ -282,12 +282,12 @@ const
   // ===========================================================================
   // 7E. LAST.FM SCRAPER STATUS & ERROR STRINGS (uLastFmScraper)
   // ===========================================================================
-  ERR_LASTFM_MISSING_API_KEY = 'Biographies come from Last.fm, and that needs a personal Last.fm API key (free). Enter it in Preferences > System > Artist information.';
+  ERR_LASTFM_MISSING_API_KEY = 'Biographies come from Last.fm, and that needs a personal Last.fm API key (free). Enter it in Preferences > System > Internet.';
   ERR_LASTFM_NETWORK_PREFIX  = 'Last.fm network error: ';
   ERR_LASTFM_API_PREFIX      = 'Last.fm: ';
   ERR_LASTFM_GENERIC         = 'Last.fm returned an error.';
   // Last.fm error 10 (invalid key) / 26 (suspended key)
-  ERR_LASTFM_KEY_REJECTED    = 'Artist information is not available: Last.fm did not accept the API key. Check it in Preferences > System > Artist information. Saved biographies and pictures still work.';
+  ERR_LASTFM_KEY_REJECTED    = 'Artist information is not available: Last.fm did not accept the API key. Check it in Preferences > System > Internet. Saved biographies and pictures still work.';
   LOG_LASTFM_KEY_REJECTED    = '[Artist Info] Last.fm did not accept the API key (invalid or blocked). Biographies of new artists cannot be fetched until the key is replaced.';
   ERR_LASTFM_PARSE_PREFIX    = 'Error parsing biography data: ';
   ERR_LASTFM_RESOLVE_PREFIX  = 'Error resolving biography: ';
@@ -627,6 +627,9 @@ const
   BUSY_MSG_TAG_EDITOR         = 'The Properties Editor is currently saving metadata to files.';
   BUSY_MSG_BACKGROUND_IO      = 'Metadata is currently being saved to files.';
 
+  { in front of a format's preview while a playlist has no format of its own }
+  LBL_FORMAT_AS_PREFS = 'As in Preferences: ';
+
   PREBAKED_QUERIES: array[0..7] of TFormatDef = (
     (DisplayName: '--- Select a template ---'; DataStr: ''),
     (DisplayName: 'Recently added (14 days)'; DataStr: '%added% IN LAST 14d'),
@@ -636,48 +639,6 @@ const
     (DisplayName: 'Last played (30 days)'; DataStr: '%lastplayed% IN LAST 30d'),
     (DisplayName: 'Heavy Rotation (> 20 Plays)'; DataStr: '%playcount% >= 20'),
     (DisplayName: 'High-Res Audiophile'; DataStr: '%bitdepth% >= 24; %samplerate% >= 88200')
-  );
-
-  // 14 items (0..13) — uses [ • %resolution%] without %codec% or parentheses
-  HEADER_FORMAT_OPTIONS: array[0..13] of TFormatDef = (
-
-    // Album-First
-    (DisplayName: 'Album';                         DataStr: '%album%'),
-    (DisplayName: 'Album • Artist';                DataStr: '%album%[ • %first_albumartist%]'),
-    (DisplayName: 'Album • Artist • Specs';        DataStr: '%album%[ • %first_albumartist%][ • %resolution%]'),
-    (DisplayName: 'Album • Year • Artist';         DataStr: '%album%[ • %year%][ • %first_albumartist%]'),
-    (DisplayName: 'Album • Year • Artist • Specs'; DataStr: '%album%[ • %year%][ • %first_albumartist%][ • %resolution%]'),
-    (DisplayName: '-'; DataStr: ''),
-
-    // Artist-First (Standard)
-    (DisplayName: 'Artist • Album';                DataStr: '[%first_albumartist% • ]%album%'),
-    (DisplayName: 'Artist • Album • Specs';        DataStr: '[%first_albumartist% • ]%album%[ • %resolution%]'),
-    (DisplayName: 'Artist • Year • Album';         DataStr: '[%first_albumartist% • ][%year% • ]%album%'),
-    (DisplayName: 'Artist • Year • Album • Specs'; DataStr: '[%first_albumartist% • ][%year% • ]%album%[ • %resolution%]'),
-    (DisplayName: '-'; DataStr: ''),
-
-    // Year, Genre & Folder
-    (DisplayName: 'Year • Album';                  DataStr: '[%year% • ]%album%'),
-    (DisplayName: 'Year • Album • Specs';          DataStr: '[%year% • ]%album%[ • %resolution%]'),
-    (DisplayName: 'Genre • Artist • Album';        DataStr: '[%first_genre% • ][%first_albumartist% • ]%album%')
-  );
-
-  // 9 items (0..8) — uses [ • %resolution%] without %codec% or parentheses
-  TRACK_FORMAT_OPTIONS: array[0..8] of TFormatDef = (
-    // Title-First (Grouped Views)
-    (DisplayName: 'Title';                        DataStr: '%title%'),
-    (DisplayName: 'Title • Specs';                DataStr: '%title%[ • %resolution%]'),
-    (DisplayName: 'Title • Artist';               DataStr: '%title%[ • %first_artist%]'),
-    (DisplayName: '-'; DataStr: ''),
-
-    // Artist-First (Flat List & Compilations)
-    (DisplayName: 'Artist • Title';               DataStr: '[%first_artist% • ]%title%'),
-    (DisplayName: 'Artist • Title • Specs';       DataStr: '[%first_artist% • ]%title%[ • %resolution%]'),
-    (DisplayName: 'Artist • Album • Title';       DataStr: '[%first_artist% • ][%album% • ]%title%'),
-    (DisplayName: '-'; DataStr: ''),
-
-    // Physical
-    (DisplayName: 'File name';                    DataStr: '%filename%')
   );
 
   DBLCLICK_OPTIONS: array[0..1] of TFormatDef = (

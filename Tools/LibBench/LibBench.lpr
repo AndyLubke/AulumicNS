@@ -469,7 +469,7 @@ begin
     Pane.Parent := F;
     Pane.SetBounds(0, 0, 900, 700);
     Pane.OnLookup := @L.Lookup;
-    Pane.SetView(gmAlbum, HEADER_FORMAT_OPTIONS[0].DataStr, TRACK_FORMAT_OPTIONS[0].DataStr, '', False);
+    Pane.SetView(gmAlbum, '%album%', '%title%', '', False);
     Lib.GetAllTracks(PlAll);
     PlAll.Sort(@CompareTrackInfo);
     PlStore.Load;

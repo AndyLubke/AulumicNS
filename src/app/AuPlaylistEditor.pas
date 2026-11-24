@@ -21,7 +21,7 @@ interface
 
 uses
   Classes, SysUtils, StrUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, uPlaylistStore;
+  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, uPlaylistStore, uPlaylistFormat, AuFormatBoxes;
 
 { The dialog, shown modal: AGroupMode -1 and '' formats
   are the defaults; AAuto shows the rules (AQuery: rules separated by ';').
@@ -49,18 +49,19 @@ type
     FRules: TStringList;
     FCustomCache: string;
     FName: TAuEdit;
-    FGrouping, FHeaderFmt, FTrackFmt: TAuCombo;
+    FGrouping: TAuCombo;
+    FHeaderFmt, FTrackFmt: TFormatBoxes;
     FHeaderCap: TAuLabel;
     FTemplate, FField, FOperator: TAuCombo;
     FValue: TAuEdit;
     FRuleList: TAuListView;
     FBtnAdd, FBtnRemove, FBtnHelp, FBtnOk: TAuButton;
     // the parent of the content: the body, or for an
-    // auto-playlist a scroll box (the editor is ~726 high: too much for
-    // 1920 x 1080 at 150 % or 1366 x 768); OK / Cancel stay below it
+    // auto-playlist a scroll box (its editor is about 650 high, which a
+    // small screen may not have); OK / Cancel stay below it
     FContent: TWinControl;
     FScroll: TAuScrollBox;
-    function SettingRow(const ACaption, ADesc: string; Y, W: Integer; out ACap: TAuLabel): Integer;
+    procedure LabelLeft(const ACaption: string; Y: Integer);
     procedure RuleCell(Sender: TObject; Row, Col: Integer; var AText: string);
     procedure RuleSel(Sender: TObject);
     procedure RuleKey(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -89,7 +90,8 @@ const
   DLG_W = 660;
   X0 = 28;
   RW = DLG_W - 2 * X0;
-  CTRL_W = 300;
+  LABEL_W = 150;             // the labels left of Name, Grouping and Rules
+  RULES_H = 72;              // the list of rules
 
 function EditPlaylistDialog(AOwner: TComponent; AStore: TPlaylistStore; var AName: string;
   var AGroupMode: Integer; var AHeaderFmt, ATrackFmt, AQuery: string; AAuto, AEditing: Boolean): Boolean;
@@ -115,31 +117,19 @@ end;
 
 { ---- TPlaylistEditorForm ---- }
 
-{ a setting's name and description at (X0, Y), W wide; the height }
-function TPlaylistEditorForm.SettingRow(const ACaption, ADesc: string; Y, W: Integer; out ACap: TAuLabel): Integer;
+{ a label left of a control of the usual height at Y }
+procedure TPlaylistEditorForm.LabelLeft(const ACaption: string; Y: Integer);
 var
   L: TAuLabel;
-  DH: Integer;
 begin
-  ACap := AddLabel(FContent, ACaption, X0, Y, W, False);
-  DH := 0;
-  if ADesc <> '' then
-  begin
-    DH := Ceil(TextHeightWrapped(ADesc, UIFont(12), S(W)) / UIScale) + 2;
-    L := AddLabel(FContent, ADesc, X0, Y + 22, W);
-    L.FontSize := 12;
-    L.WordWrap := True;
-    L.VAlign := 0;
-    L.Height := S(DH);
-  end;
-  Result := 22 + DH;
+  L := AddLabel(FContent, ACaption, X0, Y, LABEL_W - 12, False);
+  L.Height := S(32);
 end;
 
 constructor TPlaylistEditorForm.CreateEditor(AOwner: TComponent; const AName: string; AGroupMode: Integer;
   const AHeaderFmt, ATrackFmt, AQuery: string; AAuto, AEditing: Boolean);
 var
-  Y, H, I, TemplateIdx, BtnY, DlgH: Integer;
-  Cap: TAuLabel;
+  Y, I, TemplateIdx, BtnY, DlgH: Integer;
   B: TAuButton;
   Bar: TAuPanel;
   Title: string;
@@ -164,73 +154,56 @@ begin
   GetQueryableTags(FTags);
 
   Y := 18;
-  H := SettingRow('Name', 'The name of the playlist.', Y, RW, Cap);
-  Inc(Y, H + 8);
-  FName := AddEdit(FContent, X0, Y, RW, AName);
+  { name and grouping: the label on the left, the control beside it }
+  LabelLeft('Name', Y);
+  FName := AddEdit(FContent, X0 + LABEL_W, Y, RW - LABEL_W, AName);
   FName.Placeholder := 'Playlist name';
   { the Default playlist keeps its name }
   FName.Enabled := not (AEditing and SameText(AName, LBL_DEFAULT_PLAYLIST));
+  Inc(Y, 32 + 10);
+  LabelLeft('Grouping', Y);
+  FGrouping := AddCombo(FContent, X0 + LABEL_W, Y, RW - LABEL_W,
+    [LBL_USE_GLOBAL_PREFS, LBL_BY_ALBUM, LBL_BY_FOLDER, LBL_FLAT_LIST], 0);
+  FGrouping.Hint := 'How this playlist is grouped. Use global preferences follows Preferences > Playlists.';
+  FGrouping.ShowHint := True;
+  FGrouping.OnChange := @GroupingChange;
   Inc(Y, 32 + 18);
 
-  { grouping and formats: the name on the left, the combo on the right }
-  H := SettingRow('Grouping', 'How this playlist is grouped: By album, By folder or Flat list.', Y, RW - CTRL_W - 20, Cap);
-  FGrouping := AddCombo(FContent, X0 + RW - CTRL_W, Y + Math.Max(0, (H - 32) div 2), CTRL_W,
-    [LBL_USE_GLOBAL_PREFS, LBL_BY_ALBUM, LBL_BY_FOLDER, LBL_FLAT_LIST], 0);
-  FGrouping.OnChange := @GroupingChange;
-  Inc(Y, Math.Max(H, 32) + 16);
-  H := SettingRow('Album header format', 'Layout of the album headers (only when grouped By album).', Y,
-    RW - CTRL_W - 20, FHeaderCap);
-  FHeaderFmt := AddCombo(FContent, X0 + RW - CTRL_W, Y + Math.Max(0, (H - 32) div 2), CTRL_W, [LBL_USE_GLOBAL_PREFS], 0);
-  for I := 0 to High(HEADER_FORMAT_OPTIONS) do
-    if HEADER_FORMAT_OPTIONS[I].DataStr <> '' then FHeaderFmt.Items.Add(HEADER_FORMAT_OPTIONS[I].DisplayName);
-  Inc(Y, Math.Max(H, 32) + 16);
-  H := SettingRow('Track format', 'Layout of the tracks in this playlist.', Y, RW - CTRL_W - 20, Cap);
-  FTrackFmt := AddCombo(FContent, X0 + RW - CTRL_W, Y + Math.Max(0, (H - 32) div 2), CTRL_W, [LBL_USE_GLOBAL_PREFS], 0);
-  for I := 0 to High(TRACK_FORMAT_OPTIONS) do
-    if TRACK_FORMAT_OPTIONS[I].DataStr <> '' then FTrackFmt.Items.Add(TRACK_FORMAT_OPTIONS[I].DisplayName);
-  Inc(Y, Math.Max(H, 32));
+  { the formats: the name, the four boxes and their example line. With
+    every box on (nothing) the playlist follows Preferences. }
+  FHeaderCap := AddLabel(FContent, 'Album header format', X0, Y, RW, False);
+  Inc(Y, 26);
+  FHeaderFmt := TFormatBoxes.CreateBoxes(Self, FContent, fkHeader, X0, Y, RW);
+  FHeaderFmt.SetEmpty(LBL_FORMAT_AS_PREFS, AppSettings.Data.DefaultHeaderFormat);
+  Inc(Y, FORMAT_BOXES_H + 10);
+  AddLabel(FContent, 'Track format', X0, Y, RW, False);
+  Inc(Y, 26);
+  FTrackFmt := TFormatBoxes.CreateBoxes(Self, FContent, fkTrack, X0, Y, RW);
+  FTrackFmt.SetEmpty(LBL_FORMAT_AS_PREFS, AppSettings.Data.DefaultTrackFormat);
+  Inc(Y, FORMAT_BOXES_H);
 
   if AAuto then
   begin
-    Inc(Y, 22);
+    Inc(Y, 14);
     Bar := TAuPanel.Create(Self);
     Bar.Parent := FContent;
     Bar.BackRole := crBorder;
     Bar.BorderSides := 0;
     Bar.SetBounds(S(X0), S(Y), S(RW), Math.Max(1, S(1)));
-    Inc(Y, 18);
-    with AddLabel(FContent, 'RULES', X0, Y, RW, False) do
-    begin
-      FontSize := 11;
-      Bold := True;
-      TextRole := crAccent;
-    end;
-    Inc(Y, 28);
-    H := SettingRow('Smart rule template', 'Choose a ready-made set of rules, or make a custom one.', Y,
-      RW - CTRL_W - 20, Cap);
-    FTemplate := AddCombo(FContent, X0 + RW - CTRL_W, Y + Math.Max(0, (H - 32) div 2), CTRL_W, [LBL_CUSTOM_PREFS], 0);
+    Inc(Y, 16);
+    { the rules: a ready-made set or own ones; the boxes a rule is made
+      with stand above the list they fill }
+    LabelLeft('Rules', Y);
+    FTemplate := AddCombo(FContent, X0 + LABEL_W, Y, RW - LABEL_W, [LBL_CUSTOM_PREFS], 0);
+    FTemplate.Hint := 'A ready-made set of rules, or Custom for own rules.';
+    FTemplate.ShowHint := True;
     TemplateIdx := 0;
     for I := Low(PREBAKED_QUERIES) + 1 to High(PREBAKED_QUERIES) do
     begin
       FTemplate.Items.Add(PREBAKED_QUERIES[I].DisplayName);
       if SameText(AQuery, PREBAKED_QUERIES[I].DataStr) then TemplateIdx := I;
     end;
-    Inc(Y, Math.Max(H, 32) + 14);
-    FRuleList := TAuListView.Create(Self);
-    FRuleList.Parent := FContent;
-    FRuleList.SetBounds(S(X0), S(Y), S(RW), S(132));
-    FRuleList.ShowHeader := False;
-    FRuleList.MultiSelect := False;
-    FRuleList.RowMenu := False;
-    FRuleList.AutoFit := True;
-    FRuleList.RowHeight := S(30);
-    FRuleList.AddColumn('Rule', 300, 0, True);
-    FRuleList.BackRole := crCard;
-    FRuleList.EmptyText := 'No rules yet. Choose a tag, an operator and a value below, then Add.';
-    FRuleList.OnGetCell := @RuleCell;
-    FRuleList.OnSelChange := @RuleSel;
-    FRuleList.OnKeyDown := @RuleKey;
-    Inc(Y, 132 + 12);
+    Inc(Y, 32 + 10);
     { the query builder: tag, operator, value, Add }
     FField := AddCombo(FContent, X0, Y, 170, []);
     for I := 0 to High(FTags) do FField.Items.Add(FTags[I].FriendlyName);
@@ -250,6 +223,22 @@ begin
     FBtnAdd.Hint := 'Add this rule to the list.';
     FBtnAdd.ShowHint := True;
     Inc(Y, 32 + 8);
+    { room for two rules; more scroll }
+    FRuleList := TAuListView.Create(Self);
+    FRuleList.Parent := FContent;
+    FRuleList.SetBounds(S(X0), S(Y), S(RW), S(RULES_H));
+    FRuleList.ShowHeader := False;
+    FRuleList.MultiSelect := False;
+    FRuleList.RowMenu := False;
+    FRuleList.AutoFit := True;
+    FRuleList.RowHeight := S(30);
+    FRuleList.AddColumn('Rule', 300, 0, True);
+    FRuleList.BackRole := crCard;
+    FRuleList.EmptyText := 'No rules yet. Choose a tag, an operator and a value above, then Add.';
+    FRuleList.OnGetCell := @RuleCell;
+    FRuleList.OnSelChange := @RuleSel;
+    FRuleList.OnKeyDown := @RuleKey;
+    Inc(Y, RULES_H + 8);
     with AddLabel(FContent, 'A track must match all rules. Use OR (in capitals) for alternatives, e.g. Rock OR Jazz; ' +
       'dates as 14d, 2w, 1m or 1y.', X0, Y, RW - 230) do
     begin
@@ -294,10 +283,8 @@ begin
   { the values }
   if (AGroupMode >= 0) and (AGroupMode <= 2) then FGrouping.ItemIndex := AGroupMode + 1
   else FGrouping.ItemIndex := 0;
-  FHeaderFmt.ItemIndex :=
-    ComboRowOfOption(HEADER_FORMAT_OPTIONS, FormatOptionByData(HEADER_FORMAT_OPTIONS, AHeaderFmt)) + 1;
-  FTrackFmt.ItemIndex :=
-    ComboRowOfOption(TRACK_FORMAT_OPTIONS, FormatOptionByData(TRACK_FORMAT_OPTIONS, ATrackFmt)) + 1;
+  FHeaderFmt.Format := AHeaderFmt;
+  FTrackFmt.Format := ATrackFmt;
   UpdateHeaderFormatState;
   UpdateButtons;
   ActiveControl := FName;
@@ -317,12 +304,8 @@ var
 begin
   AName := CleanPlaylistName(FName.Text);
   if FGrouping.ItemIndex <= 0 then AGroupMode := -1 else AGroupMode := FGrouping.ItemIndex - 1;
-  AHeaderFmt := '';
-  I := OptionOfComboRow(HEADER_FORMAT_OPTIONS, FHeaderFmt.ItemIndex - 1);
-  if I >= 0 then AHeaderFmt := HEADER_FORMAT_OPTIONS[I].DataStr;
-  ATrackFmt := '';
-  I := OptionOfComboRow(TRACK_FORMAT_OPTIONS, FTrackFmt.ItemIndex - 1);
-  if I >= 0 then ATrackFmt := TRACK_FORMAT_OPTIONS[I].DataStr;
+  AHeaderFmt := FHeaderFmt.Format;
+  ATrackFmt := FTrackFmt.Format;
   AQuery := '';
   if FAuto then
   begin
@@ -345,7 +328,7 @@ begin
   else G := FGrouping.ItemIndex - 1;
   FHeaderFmt.Enabled := G = 0;
   if FHeaderFmt.Enabled then FHeaderCap.TextRole := crText else FHeaderCap.TextRole := crTextFaint;
-  FHeaderFmt.Invalidate;
+  FHeaderCap.Invalidate;
 end;
 
 procedure TPlaylistEditorForm.GroupingChange(Sender: TObject);

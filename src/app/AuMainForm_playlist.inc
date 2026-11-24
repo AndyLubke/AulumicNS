@@ -385,6 +385,68 @@ end;
 
 { ---- the View menu (the shown playlist's grouping and formats) ---- }
 
+const
+  { the tags of a format submenu's entries that are no quick format }
+  VIEW_FMT_GLOBAL = -1;      // as in Preferences
+  VIEW_FMT_FIELDS = -2;      // Choose fields...
+  VIEW_FMT_KEEP   = -3;      // the playlist's own format, not among the quick ones
+
+{ A format submenu of the View menu: as in Preferences, the few quick formats,
+  the playlist's own format when it is none of them, and Choose fields. }
+procedure TMainForm.AddFormatItems(ASub: TAuMenu; AKind: TFmtKind; const AOwn: string; AClick: TNotifyEvent);
+var
+  It: TAuMenuItem;
+  I: Integer;
+  F, OwnName: string;
+  Listed: Boolean;
+begin
+  It := ASub.Add('Use global preferences', AClick);
+  It.Tag := VIEW_FMT_GLOBAL;
+  It.Checked := AOwn = '';
+  ASub.AddSeparator;
+  Listed := AOwn = '';
+  for I := 0 to High(FMT_QUICK_HEADER) do
+  begin
+    if AKind = fkHeader then F := FMT_QUICK_HEADER[I] else F := FMT_QUICK_TRACK[I];
+    It := ASub.Add(FormatName(AKind, F), AClick);
+    It.Tag := I;
+    It.Checked := AOwn = F;
+    if It.Checked then Listed := True;
+  end;
+  if not Listed then
+  begin
+    OwnName := FormatName(AKind, AOwn);
+    if OwnName = '' then OwnName := 'Custom';
+    It := ASub.Add(OwnName, AClick);
+    It.Tag := VIEW_FMT_KEEP;
+    It.Checked := True;
+  end;
+  ASub.AddSeparator;
+  It := ASub.Add('Choose fields...', AClick);
+  It.Tag := VIEW_FMT_FIELDS;
+end;
+
+{ the two formats of the shown playlist, chosen field by field }
+procedure TMainForm.ChoosePlaylistFormats;
+var
+  P: PStoredPlaylist;
+  HF, TF: string;
+begin
+  P := ShownPlaylist;
+  if P = nil then Exit;
+  SaveShownPlaylist(True);
+  HF := P^.HeaderFmt;
+  TF := P^.TrackFmt;
+  if not ChooseFormatsDialog(Self, P^.Name, HF, TF, AppSettings.Data.DefaultHeaderFormat,
+    AppSettings.Data.DefaultTrackFormat, PlGroupMode(P) = gmAlbum, PlGroupMode(P) <> gmFlat) then Exit;
+  { the playlists may have changed while the window was open }
+  P := ShownPlaylist;
+  if P = nil then Exit;
+  P^.HeaderFmt := HF;
+  P^.TrackFmt := TF;
+  ViewChanged;
+end;
+
 procedure TMainForm.ViewClick(Sender: TObject);
 var
   Sub: TAuMenu;
@@ -416,29 +478,11 @@ begin
   { only headers of albums have a format - by the grouping in
     effect, the playlist's own or the default }
   FViewMenu.Item(FViewMenu.Count - 1).Enabled := PlGroupMode(P) = gmAlbum;
-  It := Sub.Add('Use global preferences', @MnViewHeader);
-  It.Tag := -1;
-  It.Checked := P^.HeaderFmt = '';
-  Sub.AddSeparator;
-  for I := 0 to High(HEADER_FORMAT_OPTIONS) do
-  begin
-    It := Sub.Add(HEADER_FORMAT_OPTIONS[I].DisplayName, @MnViewHeader);
-    It.Tag := I;
-    It.Checked := (P^.HeaderFmt <> '') and (P^.HeaderFmt = HEADER_FORMAT_OPTIONS[I].DataStr);
-  end;
+  AddFormatItems(Sub, fkHeader, P^.HeaderFmt, @MnViewHeader);
   Sub := FViewMenu.AddSub('Track format', icNote);
   { a flat list has columns, no track format }
   FViewMenu.Item(FViewMenu.Count - 1).Enabled := PlGroupMode(P) <> gmFlat;
-  It := Sub.Add('Use global preferences', @MnViewTrack);
-  It.Tag := -1;
-  It.Checked := P^.TrackFmt = '';
-  Sub.AddSeparator;
-  for I := 0 to High(TRACK_FORMAT_OPTIONS) do
-  begin
-    It := Sub.Add(TRACK_FORMAT_OPTIONS[I].DisplayName, @MnViewTrack);
-    It.Tag := I;
-    It.Checked := (P^.TrackFmt <> '') and (P^.TrackFmt = TRACK_FORMAT_OPTIONS[I].DataStr);
-  end;
+  AddFormatItems(Sub, fkTrack, P^.TrackFmt, @MnViewTrack);
   { the tracks of a work under a heading of their own (all playlists) }
   FViewMenu.AddSeparator;
   It := FViewMenu.Add('Work headings', @MnViewWorks);
@@ -560,11 +604,17 @@ var
   P: PStoredPlaylist;
   K: Integer;
 begin
+  K := TAuMenuItem(Sender).Tag;
+  if K = VIEW_FMT_KEEP then Exit;
+  if K = VIEW_FMT_FIELDS then
+  begin
+    ChoosePlaylistFormats;
+    Exit;
+  end;
   P := ShownPlaylist;
   if P = nil then Exit;
   SaveShownPlaylist(True);
-  K := TAuMenuItem(Sender).Tag;
-  if K < 0 then P^.HeaderFmt := '' else P^.HeaderFmt := HEADER_FORMAT_OPTIONS[K].DataStr;
+  if (K < 0) or (K > High(FMT_QUICK_HEADER)) then P^.HeaderFmt := '' else P^.HeaderFmt := FMT_QUICK_HEADER[K];
   ViewChanged;
 end;
 
@@ -573,11 +623,17 @@ var
   P: PStoredPlaylist;
   K: Integer;
 begin
+  K := TAuMenuItem(Sender).Tag;
+  if K = VIEW_FMT_KEEP then Exit;
+  if K = VIEW_FMT_FIELDS then
+  begin
+    ChoosePlaylistFormats;
+    Exit;
+  end;
   P := ShownPlaylist;
   if P = nil then Exit;
   SaveShownPlaylist(True);
-  K := TAuMenuItem(Sender).Tag;
-  if K < 0 then P^.TrackFmt := '' else P^.TrackFmt := TRACK_FORMAT_OPTIONS[K].DataStr;
+  if (K < 0) or (K > High(FMT_QUICK_TRACK)) then P^.TrackFmt := '' else P^.TrackFmt := FMT_QUICK_TRACK[K];
   ViewChanged;
 end;
 

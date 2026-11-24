@@ -128,8 +128,16 @@ begin
         once this tick is over (it opens a window) }
       if (FLibrary <> nil) and (not ErrorBoxesOff) and FLibrary.NeedsRebuildForWorks then
         Application.QueueAsyncCall(@AskLibraryRebuild, 0);
+      { the check for a newer version, when it is switched on }
+      if (AppSettings.Data.CheckUpdatesAtStart
+          {$IFDEF DEBUG} or Application.HasOption('test-update-as'){$ENDIF}) and (not ErrorBoxesOff)
+         {$IFDEF DEBUG} and (FShotDir = ''){$ENDIF} then
+      begin
+        FUpdateCheck := TUpdateCheck.Create(UpdateOwnVersion);
+        FUpdateCheckTick := GetTickCount64;
+      end;
     end;
-    CheckWatcher;
+    if FUpdateCheck <> nil then CheckUpdateAtStart;    CheckWatcher;
     CheckPlaylistSave;
     { play counting, about once a second (also while minimized) }
     if GetTickCount64 - FPlayCountTick >= 1000 then

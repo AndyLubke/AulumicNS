@@ -23,7 +23,7 @@ uses
   AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuTileGrid, AuExtra, AuTitleBar,
   AuFolderPicker, AuAppIcon,
   { the program }
-  AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uTonePresets, uLibraryCheck, AuLibraryCheck, uAppLifetime,
+  AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uTonePresets, uLibraryCheck, AuLibraryCheck, uPlaylistFormat, AuFormatBoxes, uAppLifetime,
   uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuPlaylistPane, AuToneForm, AuVolumePopup,
   uCrashTracer, uHangWatch, uDriveKeepAlive, uInputBlock, uEngineStateManager, uFileLockRegistry, uMetadataPayloads, uMetaUtils,
   uOSUtils, uPlaybackIOWorker, {$IFDEF DEBUG}AuTouchProbe,{$ENDIF}
@@ -33,7 +33,7 @@ uses
   AuAudioTypes, AuDecoder, AuDecFlac, AuDecWav, AuDecDsd, AuResample, uToneControl, uAudioUtils,
   { the library (stored by uDbStore) }
   uDbStore, uLibraryTypes, uLibraryQuery, uTagParser, uUserStatsManager,
-  uLibraryScanner, uLibraryManager, uLibraryWatcher, AuLogForm, AuDebugQueue, AuPrefs, uSettingsLog, AuPlaylistEditor, AuPlaylistManager, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuLoudness, uReplayGainScan, uReplayGainThread, AuReplayGainForm, AuVirtualFolderForm, uLastFmScraper, AuCoverViewer, AuArtistInfo, AuPdf, AuBooklet, AuSignalPath, AuDemoLibrary, AuHelp, uVersionHelper, AuAbout,
+  uLibraryScanner, uLibraryManager, uLibraryWatcher, AuLogForm, AuDebugQueue, AuPrefs, uSettingsLog, AuPlaylistEditor, AuPlaylistManager, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuLoudness, uReplayGainScan, uReplayGainThread, AuReplayGainForm, AuVirtualFolderForm, uLastFmScraper, AuCoverViewer, AuArtistInfo, AuPdf, AuBooklet, AuSignalPath, AuDemoLibrary, AuHelp, uVersionHelper, uUpdateCheck, AuAbout,
   uPlaylistFile, uPlaylistRows, uAutoPlaylist, uPlaylistImport, uPlaylistStore,
   { tags (the AulumicTag units) }
   audiotag, basetag, commonfunctions, id3v1genres, song, registerallreader, file_dsf, file_dff, file_dummy,

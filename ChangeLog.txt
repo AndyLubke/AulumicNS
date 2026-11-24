@@ -6,6 +6,43 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.19 (24 November 2026)
+-------------------------------------------------------------------------------
+
+Playlists
+  - The album header format and the track format are no longer picked from
+    a fixed list: each is now up to four fields in a row of boxes (Album,
+    Artist, Year, Genre, Composer, Specs; for tracks also Title and File
+    name), in the order of the line, with an example under the boxes. This
+    is in Preferences > Playlists and, per playlist, in the Playlist
+    Editor. Formats chosen before are kept as they were.
+  - The View menu of a playlist offers a few common formats and "Choose
+    fields...", which opens the boxes for that playlist.
+  - The Playlist Editor is more compact: the editor of an auto-playlist
+    fits on the screen without scrolling, and the boxes a rule is made
+    with stand above the list of rules.
+
+General
+  - Check for updates: a new button in the About window asks GitHub whether
+    a newer version is available. With a newer version there, a box offers
+    to open its download page; nothing is downloaded or installed by the
+    program itself.
+  - The same check can run at every start: Preferences > System > Internet >
+    Check for updates at start. It is off at first. The box then also has
+    "Skip this version", which keeps it away until a later version is
+    released.
+  - The card "Artist information" of Preferences > System is now called
+    "Internet"; the Last.fm API key is in it as before.
+  - The About window has a link to the project's page on GitHub.
+  - Preferences opens on its first page with all cards closed after a
+    restart. While the program runs, it still opens where it was left.
+
+Fixes
+  - An auto-playlist that is on screen now follows a library scan at once:
+    tracks that were added, removed or changed show up without switching
+    to another playlist and back.
+
+
 Version 1.1.0.18 (23 November 2026)
 -------------------------------------------------------------------------------
 

@@ -291,7 +291,7 @@ function FormatDuration(Sec: Integer): string;
 implementation
 
 uses
-  LazUTF8, DateUtils, uInputBlock, AuAudioTypes, ALMetadata, uAudioUtils, uMetaUtils, uUserStatsManager, uTagParser, uPlaylistRows, uAppStrings;
+  LazUTF8, DateUtils, uInputBlock, AuAudioTypes, ALMetadata, uAudioUtils, uMetaUtils, uUserStatsManager, uTagParser, uPlaylistRows, uPlaylistFormat, uAppStrings;
 
 const
   PL_EMPTY_TEXT = 'This playlist is empty.' + LineEnding +
@@ -1938,7 +1938,7 @@ begin
     if FEntries[I].PartTitle <> '' then Ctx.Meta.Title := FEntries[I].PartTitle;
     if TrackStats then StatsOf(I, False);
     if Fmt = '' then FEntries[I].TitleText := Ctx.Meta.Title
-    else FEntries[I].TitleText := CleanTag(FormatTrackInfo(Fmt, Ctx));
+    else FEntries[I].TitleText := TidyFormatted(CleanTag(FormatTrackInfo(Fmt, Ctx)));
     if FEntries[I].TitleText = '' then FEntries[I].TitleText := Ctx.Meta.Title;
     SetArtistText(I, TrackHasArtist);
   end;
@@ -1952,7 +1952,7 @@ begin
     if HeaderStats then
       for J := FHeaders[I].First to FHeaders[I].First + FHeaders[I].Count - 1 do
         StatsOf(J, True);
-    FHeaders[I].Text := CleanTag(FormatTrackInfo(Fmt, Ctx));
+    FHeaders[I].Text := TidyFormatted(CleanTag(FormatTrackInfo(Fmt, Ctx)));
     if Trim(FHeaders[I].Text) = '' then
       FHeaders[I].Text := ExtractFileName(FHeaders[I].FolderDir);
     FHeaders[I].Info := GroupInfoText(FHeaders[I], InfoCount, InfoTime);

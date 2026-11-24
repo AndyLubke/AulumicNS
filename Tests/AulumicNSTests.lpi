@@ -210,6 +210,16 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestProperties"/>
       </Unit>
+      <Unit>
+        <Filename Value="TestUpdateCheck.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestUpdateCheck"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestPlaylistFormat.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestPlaylistFormat"/>
+      </Unit>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

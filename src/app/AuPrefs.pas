@@ -15,7 +15,7 @@ unit AuPrefs;
   chevron); a click opens it in place. With all cards closed every page fits
   the dialog without scrolling at 1920 x 1080 / 150 % (the screenshot run
   writes prefs-fit.txt); a page scrolls when open cards make it longer, and
-  on smaller screens. The open cards are remembered (PrefsCards). "Related
+  on smaller screens. The open cards stay open until the program closes (PrefsCards). "Related
   settings" buttons lead to the page or card where a neighbouring subject
   lives.
 
@@ -37,7 +37,7 @@ unit AuPrefs;
                  ReplayGain scan (tracks at the same time)
     System       keeping the drives awake; animations, the graphics card.
                  Cards: Audio thread (CPU affinity, MMCSS, the timer), Log,
-                 Artist information (the user's Last.fm API key)
+                 Internet (the check for a newer version at start, the Last.fm API key)
     Shortcuts    the keyboard shortcuts
 
   A new setting goes where its subject is: visible when people change it
@@ -74,7 +74,7 @@ const
   PREFS_SHORTCUTS = 8;
   PREFS_PAGE_COUNT = 9;
 
-  { the cards (their ids are kept in the settings: PrefsCards) }
+  { the cards (PrefsCards lists the ids of the open ones) }
   CARD_MAINWINDOW = 'mainwindow';
   CARD_PANETEXT = 'panetext';
   CARD_FILTER = 'filter';
@@ -85,7 +85,7 @@ const
 
 { shows AppSettings.Data; with OK (True) its own settings are written back
   into AppSettings.Data and AFolders holds the new library folders. APage < 0
-  opens the page shown last time (AppSettings.Data.PrefsPage, always kept). }
+  opens the page shown last time in this run of the program (AppSettings.Data.PrefsPage). }
 function ShowPreferences(AOwner: TComponent; AFolders: TStrings; ALibrary: TLibraryManager;
   AOnScan: TPrefsScanEvent; APage: Integer = -1): Boolean;
 { the open dialog shows the scan's progress; '' = the scan has ended }
@@ -111,7 +111,7 @@ implementation
 
 uses
   Dialogs, uAppStrings, uLibraryWatcher, uAudioUtils, uSettingsLog, AuDialogs,
-  ALAudioEngine;
+  ALAudioEngine, uPlaylistFormat, AuFormatBoxes;
 
 function PlaybackRestartNeeded(const A, B: TManagerConfig): Boolean;
 begin
@@ -250,10 +250,11 @@ type
     FTextSize: TAuSegmented;
     FLibFont, FPlFont: TAuEdit;
     FLastFmKey: TAuEdit;
-    FGrouping, FHeaderFmt, FTrackFmt, FTileSize: TAuCombo;
+    FGrouping, FTileSize: TAuCombo;
+    FHeaderFmt, FTrackFmt: TFormatBoxes;
     FShowArtist, FShowComposer, FShowAlbum, FShowGenre, FPeakMeter: TAuSwitch;
     { system }
-    FAffinity, FMMCSS, FKeepAwake, FHighRes, FAlwaysLog: TAuSwitch;
+    FAffinity, FMMCSS, FKeepAwake, FHighRes, FAlwaysLog, FCheckUpdates: TAuSwitch;
     FRgThreads: TAuCombo;
     FShortcuts: TAuListView;
     { building }
@@ -287,6 +288,7 @@ type
     function TextBlock(const ACaption, ADesc: string; AW: Integer): Integer;
     procedure AddRow(ACtrl: TControl);
     function ComboRow(const ACaption, ADesc: string; const AOpts: array of TFormatDef): TAuCombo;
+    function FormatRow(const ACaption, ADesc: string; AKind: TFmtKind): TFormatBoxes;
     function SwitchRow(const ACaption, ADesc: string): TAuSwitch;
     function SpinRow(const ACaption, ADesc: string; AMin, AMax: Integer): TAuEdit;
     procedure StackRow(const ACaption, ADesc: string; ACtrl: TControl; AW, AH: Integer);
@@ -995,8 +997,10 @@ end;
 
 function TPrefsForm.SumArtistInfo: string;
 begin
-  if Trim(FLastFmKey.Text) = '' then Result := 'No Last.fm API key'
-  else Result := 'Last.fm API key entered';
+  if FCheckUpdates.Checked then Result := 'Updates: checked at start'
+  else Result := 'Updates: not checked at start';
+  if Trim(FLastFmKey.Text) = '' then Result := Result + '  •  No Last.fm API key'
+  else Result := Result + '  •  Last.fm API key entered';
 end;
 
 { ---- TPrefsCardHead / TPrefsCardBody ---- }
@@ -1151,6 +1155,20 @@ begin
   Inc(FY, Math.Max(H, 32));
 end;
 
+{ a playlist format: the name and description over the whole width, the four
+  boxes with their preview line below }
+function TPrefsForm.FormatRow(const ACaption, ADesc: string; AKind: TFmtKind): TFormatBoxes;
+var
+  H: Integer;
+begin
+  RowGap;
+  H := TextBlock(ACaption, ADesc, RW);
+  Inc(FY, H + 6);
+  Result := TFormatBoxes.CreateBoxes(Self, FCur, AKind, FX, FY, RW);
+  Result.OnChange := @AnyChange;
+  Inc(FY, FORMAT_BOXES_H);
+end;
+
 function TPrefsForm.SpinRow(const ACaption, ADesc: string; AMin, AMax: Integer): TAuEdit;
 var
   H: Integer;
@@ -1286,11 +1304,11 @@ begin
   FGrouping := ComboRow('Playlists grouping',
     'Default grouping of playlists: By album, By folder or Flat list. Each playlist can override it.',
     GROUPING_MODE_OPTIONS);
-  FHeaderFmt := ComboRow('Album header format',
-    'Default layout of the album headers in playlists (only when grouped By album). Each playlist ' +
-    'can override it.', HEADER_FORMAT_OPTIONS);
-  FTrackFmt := ComboRow('Playlists track format',
-    'Default layout of the tracks in playlists. Each playlist can override it.', TRACK_FORMAT_OPTIONS);
+  FHeaderFmt := FormatRow('Album header format',
+    'The fields of the album headers, in the order of the line (only when grouped By album). ' +
+    'Each playlist can override it.', fkHeader);
+  FTrackFmt := FormatRow('Track format',
+    'The fields of the track lines, in the order of the line. Each playlist can override it.', fkTrack);
   FCursorFollows := SwitchRow('Cursor follows playback',
     'When a track starts, the selection moves to it and it scrolls into view. Only in the playlist ' +
     'that is playing; other playlists stay where they were.');
@@ -1493,7 +1511,11 @@ begin
     'Writes AulumicNSLog.txt into the Data folder every time Aulumic closes. Otherwise it''s ' +
     'only written after an error. Handy for a problem report.');
   EndCard;
-  BeginCard(CARD_ARTISTINFO, 'Artist information', icArtist, @SumArtistInfo);
+  { what goes online: the check for a newer version and Artist Info's key }
+  BeginCard(CARD_ARTISTINFO, 'Internet', icGlobe, @SumArtistInfo);
+  FCheckUpdates := SwitchRow('Check for updates at start',
+    'Asks GitHub once at every start whether a newer version is available, and says so when ' +
+    'there is one. Off: only with Check for updates in the About window.');
   FLastFmKey := AddEdit(FCur, 0, 0, 300);
   FLastFmKey.OnChange := @AnyChange;
   SideRow('Last.fm API key',
@@ -1579,8 +1601,8 @@ begin
   FPlFont.Value := EnsureRange(D.PlaylistFontSize, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   SelectOption(FTileSize, TILE_SIZE_OPTIONS, IntToStr(D.LibraryTileSize));
   SelectOption(FGrouping, GROUPING_MODE_OPTIONS, IntToStr(D.DefaultGroupingMode));
-  SelectOption(FHeaderFmt, HEADER_FORMAT_OPTIONS, D.DefaultHeaderFormat);
-  SelectOption(FTrackFmt, TRACK_FORMAT_OPTIONS, D.DefaultTrackFormat);
+  FHeaderFmt.Format := D.DefaultHeaderFormat;
+  FTrackFmt.Format := D.DefaultTrackFormat;
   FShowArtist.Checked := D.ShowLibArtist;
   FShowComposer.Checked := D.ShowLibComposer;
   FShowAlbum.Checked := D.ShowLibAlbum;
@@ -1593,6 +1615,7 @@ begin
   FKeepAwake.Checked := D.Audio.KeepDrivesAwake;
   SelectOption(FRgThreads, RG_THREADS_OPTIONS, IntToStr(D.RGScanThreads));
   FAlwaysLog.Checked := D.AlwaysSaveLog;
+  FCheckUpdates.Checked := D.CheckUpdatesAtStart;
   FLastFmKey.Text := D.LastFmApiKey;
   EnableControls;
   UpdateLibraryButtons;
@@ -1650,8 +1673,11 @@ begin
   D.PlaylistFontSize := EnsureRange(FPlFont.Value, FONT_MAIN_MINSIZE, FONT_MAIN_MAXSIZE);
   D.LibraryTileSize := OptionInt(FTileSize, TILE_SIZE_OPTIONS, 2);
   D.DefaultGroupingMode := OptionInt(FGrouping, GROUPING_MODE_OPTIONS, 0);
-  D.DefaultHeaderFormat := OptionValue(FHeaderFmt, HEADER_FORMAT_OPTIONS, HEADER_FORMAT_OPTIONS[0].DataStr);
-  D.DefaultTrackFormat := OptionValue(FTrackFmt, TRACK_FORMAT_OPTIONS, TRACK_FORMAT_OPTIONS[0].DataStr);
+  { with no field chosen: the plain album or title }
+  D.DefaultHeaderFormat := FHeaderFmt.Format;
+  if D.DefaultHeaderFormat = '' then D.DefaultHeaderFormat := FMT_DEFAULT[fkHeader];
+  D.DefaultTrackFormat := FTrackFmt.Format;
+  if D.DefaultTrackFormat = '' then D.DefaultTrackFormat := FMT_DEFAULT[fkTrack];
   D.ShowLibArtist := FShowArtist.Checked;
   D.ShowLibComposer := FShowComposer.Checked;
   D.ShowLibAlbum := FShowAlbum.Checked;
@@ -1664,6 +1690,7 @@ begin
   D.Audio.KeepDrivesAwake := FKeepAwake.Checked;
   D.RGScanThreads := OptionInt(FRgThreads, RG_THREADS_OPTIONS, 1);
   D.AlwaysSaveLog := FAlwaysLog.Checked;
+  D.CheckUpdatesAtStart := FCheckUpdates.Checked;
   D.LastFmApiKey := Trim(FLastFmKey.Text);
 end;
 
