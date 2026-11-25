@@ -211,6 +211,36 @@
         <UnitName Value="TestProperties"/>
       </Unit>
       <Unit>
+        <Filename Value="TestArtistSource.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestArtistSource"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDownmix.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestDownmix"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDsdMix.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestDsdMix"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestAiff.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestAiff"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestAlac.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestAlac"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestDamagedFiles.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestDamagedFiles"/>
+      </Unit>
+      <Unit>
         <Filename Value="TestUpdateCheck.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestUpdateCheck"/>
@@ -219,6 +249,11 @@
         <Filename Value="TestPlaylistFormat.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestPlaylistFormat"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestThemeColours.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestThemeColours"/>
       </Unit>
     </Units>
   </ProjectOptions>

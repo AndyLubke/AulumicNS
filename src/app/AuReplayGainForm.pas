@@ -41,7 +41,7 @@ implementation
 
 uses
   uMetadataPayloads, uAppConsts, uAppStrings, uEngineStateManager, uOSUtils, AuDialogs,
-  uSettingsManager;
+  uSettingsManager, AuMenus, AuTagLoader;
 
 type
   { TReplayGainForm }
@@ -51,6 +51,7 @@ type
     FLibrary: TLibraryManager;
     FThread, FFinished: TReplayGainThread;
     FResults: TList;                 // PRGScanResult
+    FRowMenu: TAuMenu;               // the menu of a right-clicked row (kept until its entry ran)
     FCommitting, FStopPending: Boolean;
     FCrashMessage: string;
     FOnResults: Boolean;
@@ -76,6 +77,8 @@ type
     procedure Teardown;
     procedure GridCell(Sender: TObject; Row, Col: Integer; var AText: string);
     procedure GridStyle(Sender: TObject; Row: Integer; var ABold: Boolean; var AColor: TARGB);
+    procedure GridContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+    procedure FolderClick(Sender: TObject);
     procedure HideClick(Sender: TObject);
     procedure StopClick(Sender: TObject);
     procedure SaveClick(Sender: TObject);
@@ -338,6 +341,7 @@ begin
   FGrid.BackRole := crCard;
   FGrid.OnGetCell := @GridCell;
   FGrid.OnRowStyle := @GridStyle;
+  FGrid.OnRowContext := @GridContext;
   FWarn := AddLabel(Self, '', 24, 0, 600, False);
   FWarn.TextRole := crWarn;
   FWarn.Bold := True;
@@ -359,6 +363,7 @@ begin
   StopThread;
   ClearResults;
   FResults.Free;
+  FRowMenu.Free;
   if AppStateManager <> nil then
   begin
     AppStateManager.PopState(esReplayGainBusy);
@@ -576,6 +581,25 @@ begin
     4: if HasAlbum then AText := FmtPeak(R^.AlbumPeak) else AText := LBL_RG_EMPTY_CELL;
     5: AText := RGStatusText(R^.Status);
   end;
+end;
+
+procedure TReplayGainForm.GridContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+begin
+  if FGrid.SelCount = 0 then Exit;
+  FRowMenu.Free;
+  FRowMenu := TAuMenu.Create;
+  FRowMenu.Add('Open folder...', @FolderClick, icFolder);
+  FRowMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
+{ Explorer at the file of the first selected row }
+procedure TReplayGainForm.FolderClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+begin
+  Sel := FGrid.SelectedRows;
+  if (Length(Sel) = 0) or (Sel[0] < 0) or (Sel[0] >= FResults.Count) then Exit;
+  OpenFolderWithWindow(Self, PRGScanResult(FResults[Sel[0]])^.FilePath);
 end;
 
 procedure TReplayGainForm.GridStyle(Sender: TObject; Row: Integer; var ABold: Boolean; var AColor: TARGB);

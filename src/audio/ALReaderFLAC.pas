@@ -68,7 +68,7 @@ constructor TFlacReader.Create(const FileName: string);
 begin
   inherited Create;
 
-  if not FileExists(LongPath(FileName)) then
+  if not AuFileExists(FileName) then
     raise Exception.Create(ERR_FILE_NOT_FOUND + ' ' + FileName);
 
   FDecoder := TAuFlacDecoder.Create;

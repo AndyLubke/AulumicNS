@@ -9,7 +9,7 @@ unit AuAbout;
 
   The About window (Main menu > About...): the logo, the name, the version and
   build of this program file (uVersionHelper: read from the file itself), the
-  data folder, the project's page as a link, the credits. "Copy info" puts the facts on the clipboard for a
+  data folder and the project's page as links, the credits. "Copy info" puts the facts on the clipboard for a
   problem report. "Check for updates" asks GitHub for the latest release when
   it is clicked (uUpdateCheck) and says in the line beside it what it found;
   with a newer version there, the New version box comes up and the button
@@ -48,7 +48,7 @@ function PromptNewVersion(AOwner: TComponent; const ALatest: string; AWithSkip: 
 implementation
 
 uses
-  AuAppIcon, AuSettings, uVersionHelper, uUpdateCheck, uSettingsManager;
+  AuAppIcon, AuSettings, uVersionHelper, uUpdateCheck, uSettingsManager, uOSUtils;
 
 const
   ABOUT_W   = 580;
@@ -98,12 +98,14 @@ type
     FCheckBtn: TAuButton;
     FCheckNote: TAuLabel;
     FNewerFound: Boolean;        // the button opens the download page
+    FDataDir: string;            // the data folder as a link ('' in the screenshots: a made-up one)
     procedure CopyClick(Sender: TObject);
     procedure CheckClick(Sender: TObject);
     procedure CheckTick(Sender: TObject);
     procedure CheckNote(const AText: string; ARole: TAuRole);
     function Row(AIndex: Integer; const AName, AValue: string): TAuLabel;
     procedure WebClick(Sender: TObject);
+    procedure DataClick(Sender: TObject);
   public
     constructor CreateAbout(AOwner: TComponent; ADemo: Boolean);
     destructor Destroy; override;
@@ -139,6 +141,11 @@ end;
 procedure TAboutForm.WebClick(Sender: TObject);
 begin
   OpenURL(PROJECT_PAGE_URL);
+end;
+
+procedure TAboutForm.DataClick(Sender: TObject);
+begin
+  if FDataDir <> '' then RevealFileInExplorer(IncludeTrailingPathDelimiter(FDataDir));
 end;
 
 constructor TAboutForm.CreateAbout(AOwner: TComponent; ADemo: Boolean);
@@ -192,7 +199,15 @@ begin
   FInfo := 'Aulumic ' + GetAppVersion + LineEnding;
   Row(0, 'Built', GetAppBuildDate);
   Row(1, 'Made with', GetCompilerInfo);
-  Row(2, 'Data folder', DataDir);
+  { the folder with the library, the settings and the log, as a link }
+  L := Row(2, 'Data folder', DataDir);
+  if not ADemo then FDataDir := DataDir;
+  L.TextRole := crAccent;
+  L.Cursor := crHandPoint;
+  L.Hint := 'Open the data folder in Explorer.';
+  L.ShowHint := True;
+  L.OnClick := @DataClick;
+  L.FitWidth;
   Row(3, 'Program file', ExtractFileName(ParamStr(0)) + ' - ' + NS_MEANING);
   { the project's page as a link }
   L := Row(4, 'Website', PROJECT_PAGE_TEXT);

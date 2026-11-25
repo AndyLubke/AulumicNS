@@ -353,7 +353,7 @@ begin
   FFileName := FileName;
   FTextOnly := TagReadTextOnly;
   // Remember whether the existing tag could be read
-  if FileExists(LongPath(FileName)) then
+  if AuFileExists(FileName) then
     FLoadFailed := not LoadFromFile(FileName)
   else
     FLoadFailed := True;

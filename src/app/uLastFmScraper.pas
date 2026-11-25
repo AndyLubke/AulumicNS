@@ -7,8 +7,9 @@ unit uLastFmScraper;
 
   Fetches the artist information of Artist Info on one worker thread: the
   biography from the Last.fm API (with the user's own API key from the
-  settings), the picture from Wikipedia (checked with Wikidata) and, when
-  that finds none, from TheAudioDB.
+  settings) or, without a key or when Last.fm has none, the introduction of
+  the English Wikipedia article; the picture from Wikipedia and, when that
+  finds none, from TheAudioDB. Wikipedia pages are checked with Wikidata.
 
   No API key is built in. WinHTTP is part of Windows, so no DLL ships with
   the program.
@@ -82,6 +83,22 @@ function SimpleURLEncode(const S: string): string;
 // same order the scraper uses its caches. Artist Info saves edited bios and
 // own pictures there, so they end up in the folder that is shown.
 function ResolveArtistCacheDir(const AArtist: string): string;
+
+type
+  TBioSource = (bsNone, bsLastFm, bsWikipedia);
+
+// Reads the answer of Wikipedia's page query (extracts + pageprops,
+// formatversion 2). True with the introduction as paragraphs, the page's title
+// and its Wikidata item when the page exists, is no disambiguation page and
+// has a text. AIsDisambiguation tells a disambiguation page from a missing one.
+function ParseWikipediaIntro(const AJson: string; out AText, ATitle, AItemID: string;
+  out AIsDisambiguation: Boolean): Boolean;
+function WikipediaPageUrl(const ATitle: string): string;
+function LastFmArtistUrl(const AArtist: string): string;
+// Where the saved biography in AArtistDir (with trailing delimiter) came
+// from: bsNone without one or for the user's own text. AUrl is the article's
+// address for bsWikipedia, else ''.
+function ArtistBioSource(const AArtistDir: string; out AUrl: string): TBioSource;
 
 implementation
 
@@ -398,6 +415,146 @@ begin
     Result := FallbackDir
   else
     Result := PrimaryDir;   // where a new lookup saves first
+end;
+
+const
+  WIKIPEDIA_PAGE_PREFIX = 'https://en.wikipedia.org/wiki/';
+  WIKIPEDIA_INTRO_URL   = 'https://en.wikipedia.org/w/api.php?action=query' +
+    '&prop=extracts%7Cpageprops&exintro=1&explaintext=1&redirects=1' +
+    '&format=json&formatversion=2&titles=';
+  // A shorter text is a stub line, not a biography
+  WIKIPEDIA_MIN_INTRO   = 40;
+
+function ParseWikipediaIntro(const AJson: string; out AText, ATitle, AItemID: string;
+  out AIsDisambiguation: Boolean): Boolean;
+var
+  Root, Page, Node: TJSONData;
+  Lines: TStringList;
+  I: Integer;
+  Para: string;
+begin
+  Result            := False;
+  AText             := '';
+  ATitle            := '';
+  AItemID           := '';
+  AIsDisambiguation := False;
+  if Trim(AJson) = '' then
+    Exit;
+
+  try
+    Root := GetJSON(AJson);
+    try
+      if (Root = nil) or (Root.JSONType <> jtObject) then
+        Exit;
+      Page := Root.FindPath('query.pages[0]');
+      if (Page = nil) or (Page.JSONType <> jtObject) or
+         (Page.FindPath('missing') <> nil) or (Page.FindPath('invalid') <> nil) then
+        Exit;
+
+      if Page.FindPath('pageprops.disambiguation') <> nil then
+      begin
+        AIsDisambiguation := True;
+        Exit;
+      end;
+
+      Node := Page.FindPath('title');
+      if Assigned(Node) and (Node.JSONType = jtString) then
+        ATitle := Trim(Node.AsString);
+      Node := Page.FindPath('pageprops.wikibase_item');
+      if Assigned(Node) and (Node.JSONType = jtString) then
+        AItemID := Trim(Node.AsString);
+      Node := Page.FindPath('extract');
+      if Assigned(Node) and (Node.JSONType = jtString) then
+      begin
+        // One line per paragraph; an empty line between them reads better
+        Lines := TStringList.Create;
+        try
+          Lines.Text := Node.AsString;
+          for I := 0 to Lines.Count - 1 do
+          begin
+            Para := Trim(Lines[I]);
+            if Para = '' then
+              Continue;
+            if AText <> '' then
+              AText := AText + LineEnding + LineEnding;
+            AText := AText + Para;
+          end;
+        finally
+          Lines.Free;
+        end;
+      end;
+
+      Result := (ATitle <> '') and (Length(AText) >= WIKIPEDIA_MIN_INTRO);
+      if not Result then
+        AText := '';
+    finally
+      Root.Free;
+    end;
+  except
+    Result := False;
+    AText  := '';
+  end;
+end;
+
+function WikipediaPageUrl(const ATitle: string): string;
+begin
+  if Trim(ATitle) = '' then
+    Exit('');
+  Result := WIKIPEDIA_PAGE_PREFIX +
+    SimpleURLEncode(StringReplace(Trim(ATitle), ' ', '_', [rfReplaceAll]));
+end;
+
+function LastFmArtistUrl(const AArtist: string): string;
+var
+  First, Cleaned: string;
+begin
+  First   := ExtractFirstArtist(AArtist);
+  Cleaned := CleanArtistSearchName(First);
+  if Cleaned = '' then
+    Cleaned := First;
+  Result := 'https://www.last.fm/music/' + SimpleURLEncode(Cleaned);
+end;
+
+function ArtistBioSource(const AArtistDir: string; out AUrl: string): TBioSource;
+var
+  SL: TStringList;
+  Line: string;
+  I: Integer;
+begin
+  Result := bsNone;
+  AUrl   := '';
+  if (AArtistDir = '') or (not FileExists(AArtistDir + FILE_ARTIST_BIO)) or
+     FileExists(AArtistDir + FILE_ARTIST_BIO_USER) then
+    Exit;
+
+  Result := bsLastFm;
+  if not FileExists(AArtistDir + FILE_ARTIST_BIO_SOURCE) then
+    Exit;
+
+  Line := '';
+  SL   := TStringList.Create;
+  try
+    try
+      SL.LoadFromFile(AArtistDir + FILE_ARTIST_BIO_SOURCE, TEncoding.UTF8);
+      if SL.Count > 0 then
+        Line := Trim(SL[0]);
+    except
+      Line := '';
+    end;
+  finally
+    SL.Free;
+  end;
+
+  // The address is opened in the browser: only an encoded article address
+  if (Pos(WIKIPEDIA_PAGE_PREFIX, Line) <> 1) or
+     (Length(Line) <= Length(WIKIPEDIA_PAGE_PREFIX)) or (Length(Line) > 600) then
+    Exit;
+  for I := Length(WIKIPEDIA_PAGE_PREFIX) + 1 to Length(Line) do
+    if not (Line[I] in ['A'..'Z', 'a'..'z', '0'..'9', '-', '_', '.', '~', '%']) then
+      Exit;
+
+  Result := bsWikipedia;
+  AUrl   := Line;
 end;
 
 { TLastFmWorker }
@@ -979,15 +1136,18 @@ var
     end;
   end;
 
+  function WikipediaBioForName(const ACandidateName: string; out APageUrl: string): string; forward;
+
   function TryFetchAndSaveArtistBio(const ACandidateName: string): boolean;
   var
     SL: TStringList;
-    CachedBioText, FetchedBio, ErrorText: string;
+    CachedBioText, FetchedBio, ErrorText, WikiUrl: string;
   begin
     Result        := False;
     CachedBioText := '';
     FetchedBio    := '';
     ErrorText     := '';
+    WikiUrl       := '';
 
     if Cancelled or (ACandidateName = '') then
       Exit;
@@ -1016,13 +1176,13 @@ var
 
       if not Cancelled then
       begin
-        if AApiKey = '' then
-        begin
-          ResultText := ERR_LASTFM_MISSING_API_KEY;
-          Exit;
-        end;
+        if AApiKey <> '' then
+          FetchedBio := TryFetchLastFmBio(ACandidateName, ErrorText);
 
-        FetchedBio := TryFetchLastFmBio(ACandidateName, ErrorText);
+        // Without a key, or when Last.fm has no text: Wikipedia. A rejected
+        // key keeps its message, so that it gets noticed and replaced.
+        if (FetchedBio = '') and (ErrorText <> ERR_LASTFM_KEY_REJECTED) and (not Cancelled) then
+          FetchedBio := WikipediaBioForName(ACandidateName, WikiUrl);
 
         if (FetchedBio <> '') and (not Cancelled) then
         begin
@@ -1041,7 +1201,16 @@ var
               try
                 SL.Text := ResultText;
                 if SaveStringsAtomic(SL, JsonFile, TEncoding.UTF8) then
+                begin
                   SysUtils.DeleteFile(ArtistDir + FILE_ARTIST_BIO_USER);
+                  // Where the text is from: the article's address, or no file
+                  SysUtils.DeleteFile(ArtistDir + FILE_ARTIST_BIO_SOURCE);
+                  if WikiUrl <> '' then
+                  begin
+                    SL.Text := WikiUrl;
+                    SaveStringsAtomic(SL, ArtistDir + FILE_ARTIST_BIO_SOURCE, TEncoding.UTF8);
+                  end;
+                end;
               except
               end;
             finally
@@ -1054,6 +1223,8 @@ var
           ResultText := CachedBioText;
           Result     := True;
         end
+        else if AApiKey = '' then
+          ResultText := ERR_LASTFM_MISSING_API_KEY
         else if ErrorText <> '' then
         begin
           ResultText := ErrorText;
@@ -1173,6 +1344,69 @@ var
     except
       Result := -1;
     end;
+  end;
+
+  // The introduction of the English Wikipedia article ASearchName. AIsOther:
+  // the name leads to a disambiguation page or to a page that is not about a
+  // music artist, so "<name> (musician)" / "<name> (band)" are worth a try.
+  // When Wikidata gives no answer, the text is accepted.
+  function TryFetchWikipediaBio(const ASearchName: string; out AIsOther: boolean;
+    out APageUrl: string): string;
+  var
+    JSONResp, IntroText, Title, ItemID: string;
+    Disambig: Boolean;
+  begin
+    Result   := '';
+    AIsOther := False;
+    APageUrl := '';
+    if Cancelled or (ASearchName = '') then
+      Exit;
+
+    JSONResp := DownloadHTTPSJSON(WIKIPEDIA_INTRO_URL + SimpleURLEncode(ASearchName));
+    if (JSONResp = '') or Cancelled then
+      Exit;
+
+    if not ParseWikipediaIntro(JSONResp, IntroText, Title, ItemID, Disambig) then
+    begin
+      AIsOther := Disambig;
+      Exit;
+    end;
+
+    if (ItemID <> '') and (WikidataIsMusicArtist(ItemID) = 0) then
+    begin
+      AIsOther := True;
+      Exit;
+    end;
+    if Cancelled then
+      Exit;
+
+    Result   := IntroText;
+    APageUrl := WikipediaPageUrl(Title);
+  end;
+
+  function WikipediaBioForName(const ACandidateName: string; out APageUrl: string): string;
+  var
+    FuzzyName: string;
+    IsOther, Dummy: boolean;
+  begin
+    Result := TryFetchWikipediaBio(ACandidateName, IsOther, APageUrl);
+
+    if (Result = '') and IsOther and (not Cancelled) then
+    begin
+      Result := TryFetchWikipediaBio(ACandidateName + ' (musician)', Dummy, APageUrl);
+      if (Result = '') and (not Cancelled) then
+        Result := TryFetchWikipediaBio(ACandidateName + ' (band)', Dummy, APageUrl);
+    end;
+
+    if (Result = '') and (not Cancelled) then
+    begin
+      FuzzyName := StripAccents(ACandidateName);
+      if FuzzyName <> ACandidateName then
+        Result := TryFetchWikipediaBio(FuzzyName, Dummy, APageUrl);
+    end;
+
+    if Result = '' then
+      APageUrl := '';
   end;
 
   function TryFetchWikipediaImage(const SearchName: string; out IsDisambiguation: boolean): boolean;

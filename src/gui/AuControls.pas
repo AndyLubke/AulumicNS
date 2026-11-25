@@ -2774,7 +2774,7 @@ begin
     B := Math.Max(FCaret, FAnchor);
     X1 := TL + CaretPx(A) - FScrollX;
     X2 := TL + CaretPx(B) - FScrollX;
-    G.FillRect(X1, S(6), X2 - X1, Height - S(12), clSelection);
+    G.FillRect(X1, S(6), X2 - X1, Height - S(12), clTextSelection);
   end;
   Fg := clText;
   if not Enabled then Fg := clTextFaint;
@@ -3275,7 +3275,7 @@ begin
       begin
         X1 := PadX + TextWidthW(Copy(FText, FLines[I].Start + 1, S0 - FLines[I].Start), F);
         X2 := PadX + TextWidthW(Copy(FText, FLines[I].Start + 1, E0 - FLines[I].Start), F);
-        G.FillRect(X1, Y + S(1), X2 - X1, LineH - S(2), clSelection);
+        G.FillRect(X1, Y + S(1), X2 - X1, LineH - S(2), clTextSelection);
       end;
     end;
     Line := Copy(FText, FLines[I].Start + 1, FLines[I].Len);

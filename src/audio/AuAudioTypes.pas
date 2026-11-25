@@ -14,7 +14,7 @@ unit AuAudioTypes;
 interface
 
 uses
-  SysUtils;
+  SysUtils, Classes;
 
 type
   TAuSampleKind = (
@@ -83,6 +83,27 @@ function RateText(Rate: Cardinal): string;
 { the \\?\ form of long paths (260 characters and more) for the file APIs }
 function LongPath(const Path: string): string;
 
+type
+  // A file that is not on a disk. The readers of music files and of their
+  // tags open every file through AuOpenFile, so a test can hand them one
+  // that lives in memory: damaged files are then read without ever being
+  // written to a disk. Both hooks answer False for a name that is not theirs.
+  TAuOpenFileHook   = function(const AFileName: string; AMode: Word; out AStream: TStream): Boolean;
+  TAuFileExistsHook = function(const AFileName: string; out AExists: Boolean): Boolean;
+  TAuDeleteFileHook = function(const AFileName: string): Boolean;
+
+var
+  AuOpenFileHook: TAuOpenFileHook = nil;
+  AuFileExistsHook: TAuFileExistsHook = nil;
+  AuDeleteFileHook: TAuDeleteFileHook = nil;
+
+// TFileStream.Create(LongPath(AFileName), AMode), unless a hook takes the name
+function AuOpenFile(const AFileName: string; AMode: Word): TStream;
+// FileExists(LongPath(AFileName)), unless a hook knows the name
+function AuFileExists(const AFileName: string): Boolean;
+// DeleteFile(LongPath(AFileName)), unless a hook has the file
+function AuDeleteFile(const AFileName: string): Boolean;
+
 implementation
 
 constructor EAuAudio.CreateKind(AKind: TAuErrorKind; const Msg: string);
@@ -110,6 +131,27 @@ end;
   so one with '/', '\.\' or '\..\' in it, or a relative one, is left alone.
   From 240 bytes on, so the temporary file next to a file (a longer name) and
   a folder (limit 248) are covered too. }
+function AuOpenFile(const AFileName: string; AMode: Word): TStream;
+begin
+  if Assigned(AuOpenFileHook) and AuOpenFileHook(AFileName, AMode, Result) then
+    Exit;
+  Result := TFileStream.Create(LongPath(AFileName), AMode);
+end;
+
+function AuFileExists(const AFileName: string): Boolean;
+begin
+  if Assigned(AuFileExistsHook) and AuFileExistsHook(AFileName, Result) then
+    Exit;
+  Result := FileExists(LongPath(AFileName));
+end;
+
+function AuDeleteFile(const AFileName: string): Boolean;
+begin
+  if Assigned(AuDeleteFileHook) and AuDeleteFileHook(AFileName) then
+    Exit(True);
+  Result := SysUtils.DeleteFile(LongPath(AFileName));
+end;
+
 function LongPath(const Path: string): string;
 var
   L: Integer;

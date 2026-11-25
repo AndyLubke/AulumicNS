@@ -76,6 +76,9 @@ const
   FILE_ARTIST_IMAGE           = 'artist_image.jpg';
   // Empty marker files: the bio / picture was set by the user (kept by Refresh)
   FILE_ARTIST_BIO_USER        = 'artist_bio.user';
+  // Its first line is the address of the Wikipedia article a biography was
+  // taken from; a downloaded biography without this file is from Last.fm
+  FILE_ARTIST_BIO_SOURCE      = 'artist_bio.source';
   FILE_ARTIST_IMAGE_USER      = 'artist_image.user';
   // Next to the program file: a Last.fm API key for a program that has none
   // in its settings yet (uSettingsManager.ReadLastFmKeyFile)
@@ -168,7 +171,7 @@ const
   UI_TOP_PANEL_DEFAULTHEIGHT  = 200;
 
   // File Paths and Masks
-  FILE_VALID_EXTS             = '.flac,.wav,.dsf,.dff';
+  FILE_VALID_EXTS             = '.flac,.wav,.aiff,.aif,.aifc,.m4a,.dsf,.dff';
   // The library and the user stats are stored by uDbStore (snapshot .adb +
   // journal .jnl)
   FILE_DB                     = 'library.adb';

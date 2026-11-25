@@ -34,7 +34,7 @@ type
 
   TAuFlacDecoder = class(TAuDecoder)
   private
-    FFile: TFileStream;
+    FFile: TStream;
     FFileSize: Int64;
     { input window }
     FData: array of Byte;
@@ -351,7 +351,7 @@ var
   B: array[0..9] of Byte;
 begin
   try
-    FFile := TFileStream.Create(LongPath(AFileName), fmOpenRead or fmShareDenyWrite);
+    FFile := AuOpenFile(AFileName, fmOpenRead or fmShareDenyWrite);
   except
     on E: Exception do raise EAuAudio.CreateKind(aekFile, 'Cannot open file: ' + E.Message);
   end;

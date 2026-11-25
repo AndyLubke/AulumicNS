@@ -973,8 +973,10 @@ begin
 end;
 
 procedure TMdView.Layout;
+const
+  LIST_END_GAP = 16;        // under the last item of a list
 var
-  I, R, C, NC, BW, BH, KeepBlock: Integer;
+  I, J, R, C, NC, BW, BH, KeepBlock: Integer;
   Y, W, Indent, TopSp, BotSp, H, Natural, Total, Avail, CellPad, KeepOff: Single;
   Nat: array of Single;
   Lines: TMdLines;
@@ -1010,6 +1012,17 @@ begin
       mkImage: begin TopSp := S(8); BotSp := S(22); end;
     else
       begin TopSp := 0; BotSp := S(12); end;
+    end;
+    { the last item of a list: what follows is no part of the list, so it
+      stands off from it as far as a paragraph does from the next one (the
+      small gap between two items would make it look like one more item) }
+    if FBlocks[I].Kind in [mkBullet1, mkBullet2, mkNumber] then
+    begin
+      J := I + 1;
+      while (J <= High(FBlocks)) and FPinImages and (FBlocks[J].Kind = mkImage) do Inc(J);
+      if (J <= High(FBlocks)) and
+         not (FBlocks[J].Kind in [mkBullet1, mkBullet2, mkNumber, mkH1, mkH2, mkH3]) then
+        BotSp := S(LIST_END_GAP);
     end;
     { a pinned picture takes no room in the text: the panel shows it }
     if FPinImages and (FBlocks[I].Kind = mkImage) then

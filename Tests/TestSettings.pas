@@ -18,12 +18,16 @@ unit TestSettings;
   that hangs over an edge, lies in a corner no monitor shows, or was on a
   monitor that is gone comes wholly onto the monitor it covers most or the
   nearest one; a window larger than the work area is made as small as it.
+
+  The settings as a first start has them (DefaultData), and what "Reset this
+  page" of Preferences puts back: the settings of that page and no others,
+  never the output device, the volume lock or the Last.fm key.
   =============================================================================}
 
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, uSettingsManager, TestHelpers;
+  Classes, SysUtils, fpcunit, testregistry, uSettingsManager, AuPrefs, TestHelpers;
 
 type
   TTestLastFmKeyFile = class(TTestCase)
@@ -56,7 +60,127 @@ type
     procedure WithoutMonitorsNothingChanges;
   end;
 
+  TTestSettingsDefaults = class(TTestCase)
+  private
+    FKept: TAppSettingsData;
+  protected
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TheDefaultsAreThoseOfAFirstStart;
+    procedure AskingForTheDefaultsChangesNothing;
+    procedure AResetTouchesOnlyItsPage;
+    procedure AResetKeepsDeviceVolumeLockAndKey;
+    procedure TheShortcutsPageHasNothingToReset;
+  end;
+
 implementation
+
+{ ---- TTestSettingsDefaults ---- }
+
+procedure TTestSettingsDefaults.SetUp;
+begin
+  FKept := AppSettings.Data;
+end;
+
+procedure TTestSettingsDefaults.TearDown;
+begin
+  AppSettings.Data := FKept;
+end;
+
+procedure TTestSettingsDefaults.TheDefaultsAreThoseOfAFirstStart;
+var
+  D: TAppSettingsData;
+begin
+  D := AppSettings.DefaultData;
+  AssertFalse('No check for updates at start', D.CheckUpdatesAtStart);
+  AssertEquals('Nothing skipped', '', D.SkippedVersion);
+  AssertTrue('Work headings on', D.WorkHeadings);
+  AssertFalse('Composers group off', D.ShowLibComposer);
+  AssertEquals('The plain album', '%album%', D.DefaultHeaderFormat);
+  AssertEquals('The plain title', '%title%', D.DefaultTrackFormat);
+  AssertEquals('PCM buffer', 250, D.Audio.PCMBufferMs);
+  AssertEquals('DSD buffer', 500, D.Audio.DSDBufferMs);
+  AssertTrue('Automatic headroom', D.Audio.AutoHeadroom);
+  AssertFalse('Volume not locked', D.Audio.VolumeLocked);
+end;
+
+procedure TTestSettingsDefaults.AskingForTheDefaultsChangesNothing;
+var
+  D: TAppSettingsData;
+begin
+  AppSettings.Data.CheckUpdatesAtStart := True;
+  AppSettings.Data.Audio.PCMBufferMs := 1000;
+  AppSettings.Data.DefaultHeaderFormat := '[%year% • ]%album%';
+  D := AppSettings.DefaultData;
+  AssertFalse('The defaults', D.CheckUpdatesAtStart);
+  AssertTrue('The settings in use are as they were', AppSettings.Data.CheckUpdatesAtStart);
+  AssertEquals(1000, AppSettings.Data.Audio.PCMBufferMs);
+  AssertEquals('[%year% • ]%album%', AppSettings.Data.DefaultHeaderFormat);
+end;
+
+procedure TTestSettingsDefaults.AResetTouchesOnlyItsPage;
+var
+  Def, D: TAppSettingsData;
+begin
+  Def := AppSettings.DefaultData;
+  D := Def;
+  D.Audio.ResamplePCM := not Def.Audio.ResamplePCM;
+  D.Audio.ResampleQuality := Def.Audio.ResampleQuality + 1;
+  D.Audio.PCMBufferMs := 1000;
+  D.Audio.DSDBufferMs := 1000;
+  D.CheckUpdatesAtStart := True;
+  D.ShowLibComposer := True;
+  D.DefaultHeaderFormat := '[%year% • ]%album%';
+  CopyPageDefaults(PREFS_RESAMPLER, Def, D);
+  AssertEquals('The resampler is back', Def.Audio.ResamplePCM, D.Audio.ResamplePCM);
+  AssertEquals(Def.Audio.ResampleQuality, D.Audio.ResampleQuality);
+  AssertEquals('The Output page is untouched', 1000, D.Audio.PCMBufferMs);
+  AssertEquals('The DSD page', 1000, D.Audio.DSDBufferMs);
+  AssertTrue('The System page', D.CheckUpdatesAtStart);
+  AssertTrue('The Appearance page', D.ShowLibComposer);
+  AssertEquals('The Playlists page', '[%year% • ]%album%', D.DefaultHeaderFormat);
+  CopyPageDefaults(PREFS_OUTPUT, Def, D);
+  AssertEquals('Now the PCM buffer', Def.Audio.PCMBufferMs, D.Audio.PCMBufferMs);
+  AssertEquals('Not the DSD buffer', 1000, D.Audio.DSDBufferMs);
+  CopyPageDefaults(PREFS_DSD, Def, D);
+  AssertEquals(Def.Audio.DSDBufferMs, D.Audio.DSDBufferMs);
+  CopyPageDefaults(PREFS_SYSTEM, Def, D);
+  AssertFalse(D.CheckUpdatesAtStart);
+  CopyPageDefaults(PREFS_APPEARANCE, Def, D);
+  AssertFalse(D.ShowLibComposer);
+  CopyPageDefaults(PREFS_PLAYLISTS, Def, D);
+  AssertEquals(Def.DefaultHeaderFormat, D.DefaultHeaderFormat);
+end;
+
+procedure TTestSettingsDefaults.AResetKeepsDeviceVolumeLockAndKey;
+var
+  Def, D: TAppSettingsData;
+  P: Integer;
+begin
+  Def := AppSettings.DefaultData;
+  D := Def;
+  D.OutputApi := 1;
+  D.WasapiDeviceID := 'a device';
+  D.AsioDriverID := 'a driver';
+  D.Audio.VolumeLocked := not Def.Audio.VolumeLocked;
+  D.LastFmApiKey := 'a key';
+  for P := PREFS_LIBRARY to PREFS_SHORTCUTS do CopyPageDefaults(P, Def, D);
+  AssertEquals('The output interface', 1, D.OutputApi);
+  AssertEquals('The device', 'a device', D.WasapiDeviceID);
+  AssertEquals('The driver', 'a driver', D.AsioDriverID);
+  AssertTrue('The volume lock', D.Audio.VolumeLocked <> Def.Audio.VolumeLocked);
+  AssertEquals('The Last.fm key', 'a key', D.LastFmApiKey);
+end;
+
+procedure TTestSettingsDefaults.TheShortcutsPageHasNothingToReset;
+var
+  P: Integer;
+begin
+  for P := PREFS_LIBRARY to PREFS_SYSTEM do AssertTrue(PageHasSettings(P));
+  AssertFalse(PageHasSettings(PREFS_SHORTCUTS));
+  AssertFalse(PageHasSettings(-1));
+end;
 
 const
   SAMPLE_KEY = '0123456789abcdef0123456789ABCDEF';
@@ -194,6 +318,7 @@ begin
 end;
 
 initialization
+  RegisterTest(TTestSettingsDefaults);
   RegisterTest(TTestWindowFit);
   RegisterTest(TTestLastFmKeyFile);
 

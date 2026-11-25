@@ -123,7 +123,7 @@ begin
                 if IsDSD then
                   TrackStrVal := LBL_CODEC_DSD
                 else
-                  TrackStrVal := UpperCase(Copy(ExtractFileExt(Track^.FileNameOnly), 2, 10));
+                  TrackStrVal := FormatNameOf(Track^.FileNameOnly);
               end;
 
             tiResolution:

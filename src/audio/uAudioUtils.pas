@@ -17,6 +17,10 @@ uses
 
 const
   EXT_WAV     = '.wav';
+  EXT_AIFF    = '.aiff';
+  EXT_AIF     = '.aif';
+  EXT_AIFC    = '.aifc';
+  EXT_M4A     = '.m4a';   // Apple Lossless
   EXT_FLAC    = '.flac';
   EXT_DSF     = '.dsf';
   EXT_DFF     = '.dff';   // DSDIFF
@@ -65,6 +69,15 @@ type
     // and what it takes off at the moment (0 or negative, dB)
     HeadroomOn     : Boolean;
     HeadroomDB     : Double;
+    // How often the device ran out of audio since it was opened for this
+    // stream (each one is an audible gap)
+    Dropouts       : Integer;
+    // A source with more than two channels mixed to stereo: its channel
+    // count (0 = none) and the level of the mix before volume and headroom
+    // (0 or negative, dB)
+    DownmixFrom    : Integer;
+    DownmixBits    : Integer;   // the bit depth of that source
+    DownmixDB      : Double;
   end;
 
   TRateArray = array of Integer;  // sample rates (TargetRateChoices)
@@ -91,6 +104,11 @@ function IsFlacFile(const FileName: string): boolean; inline;
 
 // Check for wav file
 function IsWavFile(const FileName: string): boolean; inline;
+function IsAiffFile(const FileName: string): boolean; inline;
+function IsM4aFile(const FileName: string): boolean; inline;
+// The format of a file as it is shown and asked for (%codec%): its
+// extension in capitals, AIFF for every AIFF extension
+function FormatNameOf(const FileName: string): string;
 
 // Centralized check for virtual folder links
 function IsAulLinkFile(const FileName: string): boolean; inline;
@@ -135,7 +153,11 @@ begin
   Result := EndsText(EXT_FLAC, FileName) or
             EndsText(EXT_DSF, FileName) or
             EndsText(EXT_DFF, FileName) or
-            EndsText(EXT_WAV, FileName);
+            EndsText(EXT_WAV, FileName) or
+            EndsText(EXT_AIFF, FileName) or
+            EndsText(EXT_AIF, FileName) or
+            EndsText(EXT_AIFC, FileName) or
+            EndsText(EXT_M4A, FileName);
 end;
 
 function DsdMultiple(ADsdRate: Integer): Integer;
@@ -183,9 +205,28 @@ begin
   Result := EndsText(EXT_WAV, FileName);
 end;
 
+function IsAiffFile(const FileName: string): boolean; inline;
+begin
+  Result := EndsText(EXT_AIFF, FileName) or EndsText(EXT_AIF, FileName) or
+            EndsText(EXT_AIFC, FileName);
+end;
+
+function IsM4aFile(const FileName: string): boolean; inline;
+begin
+  Result := EndsText(EXT_M4A, FileName);
+end;
+
 function IsAulLinkFile(const FileName: string): boolean; inline;
 begin
   Result := EndsText(EXT_AULLINK, FileName);
+end;
+
+function FormatNameOf(const FileName: string): string;
+begin
+  if IsAiffFile(FileName) then
+    Result := 'AIFF'
+  else
+    Result := UpperCase(Copy(ExtractFileExt(FileName), 2, 10));
 end;
 
 // =========================================================================

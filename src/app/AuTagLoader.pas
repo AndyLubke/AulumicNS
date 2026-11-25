@@ -77,6 +77,14 @@ function FindOfflineDrivesWithWindow(AOwner: TComponent; APaths, AOffline: TStri
   written. }
 function SaveTextFileWithWindow(AOwner: TComponent; const AFile, AReplaces, AText, ACaption: string;
   out AError: string): TFileSaveResult;
+{ Explorer at a file (shown selected in its folder) or at a folder (a path
+  that ends with a path delimiter), once its drive has answered: the drive
+  is woken behind the same window first, so a sleeping disk or a NAS does not
+  freeze the window. False: nothing was opened - the wait was stopped, or the
+  drive does not answer (a note says so). }
+function OpenFolderWithWindow(AOwner: TComponent; const APath: string): Boolean;
+{ the folder of a file, as OpenFolderWithWindow takes a folder }
+function FolderOfFile(const AFile: string): string;
 { Deletes a file the same way; fsrSaved = the file is gone }
 function DeleteFileWithWindow(AOwner: TComponent; const AFile, ACaption: string): TFileSaveResult;
 { True while a wait of WakeDrivesWithWindow /
@@ -179,6 +187,38 @@ end;
 
 var
   GDriveWaitShowing: Integer = 0;
+
+function FolderOfFile(const AFile: string): string;
+begin
+  Result := ExtractFileDir(AFile);
+  if Result <> '' then Result := IncludeTrailingPathDelimiter(Result);
+end;
+
+function OpenFolderWithWindow(AOwner: TComponent; const APath: string): Boolean;
+var
+  Paths, Unreachable: TStringList;
+  Gone: Boolean;
+begin
+  Result := False;
+  if Trim(APath) = '' then Exit;
+  Paths := TStringList.Create;
+  Unreachable := TStringList.Create;
+  try
+    Paths.Add(APath);
+    if not WakeDrivesWithWindow(AOwner, Paths, APP_TITLE, Unreachable) then Exit;
+    Gone := Unreachable.Count > 0;
+  finally
+    Unreachable.Free;
+    Paths.Free;
+  end;
+  if Gone then
+  begin
+    AuMessage('The drive ' + ExtractFileDrive(APath) + ' can''t be reached.', amInfo);
+    Exit;
+  end;
+  RevealFileInExplorer(APath);
+  Result := True;
+end;
 
 function DriveWaitShowing: Boolean;
 begin

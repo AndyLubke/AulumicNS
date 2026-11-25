@@ -39,6 +39,9 @@ type
     procedure DemoLibraryHasItsAlbums;
     procedure SignalPathBitPerfectChangesNothing;
     procedure SignalPathMarksVolumeAndResampler;
+    procedure SignalPathShowsDropouts;
+    procedure SignalPathShowsTheDownmix;
+    procedure SignalPathPopupStaysOnTheScreen;
     procedure SignalPathDsdOverDoPIsTransparent;
     procedure SignalPathShowsThePreamp;
   end;
@@ -311,6 +314,79 @@ begin
   finally
     P.Free;
   end;
+end;
+
+procedure TTestDemoLibrary.SignalPathShowsDropouts;
+var
+  P: TAuSignalPath;
+  M: TAudioMetadata;
+  Inf: TSignalInfo;
+  St: TAuStage;
+begin
+  M := Default(TAudioMetadata);
+  P := TAuSignalPath.Create(nil);
+  try
+    BuildSignalPath(P, PcmInfo, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertFalse('No dropout: no line for it', FindStage(P, 'Dropouts', St));
+    Inf := PcmInfo;
+    Inf.Dropouts := 1;
+    BuildSignalPath(P, Inf, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertTrue('One dropout is shown', FindStage(P, 'Dropouts', St));
+    AssertTrue('As a warning', St.State = stModified);
+    AssertEquals('1 since', Copy(St.Detail, 1, 7));
+    AssertTrue('The samples are still the file''s', P.SummaryState = stTransparent);
+    Inf.Dropouts := 12;
+    BuildSignalPath(P, Inf, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertTrue(FindStage(P, 'Dropouts', St));
+    AssertEquals('12 since', Copy(St.Detail, 1, 8));
+  finally
+    P.Free;
+  end;
+end;
+
+procedure TTestDemoLibrary.SignalPathShowsTheDownmix;
+var
+  P: TAuSignalPath;
+  M: TAudioMetadata;
+  Inf: TSignalInfo;
+  St: TAuStage;
+begin
+  M := Default(TAudioMetadata);
+  P := TAuSignalPath.Create(nil);
+  try
+    BuildSignalPath(P, PcmInfo, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertFalse('Stereo: no line for a downmix', FindStage(P, 'Downmix', St));
+    Inf := PcmInfo;
+    Inf.BitPerfect := False;
+    Inf.DownmixFrom := 6;
+    Inf.DownmixBits := 24;
+    Inf.DownmixDB := -7.66;
+    BuildSignalPath(P, Inf, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertTrue('The downmix is shown', FindStage(P, 'Downmix', St));
+    AssertTrue('As a change of the signal', St.State = stModified);
+    AssertEquals('5.1 to stereo', Copy(St.Detail, 1, 13));
+    AssertTrue('With the level it is lowered by', Pos('so it cannot clip', St.Detail) > 0);
+    AssertTrue(FindStage(P, 'Source file', St));
+    AssertTrue('The file as it is: its bits', Pos('24 bit', St.Detail) > 0);
+    AssertTrue('and its channels', Pos('5.1 (6 channels)', St.Detail) > 0);
+    Inf.DownmixDB := 0.0;
+    BuildSignalPath(P, Inf, M, 'C:\Music\a.flac', 'USB DAC', False);
+    AssertTrue(FindStage(P, 'Downmix', St));
+    AssertEquals('At full level: nothing about lowering', 0, Pos('cannot clip', St.Detail));
+  finally
+    P.Free;
+  end;
+end;
+
+procedure TTestDemoLibrary.SignalPathPopupStaysOnTheScreen;
+begin
+  // work area 0 .. 1000
+  AssertEquals('Below the badge, room enough: the top stays', 100, SignalPathTop(100, 500, -1, 0, 1000));
+  AssertEquals('Below, too high for the rest: moved up', 300, SignalPathTop(600, 700, -1, 0, 1000));
+  AssertEquals('Above the badge: the lower edge stays', 400, SignalPathTop(500, 500, 900, 0, 1000));
+  AssertEquals('Above, higher than the room over the badge: at the top edge', 0, SignalPathTop(300, 950, 900, 0, 1000));
+  AssertEquals('Higher than the screen: the top wins', 0, SignalPathTop(100, 1200, -1, 0, 1000));
+  AssertEquals('A screen above this one (negative places): inside it', -950, SignalPathTop(-700, 950, -1, -1000, 0));
 end;
 
 procedure TTestDemoLibrary.SignalPathMarksVolumeAndResampler;

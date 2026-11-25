@@ -6,8 +6,9 @@ unit AuArtistInfo;
   Licensed under the GNU General Public License, version 3 (see LICENSE).
 
   Artist Info (a click on an artist in the banner): the biography and picture from Last.fm / Wikipedia /
-  TheAudioDB (uLastFmScraper, one worker thread; the biography needs the
-  user's own Last.fm API key from Preferences), saved in Data\MusicInfo,
+  TheAudioDB (uLastFmScraper, one worker thread; the biography is Last.fm's
+  with the user's own API key from Preferences, else Wikipedia's introduction;
+  a line under it names the source and opens its page), saved in Data\MusicInfo,
   and how much of the artist the library holds. The biography can be edited
   (F2) and the picture replaced (Ctrl+O, a dropped file, Ctrl+V) or removed
   (Del); the user's own biography and picture are kept by Refresh (F5).
@@ -61,7 +62,8 @@ type
     FLibrary: TLibraryManager;
     FScraper: TLastFmWorker;
     FLoadTimer: TTimer;
-    FArtistLbl, FStatsLbl, FEditHint: TAuLabel;
+    FArtistLbl, FStatsLbl, FEditHint, FSourceLbl: TAuLabel;
+    FSourceUrl: string;          // the page the biography comes from ('' = none)
     FBtnWeb, FBtnPic, FBtnClear, FBtnEdit, FBtnRefresh: TAuIconButton;
     FPicView: TArtistPicture;
     FBioMemo: TAuMemo;
@@ -94,6 +96,8 @@ type
     procedure BioReceived(const AArtistName, ABioText, AImagePath: string);
     procedure BioChange(Sender: TObject);
     procedure WebClick(Sender: TObject);
+    procedure SourceClick(Sender: TObject);
+    procedure UpdateSource;
     procedure PicClick(Sender: TObject);
     procedure ClearClick(Sender: TObject);
     procedure EditClick(Sender: TObject);
@@ -227,6 +231,11 @@ begin
   FEditHint := AddLabel(Self, HINT_ARTIST_MEMO_EDIT, 20, 0, 400);
   FEditHint.FontSize := 12;
   FEditHint.Visible := False;
+  FSourceLbl := AddLabel(Self, '', 20, 0, 400, True);
+  FSourceLbl.FontSize := 12;
+  FSourceLbl.Hint := HINT_BIO_SOURCE;
+  FSourceLbl.OnClick := @SourceClick;
+  FSourceLbl.Visible := False;
   FLoadTimer := TTimer.Create(Self);
   FLoadTimer.Enabled := False;
   FLoadTimer.Interval := PANEL_LOAD_DELAY_MS;
@@ -293,7 +302,7 @@ begin
   Y := S(64);
   { without a biography the picture takes the whole window }
   BioVisible := FIsEditing or FFetching or (not HasPicture) or (Trim(FBioText) <> '');
-  if FIsEditing then Bottom := S(44) else Bottom := S(16);
+  if FIsEditing or FSourceLbl.Visible then Bottom := S(44) else Bottom := S(16);
   if HasPicture or FIsEditing then
   begin
     if not HasPicture then PicH := S(120)
@@ -314,6 +323,8 @@ begin
   FBioMemo.SetBounds(S(20), Y, W - S(40), Math.Max(S(40), H - Y - Bottom));
   FEditHint.Visible := FIsEditing;
   FEditHint.SetBounds(S(20), H - S(34), W - S(40), S(22));
+  { as wide as its text (UpdateSource): only the text is the link }
+  FSourceLbl.SetBounds(S(20), H - S(34), FSourceLbl.Width, S(22));
 end;
 
 procedure TArtistInfoForm.Resize;
@@ -407,6 +418,7 @@ begin
       if FileExists(BioFile) then SysUtils.DeleteFile(BioFile);
       { an emptied biography is fetched from the web again }
       SysUtils.DeleteFile(ArtistDir + FILE_ARTIST_BIO_USER);
+      SysUtils.DeleteFile(ArtistDir + FILE_ARTIST_BIO_SOURCE);
     end
     else
     begin
@@ -438,6 +450,7 @@ begin
     if FBioIsPlaceholder then SetBioText('', False);
     FBioMemo.ReadOnly := False;
     FBioMemo.Plain := False;
+    UpdateSource;
     LayoutControls;
     UpdateButtons;
     if FBioMemo.CanFocus then FBioMemo.SetFocus;
@@ -449,6 +462,7 @@ begin
     FBioMemo.ReadOnly := True;
     FBioMemo.Plain := True;
     if (Trim(FBioText) = '') and not HasPicture then SetBioText(LBL_BIO_UNAVAILABLE, True);
+    UpdateSource;
     LayoutControls;
     UpdateButtons;
   end;
@@ -564,6 +578,40 @@ begin
   { the search is for copying text in, so editing starts }
   SetEditMode(True);
   OpenURL('https://www.google.com/search?q=' + SimpleURLEncode(ExtractFirstArtist(FCurrentArtist) + ' biography'));
+end;
+
+procedure TArtistInfoForm.SourceClick(Sender: TObject);
+begin
+  if FSourceUrl <> '' then OpenURL(FSourceUrl);
+end;
+
+{ the line under a downloaded biography that names where it is from; none
+  while editing, for the user's own text and without a text }
+procedure TArtistInfoForm.UpdateSource;
+var
+  Url, Line: string;
+begin
+  Line := '';
+  Url := '';
+  FSourceUrl := '';
+  if (not FIsEditing) and (not FDemo) and (Trim(FBioText) <> '') and (Trim(FCurrentArtist) <> '') then
+    case ArtistBioSource(ResolveArtistCacheDir(FCurrentArtist), Url) of
+      bsWikipedia:
+        begin
+          Line := LBL_BIO_SOURCE_WIKIPEDIA;
+          FSourceUrl := Url;
+        end;
+      bsLastFm:
+        begin
+          Line := LBL_BIO_SOURCE_LASTFM;
+          FSourceUrl := LastFmArtistUrl(FCurrentArtist);
+        end;
+    end;
+  FSourceLbl.Caption := Line;
+  FSourceLbl.FitWidth;
+  FSourceLbl.Visible := Line <> '';
+  FSourceLbl.ShowHint := FSourceUrl <> '';
+  if FSourceUrl <> '' then FSourceLbl.Cursor := crHandPoint else FSourceLbl.Cursor := crDefault;
 end;
 
 procedure TArtistInfoForm.PicClick(Sender: TObject);
@@ -720,6 +768,7 @@ begin
     FArtistLbl.Caption := LBL_UNKNOWN_ARTIST;
     FStatsLbl.Caption := '';
     SetBioText(LBL_ARTIST_INFO_UNAVAILABLE, True);
+    UpdateSource;
     LayoutControls;
     UpdateButtons;
     Exit;
@@ -731,6 +780,7 @@ begin
   FFetching := True;
   FQueuedArtist := AArtist;
   FQueuedForce := ForceRefresh;
+  UpdateSource;
   LayoutControls;
   UpdateButtons;
   { the window first, then the lookup (a short delay) }
@@ -794,6 +844,7 @@ begin
     SetBioText(ABioText, (Trim(ABioText) <> '') and IsPlaceholderBioText(ABioText));
   if (FBioText = '') and not FBioIsPlaceholder and not HasPicture then
     SetBioText(LBL_BIO_UNAVAILABLE, True);
+  UpdateSource;
   LayoutControls;
   UpdateButtons;
 end;
@@ -810,6 +861,12 @@ begin
     FIsEditing := True;
     FBioMemo.ReadOnly := False;
     FBioMemo.Plain := False;
+  end
+  else
+  begin
+    FSourceLbl.Caption := LBL_BIO_SOURCE_WIKIPEDIA;
+    FSourceLbl.FitWidth;
+    FSourceLbl.Visible := True;
   end;
   LayoutControls;
   UpdateButtons;

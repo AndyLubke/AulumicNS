@@ -96,6 +96,9 @@ type
   // by the stop (or may still be the previous track's when the error comes
   // before the new track's info).
   TSampleRateErrorEvent = procedure(AttemptedRate: Integer; AIsDSD: Boolean) of object;
+  // The playback stopped at the end of a track because StopAfterCurrent was
+  // on. ANextTrackId: the track that would have followed (0: none)
+  TStoppedAfterEvent    = procedure(ANextTrackId: Integer) of object;
 
   // The dialog ShowEngineErrorAsync opens (see Update)
   TEngineErrorDialog = (eedMessage, eedSampleRate);
@@ -159,6 +162,11 @@ type
 
     FRepeatMode      : TRepeatMode;
     FShuffleMode     : TShuffleMode;
+    // The playing track is the last one: playback stops at its end. A wish
+    // for one time: it is over once it has stopped the playback.
+    FStopAfterCurrent    : Boolean;
+    FOnStopAfterChange   : TNotifyEvent;
+    FOnStoppedAfter      : TStoppedAfterEvent;
 
     FOnTrackChange     : TTrackChangeEvent;
     FOnTrackInfoRefreshed : TTrackChangeEvent;  // RefreshTrackInfo's result
@@ -187,6 +195,7 @@ type
       const AMeta: TAudioMetadata);
     procedure RebuildPlayQueue(const ActiveID: integer = 0);
     procedure SetNotifyHandle(Value: THandle);
+    procedure SetStopAfterCurrent(AValue: Boolean);
     procedure ChangeRevision;
 
   public
@@ -217,6 +226,13 @@ type
 
     procedure ToggleRepeat;
     procedure ToggleShuffle;
+    // The engine has played the current track to its end and no next one
+    // took over: the next track is started, or - with StopAfterCurrent - the
+    // playback stops and OnStoppedAfter names the track that would have
+    // followed. Called by Update.
+    procedure TrackEnded;
+    // The file that would follow the current track without a gap ('' = none)
+    function  GaplessNextPath: string;
 
     function  GetProgress: Double;
     function  GetDuration: Double;
@@ -256,6 +272,9 @@ type
     property State: TPlaybackState read FState;
     property CurrentIndex: Integer read FCurrentIndex;
     property QueuedNextFilePath: string read FQueuedNextFilePath;
+    property StopAfterCurrent: Boolean read FStopAfterCurrent write SetStopAfterCurrent;
+    property OnStopAfterChange: TNotifyEvent read FOnStopAfterChange write FOnStopAfterChange;
+    property OnStoppedAfter: TStoppedAfterEvent read FOnStoppedAfter write FOnStoppedAfter;
     property RepeatMode: TRepeatMode read FRepeatMode;
     property ShuffleMode: TShuffleMode read FShuffleMode;
     property NotifyHandle: THandle read FNotifyHandle write SetNotifyHandle;
@@ -281,7 +300,10 @@ type
 // The buffer of a DSD track: DSDBufferMs when the DSD goes to
 // the DAC as DSD ("Play DSD natively": DoP over WASAPI, native or DoP over
 // ASIO), PCMBufferMs when it is converted to PCM
-function DsdBufferFor(const AConfig: TManagerConfig): Integer;
+function DsdBufferFor(const AConfig: TManagerConfig): Integer; overload;
+// The same for one file: a DSD file with more than two channels is converted
+// to PCM whatever AConfig.UseDoP says
+function DsdBufferFor(const AConfig: TManagerConfig; const AFilePath: string): Integer; overload;
 
 implementation
 
@@ -290,6 +312,14 @@ uses AuLog, Math, uAppStrings, uOSUtils;
 function DsdBufferFor(const AConfig: TManagerConfig): Integer;
 begin
   if AConfig.UseDoP then
+    Result := AConfig.DSDBufferMs
+  else
+    Result := AConfig.PCMBufferMs;
+end;
+
+function DsdBufferFor(const AConfig: TManagerConfig; const AFilePath: string): Integer;
+begin
+  if DsdGoesOutAsDsd(AConfig.UseDoP, AFilePath) then
     Result := AConfig.DSDBufferMs
   else
     Result := AConfig.PCMBufferMs;
@@ -947,6 +977,62 @@ begin
   end;
 end;
 
+procedure TPlaybackManager.SetStopAfterCurrent(AValue: Boolean);
+begin
+  if FStopAfterCurrent = AValue then
+    Exit;
+  FStopAfterCurrent := AValue;
+  // The track prepared to follow without a gap is dropped (on), or prepared
+  // again (off). A swap the audio thread has already made comes first.
+  if (FState = psPlaying) or (FState = psPaused) then
+    UpdateGapless;
+  if Assigned(FOnStopAfterChange) then
+    FOnStopAfterChange(Self);
+end;
+
+function TPlaybackManager.GaplessNextPath: string;
+var
+  Next: PQueueItem;
+begin
+  if ResolveGaplessNext(Next) then
+    Result := Next^.FilePath
+  else
+    Result := '';
+end;
+
+procedure TPlaybackManager.TrackEnded;
+var
+  NextIdx, NextId: Integer;
+begin
+  if not FStopAfterCurrent then
+  begin
+    PlayNext(False);
+    Exit;
+  end;
+
+  // The track that would have been next, as PlayNext would choose it
+  NextIdx := -1;
+  if (FCurrentIndex >= 0) and (FCurrentIndex < FPlayQueue.Count) then
+  begin
+    if FRepeatMode = rmOne then
+      NextIdx := FCurrentIndex
+    else if FCurrentIndex + 1 < FPlayQueue.Count then
+      NextIdx := FCurrentIndex + 1
+    else if (FRepeatMode = rmAll) and (FShuffleMode = smOff) then
+      NextIdx := 0;
+  end;
+  NextId := 0;
+  if NextIdx >= 0 then
+    NextId := PQueueItem(FPlayQueue[NextIdx])^.TrackId;
+
+  FStopAfterCurrent := False;
+  Stop;
+  if Assigned(FOnStopAfterChange) then
+    FOnStopAfterChange(Self);
+  if Assigned(FOnStoppedAfter) then
+    FOnStoppedAfter(NextId);
+end;
+
 procedure TPlaybackManager.PlayNext(ForceUserClick: Boolean = False);
 begin
   if FPlayQueue.Count = 0 then
@@ -1387,6 +1473,10 @@ begin
      (FPlayQueue.Count = 0) then
     Exit;
 
+  // The playing track is to be the last one: nothing follows without a gap
+  if FStopAfterCurrent then
+    Exit;
+
   if FRepeatMode = rmOne then
     NextIdx := FCurrentIndex
   else if FCurrentIndex + 1 < FPlayQueue.Count then
@@ -1789,7 +1879,7 @@ begin
   end
   else if FAudioEngine.HasFinished then
   begin
-    PlayNext(False);
+    TrackEnded;
   end;
 end;
 
@@ -1894,11 +1984,11 @@ begin
     // The DSD buffer only for DSD that goes to the DAC as DSD
     // (DoP, native over ASIO): a dropout there is a pop (the DAC loses the
     // DSD stream). DSD converted to PCM is PCM from then on: the PCM buffer.
-    FAudioEngine.BufferSizeMs     := DsdBufferFor(FConfig);
+    FAudioEngine.BufferSizeMs     := DsdBufferFor(FConfig, AFilePath);
     FAudioEngine.DsdGainDB        := FConfig.DsdToPcmGain;
     FAudioEngine.DsdLowPassFilter := FConfig.DsdLowPassFilter;
 
-    if FConfig.UseDoP then
+    if DsdGoesOutAsDsd(FConfig.UseDoP, AFilePath) then
       FAudioEngine.ResamplePCM := False
     else if FConfig.DisableResampleForDSD then
       FAudioEngine.ResamplePCM := False

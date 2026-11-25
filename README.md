@@ -4,23 +4,25 @@
 
 ![The main window of Aulumic](help/shots/02-dark-playing.png)
 
-Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It needs no installation and no extra DLLs: the FLAC decoder, the resampler, the loudness meter and the whole user interface are part of the program.
+Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It needs no installation and no extra DLLs: the decoders (FLAC, Apple Lossless), the resampler, the loudness meter and the whole user interface are part of the program.
 
 ## What it does
 
 **Playback**
 - WASAPI exclusive mode and ASIO, with a badge and a Signal Path window that show whether the output is bit-perfect, and every stage between the file and the DAC when it isn't.
-- FLAC, WAV, DSF and DFF. DSD as native DSD over ASIO, as DoP, or converted to PCM.
-- Gapless playback.
+- FLAC, WAV, AIFF, Apple Lossless (ALAC), DSF and DFF. DSD as native DSD over ASIO, as DoP, or converted to PCM.
+- Files with more than two channels (5.1, for example) play as a stereo mix.
+- Gapless playback, and Stop after current track.
 - A resampler you can leave off, or set up in detail (quality, phase, bandwidth, anti-aliasing).
 - ReplayGain (EBU R128) with a built-in scanner, and automatic headroom against clipping.
 - A five-band tone control that shows its curve.
 
 **Library and playlists**
-- A library of your music folders with a tree (folders, artists, albums, genres), search and virtual folders. Local folders are watched for changes.
+- A library of your music folders with a tree (folders, artists, composers, albums, genres), search and virtual folders. Local folders are watched for changes.
+- For classical music: the movements of a work under a heading of their own, and browsing by composer.
 - Album tiles: the albums of any part of the library as covers, next to the tree. A tile plays, drags and opens its menu like an album in the tree.
 - Playlists and auto-playlists with a query builder, M3U import and export, ratings and favourites.
-- A tag editor, a cover viewer, a booklet viewer for PDF booklets and artist information.
+- A tag editor, a check of the tags for things that don't agree, a cover viewer, a booklet viewer for PDF booklets and artist information.
 
 **Look and feel**
 - Dark and light theme (or follow Windows), six accent colours, sharp at every Windows scaling, touch scrolling.
@@ -28,16 +30,26 @@ Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It ne
 
 ![The library as album tiles](help/shots/11-library-tiles.png)
 
+## Sound quality
+
+Bit-perfect playback is the default, and the program shows when it isn't: the badge says Bit-perfect or Processed, and the Signal Path lists every stage that touches the audio.
+
+- **Lossless means identical:** The built-in decoders are tested to give exactly the samples that were stored. Apple Lossless and AIFF files are checked against the same audio as FLAC and WAV, bit for bit.
+- **One calculation, one rounding:** Whatever changes the audio (volume, ReplayGain, tone control, resampler) is calculated in 64-bit floating point and rounded once, at the very end, with dither. A 16-bit file is never rounded back to 16 bits on the way.
+- **The resampler:** Own code, with a choice of linear, intermediate and minimum phase. Measured with test tones, what it adds stays below -150 dB at 24-bit precision and below -200 dB at the highest setting. Against libsoxr, a widely used resampler, the output agrees to within 0.001 dB in level.
+- **DSD:** Sent to the DAC unchanged, as native DSD or DoP. Converted to PCM only on request.
+- **No clipping:** With automatic headroom, an album whose peaks would not fit after resampling is lowered by exactly what it needs. Nothing is clipped and nothing is limited.
+
 ## What it doesn't do
 
 Aulumic does one thing: it plays your own lossless music files, unchanged, on Windows. Some things are left out on purpose, others follow from how the program is built.
 
-- **Lossy formats (MP3, AAC, Ogg Vorbis, Opus):** not played. Aulumic uses no external DLLs, so every format needs its own decoder inside the program, and the work went into the lossless ones.
-- **Other lossless formats (ALAC, AIFF, APE, WavPack) and CUE sheets:** not at present. FLAC and WAV are the PCM formats.
+- **Lossy formats (MP3, AAC, Ogg Vorbis, Opus):** not played. Aulumic uses no external DLLs, so every format needs its own decoder inside the program, and the work went into the lossless ones. An M4A file with AAC inside is refused with a message.
+- **Other lossless formats (APE, WavPack) and CUE sheets:** not at present.
 - **SACD ISO images:** not played. DSD plays from DSF and DFF files.
 - **Streaming services (Qobuz, Tidal, Spotify) and internet radio:** no. The services only open their catalogues to programs with a contract, and Aulumic plays files, not streams.
 - **Network playback (UPnP / DLNA) and remote control apps:** no. The music has to be in folders the PC can reach; a network share or NAS is fine.
-- **More than two channels:** mono and stereo only.
+- **Multichannel output:** no. Files with more than two channels play as a stereo mix.
 - **Shared mode and plugins:** Aulumic takes the audio device exclusively, which is what makes bit-perfect playback possible, so other programs are silent on that device while it plays. There are no VST plugins and no room correction.
 - **Linux and macOS:** Windows 10 and 11 only. The output and the whole user interface are built on Windows itself.
 
@@ -52,7 +64,7 @@ Take `AulumicNS-<version>-win64.zip` from the **Releases** page of this reposito
 - Aulumic is portable: it keeps its settings and library in the folders `Data` and `Cache` next to the program file. If it can't write there, it uses `%APPDATA%\AulumicNS`.
 - To remove it, delete the folder.
 
-**New versions:** to get an email from GitHub whenever a new version is released, sign in to GitHub, open this repository and choose **Watch > Custom > Releases**. Without a GitHub account, the releases can be followed in a feed reader at `https://github.com/AndyLubke/AulumicNS/releases.atom`.
+**New versions:** Aulumic can check for itself: Main menu > About > Check for updates, or at every start when that is switched on in Preferences > System > Internet. To get an email from GitHub whenever a new version is released, sign in to GitHub, open this repository and choose **Watch > Custom > Releases**. Without a GitHub account, the releases can be followed in a feed reader at `https://github.com/AndyLubke/AulumicNS/releases.atom`.
 
 ## First steps
 
@@ -64,7 +76,7 @@ Press F1 for the help.
 
 ### Artist biographies
 
-Artist Info gets its biographies from Last.fm, and Last.fm asks every program for an API key. Aulumic has none built in. A key is free: create an API account at [last.fm/api](https://www.last.fm/api) and paste the key into Preferences > System > Artist information.
+Artist Info shows the introduction of the artist's Wikipedia article, without any set-up. With a personal Last.fm API key the text comes from Last.fm, which knows more artists. A key is free: create an API account at [last.fm/api](https://www.last.fm/api) and paste the key into Preferences > System > Internet.
 
 ## Support
 

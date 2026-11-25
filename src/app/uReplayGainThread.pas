@@ -118,7 +118,7 @@ implementation
 
 uses
   AuAudioTypes, Windows, SysUtils, Math, uAppConsts, ALMetadata, ALReaderFLAC,
-  ALReaderWAV, ALReaders,
+  ALReaderWAV, ALReaderAIFF, ALReaderALAC, ALReaders,
   uAudioUtils, uOSUtils, AuLog, uAppStrings;  // AuLog: AddLog
 
 const
@@ -458,6 +458,8 @@ function TRGTrackWorker.Measure(AIndex: Integer): Boolean;
 var
   FlacReader         : TFlacReader;
   WavReader          : TWavReader;
+  AiffReader         : TAiffReader;
+  AlacReader         : TAlacReader;
   DsdSource          : TDsdToPcmSource;
   BytesRead, FramesRead, I, Channels, SampleRate, BitsPerSample, SampleCount, FrameSize, ReqBytes, ReqSamples: Integer;
   TotalFramesDecoded : Int64;
@@ -483,6 +485,8 @@ begin
 
   FlacReader := nil;
   WavReader  := nil;
+  AiffReader := nil;
+  AlacReader := nil;
   DsdSource  := nil;
   FileType   := 0;
 
@@ -511,10 +515,30 @@ begin
         SampleRate    := WavReader.SampleRate;
         BitsPerSample := WavReader.BitsPerSample;
       end
+      else if IsAiffFile(FilePath) then
+      begin
+        FileType      := 4;
+        AiffReader    := TAiffReader.Create(FilePath);
+        Channels      := AiffReader.Channels;
+        SampleRate    := AiffReader.SampleRate;
+        BitsPerSample := AiffReader.BitsPerSample;
+      end
+      else if IsM4aFile(FilePath) then
+      begin
+        FileType      := 5;
+        AlacReader    := TAlacReader.Create(FilePath);
+        Channels      := AlacReader.Channels;
+        SampleRate    := AlacReader.SampleRate;
+        BitsPerSample := AlacReader.BitsPerSample;
+      end
       else if IsDSDFile(FilePath) then
       begin
         FileType      := 3;
-        DsdSource     := TDsdToPcmSource.Create(FilePath, 0, True);
+        // More than two channels: the stereo mix that is played is measured
+        if DsdFileChannels(FilePath) > 2 then
+          DsdSource   := TDsdMixSource.Create(FilePath, True)
+        else
+          DsdSource   := TDsdToPcmSource.Create(FilePath, 0, True);
         Channels      := DsdSource.GetChannels;
         SampleRate    := DsdSource.GetSampleRate;
         BitsPerSample := DsdSource.GetBitsPerSample;
@@ -536,6 +560,10 @@ begin
         ExpectedFrames := FlacReader.DataSize div FrameSize
       else if FileType = 2 then
         ExpectedFrames := WavReader.DataSize div FrameSize
+      else if FileType = 4 then
+        ExpectedFrames := AiffReader.DataSize div FrameSize
+      else if FileType = 5 then
+        ExpectedFrames := AlacReader.DataSize div FrameSize
       else
         ExpectedFrames := Round(DsdSource.GetDuration * SampleRate);
 
@@ -557,6 +585,10 @@ begin
           BytesRead := FlacReader.ReadData(@FReadBuffer[0], ReqBytes)
         else if FileType = 2 then
           BytesRead := WavReader.ReadData(@FReadBuffer[0], ReqBytes)
+        else if FileType = 4 then
+          BytesRead := AiffReader.ReadData(@FReadBuffer[0], ReqBytes)
+        else if FileType = 5 then
+          BytesRead := AlacReader.ReadData(@FReadBuffer[0], ReqBytes)
         else
           BytesRead := DsdSource.ReadData(@FReadBuffer[0], ReqBytes);
 
@@ -614,6 +646,10 @@ begin
           ProgressVal := FlacReader.GetProgress
         else if FileType = 2 then
           ProgressVal := WavReader.GetProgress
+        else if FileType = 4 then
+          ProgressVal := AiffReader.GetProgress
+        else if FileType = 5 then
+          ProgressVal := AlacReader.GetProgress
         else
           ProgressVal := DsdSource.GetProgress;
         FWork.Pct[AIndex] := EnsureRange(Round(ProgressVal * 100.0), 0, 100);
@@ -665,6 +701,10 @@ begin
       FlacReader.Free;
     if Assigned(WavReader) then
       WavReader.Free;
+    if Assigned(AiffReader) then
+      AiffReader.Free;
+    if Assigned(AlacReader) then
+      AlacReader.Free;
     if Assigned(DsdSource) then
       DsdSource.Free;
   end;

@@ -35,6 +35,7 @@ type
     procedure ATypedValueGoesToEverySelectedFile;
     procedure AFieldLeftAloneChangesNothing;
     procedure AnEmptiedFieldClearsTheValue;
+    procedure TheFolderOfAFileEndsWithADelimiter;
   end;
 
 implementation
@@ -185,6 +186,14 @@ begin
   AssertEquals('The second', '', Rec(1)^.Current.Work);
   AssertTrue('Marked as changed', Rec(0)^.IsModified and Rec(1)^.IsModified);
   AssertEquals('The third keeps its work', 'Egmont', Rec(2)^.Current.Work);
+end;
+
+{ what "Open folder" hands to Explorer for a file's folder }
+procedure TTestProperties.TheFolderOfAFileEndsWithADelimiter;
+begin
+  AssertEquals('m:\music\album\', FolderOfFile('m:\music\album\01 - Track.flac'));
+  AssertEquals('A file in a drive''s root', 'm:\', FolderOfFile('m:\track.flac'));
+  AssertEquals('No folder', '', FolderOfFile('track.flac'));
 end;
 
 initialization

@@ -38,7 +38,7 @@ function CreateVirtualFolderForm(AOwner: TComponent; const ABaseDir, AName: stri
 implementation
 
 uses
-  uAppConsts, uAppStrings, uOSUtils, uMetaUtils, uAudioUtils, AuTagLoader;
+  uAppConsts, uAppStrings, uOSUtils, uMetaUtils, uAudioUtils, AuTagLoader, AuMenus;
 
 type
   { TVirtualFolderForm }
@@ -52,7 +52,8 @@ type
     FName, FSearch: TAuEdit;
     FChecks: array[0..4] of TAuCheckBox;
     FList: TAuListView;
-    FBtnAdd, FBtnFind, FBtnRemove, FBtnSave, FBtnCancel: TAuButton;
+    FBtnAdd, FBtnFind, FBtnRemove, FBtnFolder, FBtnSave, FBtnCancel: TAuButton;
+    FRowMenu: TAuMenu;               // the menu of a right-clicked folder (kept until its entry ran)
     FLocation, FStatus, FNameCap, FSearchCap, FInCap: TAuLabel;
     procedure Layout;
     procedure UpdateButtons;
@@ -63,6 +64,8 @@ type
     procedure AddClick(Sender: TObject);
     procedure FindClick(Sender: TObject);
     procedure RemoveClick(Sender: TObject);
+    procedure FolderClick(Sender: TObject);
+    procedure ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
     procedure SaveClick(Sender: TObject);
     procedure SearchEnter(Sender: TObject);
     procedure FormDrop(Sender: TObject; const FileNames: array of string);
@@ -219,6 +222,11 @@ begin
   FBtnRemove.Icon := icTrash;
   FBtnRemove.Hint := HINT_ALIAS_REMOVE;
   FBtnRemove.ShowHint := True;
+  FBtnFolder := AddButton(Self, 'Open folder', 0, 0, 150, bkNormal, @FolderClick);
+  FBtnFolder.Icon := icFolder;
+  FBtnFolder.Hint := 'Show the selected folder in Explorer.';
+  FBtnFolder.ShowHint := True;
+  FList.OnRowContext := @ListContext;
 
   FStatus := AddLabel(Self, '', 24, 0, 400);
   FStatus.FontSize := 12;
@@ -254,6 +262,7 @@ var
   I: Integer;
 begin
   for I := 0 to 4 do LastChecks[I] := FChecks[I].Checked;
+  FRowMenu.Free;
   FPaths.Free;
   inherited Destroy;
 end;
@@ -288,6 +297,7 @@ begin
   FBtnAdd.SetBounds(W - S(24) - S(150), ListTop, S(150), S(34));
   FBtnFind.SetBounds(W - S(24) - S(150), ListTop + S(42), S(150), S(34));
   FBtnRemove.SetBounds(W - S(24) - S(150), ListTop + S(84), S(150), S(34));
+  FBtnFolder.SetBounds(W - S(24) - S(150), ListTop + S(126), S(150), S(34));
   FBtnSave.SetBounds(W - S(24) - S(110), BY, S(110), S(34));
   FBtnCancel.SetBounds(FBtnSave.Left - S(10) - S(110), BY, S(110), S(34));
   FStatus.SetBounds(S(24), BY - S(6), Math.Max(0, FBtnCancel.Left - S(36)), S(46));
@@ -311,6 +321,26 @@ begin
   inherited KeyDown(Key, Shift);
 end;
 
+{ Explorer at the first selected folder }
+procedure TVirtualFolderForm.FolderClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+begin
+  Sel := FList.SelectedRows;
+  if (Length(Sel) = 0) or (Sel[0] < 0) or (Sel[0] >= FPaths.Count) then Exit;
+  OpenFolderWithWindow(Self, IncludeTrailingPathDelimiter(FPaths[Sel[0]]));
+end;
+
+procedure TVirtualFolderForm.ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+begin
+  if FList.SelCount = 0 then Exit;
+  FRowMenu.Free;
+  FRowMenu := TAuMenu.Create;
+  FRowMenu.Add('Open folder...', @FolderClick, icFolder);
+  FRowMenu.Add('Remove', @RemoveClick, icTrash);
+  FRowMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
 procedure TVirtualFolderForm.UpdateButtons;
 var
   AnyCheck: Boolean;
@@ -320,6 +350,7 @@ begin
   for I := 0 to 4 do AnyCheck := AnyCheck or FChecks[I].Checked;
   FBtnFind.Enabled := AnyCheck and ((Trim(FSearch.Text) <> '') or (Trim(FName.Text) <> '')) and (FLibrary <> nil);
   FBtnRemove.Enabled := FList.SelCount > 0;
+  FBtnFolder.Enabled := FList.SelCount > 0;
   FBtnSave.Enabled := (Trim(FName.Text) <> '') and (FPaths.Count > 0);
 end;
 

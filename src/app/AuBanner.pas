@@ -58,7 +58,7 @@ type
     FRects: array[TBannerHot] of TRect;
     FArtistRects: array of TRect;
     FShownArtists: Integer;
-    FOnRate, FOnBadge, FOnMoreArtists: TBannerPointEvent;
+    FOnRate, FOnBadge, FOnMoreArtists, FOnContext: TBannerPointEvent;
     FOnCover, FOnAlbum, FOnHeart, FOnBooklet: TNotifyEvent;
     FOnArtist: TBannerArtistEvent;
     procedure MeterBack(Sender: TObject; G: TGfx);
@@ -125,6 +125,8 @@ type
     property OnBadge: TBannerPointEvent read FOnBadge write FOnBadge;
     property OnHeart: TNotifyEvent read FOnHeart write FOnHeart;
     property OnBooklet: TNotifyEvent read FOnBooklet write FOnBooklet;
+    { a right-click anywhere on the banner }
+    property OnContext: TBannerPointEvent read FOnContext write FOnContext;
   end;
 
 const
@@ -705,6 +707,7 @@ var
 begin
   inherited MouseDown(Button, Shift, X, Y);
   if Button = mbLeft then FDown := HotAt(X, Y, A) else FDown := bhNone;
+  if (Button = mbRight) and Assigned(FOnContext) then FOnContext(Self, ClientToScreen(Point(X, Y)));
 end;
 
 procedure TNowPlayingBanner.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);

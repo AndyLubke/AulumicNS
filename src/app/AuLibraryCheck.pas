@@ -19,7 +19,7 @@ interface
 
 uses
   Classes, SysUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, uLibraryTypes, uLibraryCheck;
+  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuMenus, AuForms, uLibraryTypes, uLibraryCheck;
 
 type
   { the files of a finding, for Properties }
@@ -44,6 +44,9 @@ function LibraryCheckCell(AForm: TAuForm; ARow, ACol: Integer): string;
 
 implementation
 
+uses
+  AuTagLoader;
+
 const
   DLG_W = 980;
   DLG_H = 600;
@@ -66,7 +69,8 @@ type
     FSortCol: Integer;                // the column the list is sorted by (0: by kind, as found)
     FSortDesc: Boolean;
     FList: TAuListView;
-    FBtnAgain, FBtnOpen, FBtnClose: TAuButton;
+    FBtnAgain, FBtnFolder, FBtnOpen, FBtnClose: TAuButton;
+    FRowMenu: TAuMenu;                // the menu of a right-clicked finding (kept until its entry ran)
     procedure Layout;
     procedure TakeTracks(ATracks: TTrackList);
     procedure UpdateState;
@@ -83,10 +87,13 @@ type
     procedure AgainClick(Sender: TObject);
     procedure OpenClick(Sender: TObject);
     procedure OpenRows(const ARows: TIntegerArray);
+    procedure FolderClick(Sender: TObject);
+    procedure ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
   protected
     procedure Resize; override;
   public
     constructor CreateCheck(AOwner: TComponent; const AScope: string);
+    destructor Destroy; override;
   end;
 
 procedure ShowLibraryCheck(AOwner: TComponent; const AScope: string; AOnCollect: TCheckCollectEvent;
@@ -200,6 +207,11 @@ begin
   FBtnAgain.Icon := icRefresh;
   FBtnAgain.Hint := 'Read this part of the library again, after tags were changed.';
   FBtnAgain.ShowHint := True;
+  FBtnFolder := AddButton(Self, 'Open folder', 0, 0, 150, bkNormal, @FolderClick);
+  FBtnFolder.Icon := icFolder;
+  FBtnFolder.Hint := 'Show the folder of the selected finding in Explorer.';
+  FBtnFolder.ShowHint := True;
+  FList.OnRowContext := @ListContext;
   FBtnClose := AddButton(Self, 'Close', 0, 0, 110);
   FBtnClose.ModalResult := mrCancel;
   FBtnOpen := AddButton(Self, 'Open in Properties', 0, 0, 190, bkPrimary, @OpenClick);
@@ -215,6 +227,12 @@ begin
   UpdateState;
 end;
 
+destructor TLibraryCheckForm.Destroy;
+begin
+  FRowMenu.Free;
+  inherited Destroy;
+end;
+
 procedure TLibraryCheckForm.Layout;
 var
   W, H, BY: Integer;
@@ -228,6 +246,7 @@ begin
   FList.SetBounds(S(24), S(54), W - S(48), BY - S(16) - S(28) - S(54));
   FNote.SetBounds(S(24), FList.Top + FList.Height + S(6), W - S(48), S(22));
   FBtnAgain.SetBounds(S(24), BY, S(140), S(34));
+  FBtnFolder.SetBounds(S(24) + S(140) + S(10), BY, S(150), S(34));
   FBtnClose.SetBounds(W - S(24) - S(110), BY, S(110), S(34));
   FBtnOpen.SetBounds(FBtnClose.Left - S(10) - S(190), BY, S(190), S(34));
 end;
@@ -403,6 +422,7 @@ begin
   if FTrackCount = 0 then FList.EmptyText := 'No tracks here.'
   else FList.EmptyText := 'Nothing found.';
   FBtnOpen.Enabled := FList.SelCount > 0;
+  FBtnFolder.Enabled := FList.SelCount > 0;
 end;
 
 procedure TLibraryCheckForm.ListCell(Sender: TObject; Row, Col: Integer; var AText: string);
@@ -472,6 +492,30 @@ begin
     Seen.Free;
     SL.Free;
   end;
+end;
+
+{ Explorer at the folder of the first selected finding (the folder of its
+  first file: a finding about names can reach over several folders) }
+procedure TLibraryCheckForm.FolderClick(Sender: TObject);
+var
+  Rows: TIntegerArray;
+  F: Integer;
+begin
+  Rows := FList.SelectedRows;
+  if Length(Rows) = 0 then Exit;
+  F := ShownFinding(Rows[0]);
+  if (F < 0) or (Length(FFound[F].Paths) = 0) then Exit;
+  OpenFolderWithWindow(Self, FolderOfFile(FFound[F].Paths[0]));
+end;
+
+procedure TLibraryCheckForm.ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+begin
+  if FList.SelCount = 0 then Exit;
+  FRowMenu.Free;
+  FRowMenu := TAuMenu.Create;
+  FRowMenu.Add('Open in Properties', @OpenClick, icTag);
+  FRowMenu.Add('Open folder...', @FolderClick, icFolder);
+  FRowMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 
 { the same part of the library, as its records are now }

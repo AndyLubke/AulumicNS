@@ -111,7 +111,7 @@ end;
 
 function TDffTagReader.LoadFromFile(const AFileName: TFileName): boolean;
 var
-  fStream: TFileStream;
+  fStream: TStream;
   Id, SubId: string;
   FormSize, ChunkSize, SubSize, Pos, FormEnd, PropEnd, SubPos, Id3Pos, Id3Size: int64;
   V, Frames, FrameRate: cardinal;
@@ -157,7 +157,7 @@ begin
   fStream := nil;
   try
     try
-      fStream := TFileStream.Create(LongPath(AFileName), fmOpenRead or fmShareDenyNone);
+      fStream := AuOpenFile(AFileName, fmOpenRead or fmShareDenyNone);
       if (not ReadId(fStream, Id)) or (Id <> 'FRM8') then Exit(False);
       if not ReadU64BE(fStream, FormSize) then Exit(False);
       if (not ReadId(fStream, Id)) or (Id <> 'DSD ') then Exit(False);
@@ -260,7 +260,7 @@ end;
 
 function TDffTagReader.SaveToFile(const AFileName: TFileName): boolean;
 var
-  Src, Dst: TFileStream;
+  Src, Dst: TStream;
   Tag: TMemoryStream;
   Id: string;
   FormSize, ChunkSize, Pos, FormEnd, Copied: int64;
@@ -273,7 +273,7 @@ begin
   Tag := nil;
   try
     try
-      Src := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
+      Src := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
       if (not ReadId(Src, Id)) or (Id <> 'FRM8') then Exit(False);
       if not ReadU64BE(Src, FormSize) then Exit(False);
       if (not ReadId(Src, Id)) or (Id <> 'DSD ') then Exit(False);
@@ -287,7 +287,7 @@ begin
         fTags.WriteToStream(Tag);
         if fTags.LastWriteDroppedFrames then Exit(False);
       end;
-      Dst := TFileStream.Create(LongPath(AFileName), fmCreate or fmOpenReadWrite);
+      Dst := AuOpenFile(AFileName, fmCreate or fmOpenReadWrite);
       WriteId(Dst, 'FRM8');
       WriteU64BE(Dst, 0);                // set below
       WriteId(Dst, 'DSD ');

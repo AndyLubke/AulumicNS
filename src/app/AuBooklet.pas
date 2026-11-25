@@ -66,6 +66,7 @@ type
     FFiles: TStringList;
     FFileIdx: Integer;
     FFileMenu: TAuMenu;
+    FPageMenu: TAuMenu;              // the menu of a right-click on the page
     FTitle: TAuLabel;
     FPageLbl: TAuLabel;
     FBtnPrev, FBtnNext, FBtnZoomOut, FBtnZoomIn, FBtnFit, FBtnFile, FBtnExternal: TAuIconButton;
@@ -90,6 +91,8 @@ type
     procedure FitClick(Sender: TObject);
     procedure ModeChange(Sender: TObject);
     procedure FileClick(Sender: TObject);
+    procedure PageMenu;
+    procedure FolderClick(Sender: TObject);
     procedure FilePick(Sender: TObject);
     procedure FormClosed(Sender: TObject; var CloseAction: TCloseAction);
     procedure ExternalClick(Sender: TObject);
@@ -126,6 +129,9 @@ function BookletWindow: TCustomForm;
 procedure CloseBooklet;
 
 implementation
+
+uses
+  AuTagLoader;
 
 var
   BookletForm: TAuBookletForm = nil;
@@ -191,6 +197,11 @@ end;
 procedure TAuPdfView.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   inherited MouseDown(Button, Shift, X, Y);
+  if Button = mbRight then
+  begin
+    FForm.PageMenu;
+    Exit;
+  end;
   if (Button = mbLeft) and (FForm.FZoom > 1.001) then
   begin
     FDragging := True;
@@ -380,6 +391,7 @@ begin
   CloseFile;
   FFiles.Free;
   FFileMenu.Free;
+  FPageMenu.Free;
   if BookletForm = Self then BookletForm := nil;
   inherited Destroy;
 end;
@@ -851,6 +863,22 @@ begin
   UpdateLabels;
   RequestVisible;
   FView.Invalidate;
+end;
+
+procedure TAuBookletForm.PageMenu;
+begin
+  if (FFileIdx < 0) or (FFileIdx >= FFiles.Count) then Exit;
+  FPageMenu.Free;
+  FPageMenu := TAuMenu.Create;
+  FPageMenu.Add('Open folder...', @FolderClick, icFolder);
+  FPageMenu.PopupAtCursor;
+end;
+
+{ Explorer at the booklet that is shown }
+procedure TAuBookletForm.FolderClick(Sender: TObject);
+begin
+  if (FFileIdx < 0) or (FFileIdx >= FFiles.Count) then Exit;
+  OpenFolderWithWindow(Self, FFiles[FFileIdx]);
 end;
 
 procedure TAuBookletForm.FileClick(Sender: TObject);

@@ -25,6 +25,9 @@ uses
   ALReaders, ALAudioTypes;
 
 const
+  // Above every rate a source can have (DSD1024 as DoP is 2.8 MHz)
+  MAX_SOURCE_RATE = 16000000;
+
   // Sane clamping bounds for ReplayGain tags (dB)
   RG_MIN_GAIN_DB = -60.0;
   RG_MAX_GAIN_DB = 24.0;
@@ -153,6 +156,10 @@ function  HeadroomChainKey(const ACfg: TPlayThreadConfig; const AFileName: strin
 // comes at 0 dB; ADsdGainDB is not applied here (the play thread's
 // DSP does, after the resampler). nil for an unsupported file type;
 // raises EAudioEngineError for an invalid or multi-channel file.
+// A DSD file goes to the DAC as DSD (DoP, native) when that is switched on
+// (AUseDoP) and it has at most two channels: more channels can only be mixed
+// to stereo as PCM. False for every other file.
+function  DsdGoesOutAsDsd(AUseDoP: Boolean; const AFileName: string): Boolean;
 function  CreateSourceFor(const ACfg: TPlayThreadConfig; ADsdGainDB: Integer;
   AFloatDSP: TResamplerFloatDSPProc; const Filename: string;
   out InRate, OutRate: integer): TAudioSource;
@@ -291,7 +298,7 @@ begin
     // =========================================================================
     // DSD Double-Amplification Shield
     // =========================================================================
-    if IsDSD and (not ACfg.UseDoP) and (ADsdGainDB <> 0) then
+    if IsDSD and (ADsdGainDB <> 0) and (not DsdGoesOutAsDsd(ACfg.UseDoP, AFileName)) then
     begin
       // 1. Subtract the DSD->PCM pre-amp gain so we don't double-boost
       OutGain := EnsureRange(OutGain - ADsdGainDB, RG_MIN_GAIN_DB, RG_MAX_GAIN_DB);
@@ -303,6 +310,11 @@ begin
   end;
 end;
 
+function DsdGoesOutAsDsd(AUseDoP: Boolean; const AFileName: string): Boolean;
+begin
+  Result := AUseDoP and IsDSDFile(AFileName) and (DsdFileChannels(AFileName) <= 2);
+end;
+
 function HeadroomChainKey(const ACfg: TPlayThreadConfig; const AFileName: string;
   AInRate, AOutRate: Integer): string;
 var
@@ -310,7 +322,7 @@ var
 begin
   if IsDSDFile(AFileName) then
   begin
-    if ACfg.UseDoP then
+    if DsdGoesOutAsDsd(ACfg.UseDoP, AFileName) then
       Exit('dop');        // DSD as DSD: no gain, no peak
     Result := 'dsd';
     if ACfg.DsdLowPassFilter then
@@ -352,7 +364,7 @@ function CreateSourceFor(const ACfg: TPlayThreadConfig; ADsdGainDB: Integer;
   out InRate, OutRate: integer): TAudioSource;
 var
   Res, TempResampler: TAudioSource;
-  FinalRate: integer;
+  FinalRate, DsdChannels: integer;
   ResamplerCfg: TResamplerConfig;
 begin
   Result  := nil;
@@ -363,8 +375,21 @@ begin
   // 1. Create the base audio source
   if IsDSDFile(Filename) then
   begin
-    if ACfg.UseDoP then
+    DsdChannels := DsdFileChannels(Filename);
+    if ACfg.UseDoP and (DsdChannels <= 2) then
       Res := TDsfSource.Create(Filename)
+    else if DsdChannels > 2 then
+    begin
+      { More than two channels: converted and mixed to stereo, whatever the
+        setting for DSD says (bit streams cannot be added) }
+      Res := TDsdMixSource.Create(Filename, ACfg.DsdLowPassFilter);
+      if ACfg.ResamplePCM then
+      begin
+        FinalRate := CalcTargetRate(ACfg, Res.GetSampleRate);
+        if (FinalRate > 0) and (FinalRate < Integer(Res.GetSampleRate)) then
+          TDsdToPcmSource(Res).SetOutputRate(Cardinal(FinalRate));
+      end;
+    end
     else
     begin
       { Converted at 0 dB, always. The DSD gain
@@ -393,11 +418,26 @@ begin
   begin
     Res := TFlacSource.Create(Filename);
   end
+  else if IsAiffFile(Filename) then
+  begin
+    Res := TAiffSource.Create(Filename);
+  end
+  else if IsM4aFile(Filename) then
+  begin
+    Res := TAlacSource.Create(Filename);
+  end
   else
   begin
     Exit; // Unsupported file type
   end;
 
+  // A rate no file has (a damaged header) is refused before it is used as a
+  // number: the source that was opened must not be left behind
+  if Res.GetSampleRate > MAX_SOURCE_RATE then
+  begin
+    Res.Free;
+    raise EAudioEngineError.CreateTyped(aeAudioFail, ERR_AUDIO_INVALID);
+  end;
   InRate := Res.GetSampleRate;
 
   // =========================================================================
@@ -411,11 +451,17 @@ begin
     raise EAudioEngineError.CreateTyped(aeAudioFail, ERR_AUDIO_INVALID);
   end;
 
-  if (Res.GetChannels > 2) or (IsDSDFile(Filename) and (Res.GetChannels <> 2)) then
+  if IsDSDFile(Filename) and (Res.GetChannels <> 2) then
   begin
     Res.Free;
     raise EAudioEngineError.CreateTyped(aeMultiChannel, ERR_AUDIO_MULTI_CHANNEL);
   end;
+
+  // PCM with more than two channels becomes stereo right here, so everything
+  // behind it (resampler, gain, outputs) sees an ordinary stereo stream.
+  // TDownmixSource owns Res from its first statement on.
+  if Res.GetChannels > 2 then
+    Res := TDownmixSource.Create(Res);
 
   // 2. Apply the Resampler if required
   if (not (Res is TDsfSource)) and ACfg.ResamplePCM then

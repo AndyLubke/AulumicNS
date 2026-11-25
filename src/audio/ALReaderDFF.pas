@@ -23,7 +23,7 @@ unit ALReaderDFF;
 interface
 
 uses
-  SysUtils, Classes, Math, AuAudioTypes, AuDecoder, AuDecDsd;
+  SysUtils, Classes, Math, AuAudioTypes, AuDecoder, AuDecDsd, ALAudioTypes;
 
 type
   { TDffReader }
@@ -43,10 +43,16 @@ type
     constructor Create(const FileName: string);
     destructor Destroy; override;
     function ReadData(Buffer: Pointer; BytesToRead: integer): integer;
+    // Every channel of the file: ASteps bytes per channel, the channels of
+    // one step side by side, the DSD bits MSB first. Returns the steps read.
+    function ReadRaw(ADest: PByte; ASteps: Integer): Integer;
+    // What each channel is, from the names in the file (nil when it has none)
+    function Roles: TChannelRoles;
     function GetProgress: double;
     procedure Seek(Percent: double);
     function GetDoPMarker: byte;
     procedure SetDoPMarker(Value: byte);
+    property FileChannels: word read FFileChannels;
     property SampleRate: cardinal read FSampleRate;
     property Channels: word read FChannelCount;
     property DataSize: int64 read FValidAudioBytes;
@@ -64,12 +70,12 @@ const
 
 function IsDffFile(const FileName: string): Boolean;
 var
-  F: TFileStream;
+  F: TStream;
   Sig: array[0..3] of AnsiChar;
 begin
   Result := False;
   try
-    F := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
+    F := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
     try
       if F.Read(Sig, 4) = 4 then Result := Sig = 'FRM8';
     finally
@@ -168,6 +174,37 @@ begin
     if FBytesRead > FValidAudioBytes then FBytesRead := FValidAudioBytes;
   end;
   FMarker := Marker;
+end;
+
+function TDffReader.ReadRaw(ADest: PByte; ASteps: Integer): Integer;
+begin
+  Result := 0;
+  if (FDec = nil) or (ASteps <= 0) then Exit;
+  Result := FDec.ReadDsd(ADest, ASteps);
+  if Result < 0 then Result := 0;
+  Inc(FBytesRead, Int64(Result) * 2);
+  if FBytesRead > FValidAudioBytes then FBytesRead := FValidAudioBytes;
+end;
+
+function TDffReader.Roles: TChannelRoles;
+var
+  I: Integer;
+  Id: string;
+begin
+  Result := nil;
+  if (FDec = nil) or (Length(FDec.ChannelIds) <> Integer(FFileChannels)) then Exit;
+  SetLength(Result, FFileChannels);
+  for I := 0 to High(Result) do
+  begin
+    Id := UpperCase(Trim(FDec.ChannelIds[I]));
+    if (Id = 'SLFT') or (Id = 'MLFT') then Result[I] := chLeft
+    else if (Id = 'SRGT') or (Id = 'MRGT') then Result[I] := chRight
+    else if Id = 'C' then Result[I] := chCentre
+    else if Id = 'LFE' then Result[I] := chLfe
+    else if Id = 'LS' then Result[I] := chSurroundLeft
+    else if Id = 'RS' then Result[I] := chSurroundRight
+    else Result[I] := chNone;
+  end;
 end;
 
 procedure TDffReader.Seek(Percent: double);

@@ -16,11 +16,17 @@ unit ALReaders;
 interface
 
 uses
-  Classes, SysUtils, Math, ALReaderWAV, ALReaderFLAC, ALReaderDSF, 
+  Classes, SysUtils, Math, ALReaderWAV, ALReaderAIFF, ALReaderALAC, ALReaderFLAC, ALReaderDSF, 
   AuResample,      // the built-in resampler
   ALAudioTypes;
 
+const
+  DOWNMIX_MAX_CHANNELS = 8;
+
 type
+  // One weight per input channel
+  TDownmixWeights = array[0..DOWNMIX_MAX_CHANNELS - 1] of double;
+
   TRateMap = record
     InRate: integer;
     OutRate: integer;
@@ -52,6 +58,9 @@ type
     // Tunnels through wrapper classes (BitDepth, MonoToStereo, Resampler)
     // so PrepareGapless always finds its matching layer
     function FindLayer(AClass: TClass): TAudioSource; virtual;
+    // What each channel of a source with more than two is, when the format
+    // does not store them in the usual order (nil: the usual order)
+    function ChannelRoles: TChannelRoles; virtual;
   end;
 
   TWavSource = class(TAudioSource)
@@ -68,6 +77,39 @@ type
     function GetDuration: double; override;
     function ReadData(B: Pointer; len: integer): integer; override;
     procedure Seek(Percent: double); override;
+  end;
+
+  TAiffSource = class(TAudioSource)
+  private
+    FReader: TAiffReader;
+    FDuration: Double;
+  public
+    constructor Create(const f: string);
+    destructor Destroy; override;
+    function GetSampleRate: cardinal; override;
+    function GetChannels: word; override;
+    function GetBitsPerSample: word; override;
+    function GetProgress: double; override;
+    function GetDuration: double; override;
+    function ReadData(B: Pointer; len: integer): integer; override;
+    procedure Seek(Percent: double); override;
+  end;
+
+  TAlacSource = class(TAudioSource)
+  private
+    FReader: TAlacReader;
+    FDuration: Double;
+  public
+    constructor Create(const f: string);
+    destructor Destroy; override;
+    function GetSampleRate: cardinal; override;
+    function GetChannels: word; override;
+    function GetBitsPerSample: word; override;
+    function GetProgress: double; override;
+    function GetDuration: double; override;
+    function ReadData(B: Pointer; len: integer): integer; override;
+    procedure Seek(Percent: double); override;
+    function ChannelRoles: TChannelRoles; override;
   end;
 
   TFlacSource = class(TAudioSource)
@@ -106,6 +148,7 @@ type
     procedure PrepareGapless(Previous: TAudioSource); override;
     function GetDoPMarker: byte; override;
     procedure SetDoPMarker(Value: byte); override;
+    property Reader: TDsfReader read FReader;
   end;
 
   { TDsdToPcmSource }
@@ -141,6 +184,9 @@ type
 
     procedure InitLookupTable;
     procedure InitRateDependent;
+  protected
+    // The channel counts of the file this converter is for
+    function AcceptsChannels(ACount: integer): Boolean; virtual;
   public
     constructor Create(const FileName: string; GaindB: Integer; ApplyLPF: Boolean);
     destructor Destroy; override;
@@ -160,6 +206,34 @@ type
     procedure Seek(Percent: double); override;
     procedure PrepareGapless(Previous: TAudioSource); override;
     procedure SetDSDGain(GainDB: double); override;
+  end;
+
+  { TDsdMixSource }
+
+  // A DSD file of more than two channels as stereo PCM. Bit streams cannot
+  // be added, so every channel is converted with the filter of
+  // TDsdToPcmSource and the sums are made from the unrounded values, with the
+  // weights of TDownmixSource, scaled down by MakeupGain. Such a file is PCM
+  // whatever the setting for DSD says.
+  TDsdMixSource = class(TDsdToPcmSource)
+  private
+    FMixCh: integer;
+    FRaw: array of byte;
+    FHist: array[0..DOWNMIX_MAX_CHANNELS - 1] of array[0..511] of byte;
+    FLastIn, FDcOut: array[0..DOWNMIX_MAX_CHANNELS - 1] of double;
+    FCoefL, FCoefR: TDownmixWeights;
+    FMakeup: double;
+    procedure ClearMixState;
+  protected
+    function AcceptsChannels(ACount: integer): Boolean; override;
+  public
+    constructor Create(const FileName: string; ApplyLPF: Boolean);
+    function GetChannels: word; override;
+    function ReadData(Buffer: Pointer; BytesToRead: integer): integer; override;
+    procedure Seek(Percent: double); override;
+    procedure PrepareGapless(Previous: TAudioSource); override;
+    property SourceChannels: integer read FMixCh;
+    property MakeupGain: double read FMakeup;
   end;
 
   // Hook to run 64-bit float DSP, headroom, and single-pass
@@ -261,6 +335,62 @@ type
     procedure SetTargetBitDepth(Bits: word); override;
     function FindLayer(AClass: TClass): TAudioSource; override;
   end;
+
+  { TDownmixSource }
+
+  // PCM with more than two channels, mixed to stereo: the front channels at
+  // full level, the centre and each surround channel at -3 dB into its side
+  // (a single rear channel at -6 dB into both), the LFE channel left out
+  // (ITU-R BS.775). The sum is scaled down by MakeupGain, the largest it can
+  // become, so it never clips here; the play thread gives that gain back
+  // together with the volume, where the headroom watches the peaks. The
+  // output is 32 bit, so the weighted sums keep their fractions.
+  TDownmixSource = class(TAudioSource)
+  private
+    FBaseSource: TAudioSource;
+    FTempBuffer: array of byte;
+    FInChannels: integer;
+    FCoefL, FCoefR: TDownmixWeights;
+    FMakeup: double;
+  public
+    constructor Create(Base: TAudioSource);
+    destructor Destroy; override;
+    function GetSampleRate: cardinal; override;
+    function GetChannels: word; override;
+    function GetBitsPerSample: word; override;
+    function GetProgress: double; override;
+    function GetDuration: double; override;
+    function ReadData(B: Pointer; len: integer): integer; override;
+    procedure Seek(Percent: double); override;
+    procedure PrepareGapless(Previous: TAudioSource); override;
+    function FindLayer(AClass: TClass): TAudioSource; override;
+    // Channels and bit depth of the wrapped source
+    property SourceChannels: integer read FInChannels;
+    function SourceBits: integer;
+    // What the mix was scaled down by (1 or more)
+    property MakeupGain: double read FMakeup;
+  end;
+
+// The weights of AChannels input channels (3 .. DOWNMIX_MAX_CHANNELS, in the
+// order FLAC and WAV store them) for the left and the right output, and
+// ANorm, the largest sum of weights of one side. More channels than that:
+// only the first two are used.
+procedure DownmixMatrix(AChannels: integer;
+  out ACoefL, ACoefR: TDownmixWeights; out ANorm: double);
+// The same from what each channel is (a DSD file names its channels). False
+// when ARoles does not hold a left and a right channel: the caller then
+// takes DownmixMatrix by the count.
+function DownmixWeights(const ARoles: TChannelRoles;
+  out ACoefL, ACoefR: TDownmixWeights; out ANorm: double): Boolean;
+// "5.1", "quadraphonic", "7.1" ... for a channel count above two
+function ChannelLayoutName(AChannels: integer): string;
+// The channels a DSF or DFF file holds (only its header is read); 0 when it
+// cannot be read
+function DsdFileChannels(const AFileName: string): integer;
+// The mix a source chain makes of a file with more than two channels: its
+// channel count (0 = none), the bit depth of the file (1 for DSD) and what
+// the sum was scaled down by
+function DownmixOf(ASource: TAudioSource; out ASourceBits: integer; out AMakeup: double): integer;
 
 const
   // DSD-to-PCM (TDsdToPcmSource), the same at every DSD rate
@@ -409,6 +539,11 @@ begin
     Result := nil;
 end;
 
+function TAudioSource.ChannelRoles: TChannelRoles;
+begin
+  Result := nil;
+end;
+
 { TWavSource }
 
 constructor TWavSource.Create(const f: string);
@@ -469,6 +604,125 @@ begin
 end;
 
 { TFlacSource }
+
+{ TAlacSource }
+
+constructor TAlacSource.Create(const f: string);
+var
+  BytesPerSec: Int64;
+begin
+  inherited Create;
+  FReader  := TAlacReader.Create(f);
+  FClipped := False;
+  BytesPerSec := Int64(FReader.SampleRate) * FReader.Channels * (FReader.BitsPerSample div 8);
+  if BytesPerSec > 0 then
+    FDuration := FReader.DataSize / BytesPerSec
+  else
+    FDuration := 0.0;
+end;
+
+destructor TAlacSource.Destroy;
+begin
+  FReader.Free;
+  inherited;
+end;
+
+function TAlacSource.GetSampleRate: cardinal;
+begin
+  Result := FReader.SampleRate;
+end;
+
+function TAlacSource.GetChannels: word;
+begin
+  Result := FReader.Channels;
+end;
+
+function TAlacSource.GetBitsPerSample: word;
+begin
+  Result := FReader.BitsPerSample;
+end;
+
+function TAlacSource.GetProgress: double;
+begin
+  Result := FReader.GetProgress;
+end;
+
+function TAlacSource.GetDuration: double;
+begin
+  Result := FDuration;
+end;
+
+function TAlacSource.ReadData(B: Pointer; len: integer): integer;
+begin
+  Result := FReader.ReadData(B, len);
+end;
+
+procedure TAlacSource.Seek(Percent: double);
+begin
+  FReader.Seek(EnsureRange(Percent, 0.0, 1.0));
+end;
+
+function TAlacSource.ChannelRoles: TChannelRoles;
+begin
+  Result := FReader.Roles;
+end;
+
+{ TAiffSource }
+
+constructor TAiffSource.Create(const f: string);
+var
+  BytesPerSec: Int64;
+begin
+  inherited Create;
+  FReader  := TAiffReader.Create(f);
+  FClipped := False;
+  BytesPerSec := Int64(FReader.SampleRate) * FReader.Channels * (FReader.BitsPerSample div 8);
+  if BytesPerSec > 0 then
+    FDuration := FReader.DataSize / BytesPerSec
+  else
+    FDuration := 0.0;
+end;
+
+destructor TAiffSource.Destroy;
+begin
+  FReader.Free;
+  inherited;
+end;
+
+function TAiffSource.GetSampleRate: cardinal;
+begin
+  Result := FReader.SampleRate;
+end;
+
+function TAiffSource.GetChannels: word;
+begin
+  Result := FReader.Channels;
+end;
+
+function TAiffSource.GetBitsPerSample: word;
+begin
+  Result := FReader.BitsPerSample;
+end;
+
+function TAiffSource.GetProgress: double;
+begin
+  Result := FReader.GetProgress;
+end;
+
+function TAiffSource.GetDuration: double;
+begin
+  Result := FDuration;
+end;
+
+function TAiffSource.ReadData(B: Pointer; len: integer): integer;
+begin
+  Result := FReader.ReadData(B, len);
+end;
+
+procedure TAiffSource.Seek(Percent: double);
+begin
+  FReader.Seek(EnsureRange(Percent, 0.0, 1.0));
+end;
 
 constructor TFlacSource.Create(const f: string);
 var
@@ -686,7 +940,7 @@ begin
      (((FSource.GetSampleRate mod RATE_FAMILY_44K) <> 0) and ((FSource.GetSampleRate mod RATE_FAMILY_48K) <> 0)) then
     raise EAudioEngineError.CreateTyped(aeAudioFail, ERR_DECODE_DSF_RATE);
 
-  if FSource.GetChannels <> 2 then
+  if not AcceptsChannels(FSource.GetChannels) then
     raise EAudioEngineError.CreateTyped(aeMultiChannel, ERR_DECODE_DSF_STEREO);
 
   // Fixed 96 KB DoP input buffer (8,192 stereo frames * 12 bytes)
@@ -712,6 +966,11 @@ destructor TDsdToPcmSource.Destroy;
 begin
   FSource.Free;
   inherited;
+end;
+
+function TDsdToPcmSource.AcceptsChannels(ACount: integer): Boolean;
+begin
+  Result := ACount = 2;
 end;
 
 procedure TDsdToPcmSource.SetDSDGain(GainDB: double);
@@ -770,7 +1029,8 @@ begin
     Prev := TDsdToPcmSource(Previous.FindLayer(TDsdToPcmSource));
     // The window holds DSD bytes: only from a stream of the
     // same DSD rate and decimation (another one starts with its fade-in)
-    if Assigned(Prev) and (Prev.FDecim = Self.FDecim) and Assigned(Prev.FSource) and
+    if Assigned(Prev) and (Prev.ClassType = Self.ClassType) and
+       (Prev.FDecim = Self.FDecim) and Assigned(Prev.FSource) and
        (Prev.FSource.GetSampleRate = Self.FSource.GetSampleRate) then
     begin
       Self.FLastInL := Prev.FLastInL;
@@ -1008,6 +1268,179 @@ begin
   end;
 
   Result := TotalSamplesDone * PCM32_STEREO_BYTES;
+end;
+
+{ TDsdMixSource }
+
+constructor TDsdMixSource.Create(const FileName: string; ApplyLPF: Boolean);
+begin
+  // The converter at 0 dB: the DSD gain is the play thread's, with the volume
+  inherited Create(FileName, 0, ApplyLPF);
+  FMixCh := TDsfSource(FSource).Reader.FileChannels;
+  if not DownmixWeights(TDsfSource(FSource).Reader.Roles, FCoefL, FCoefR, FMakeup) then
+    DownmixMatrix(FMixCh, FCoefL, FCoefR, FMakeup);
+  // 4 x FDecim bytes of every channel per output sample
+  SetLength(FRaw, DSD_IN_CHUNK_FRAMES * 4 * FMixCh);
+  ClearMixState;
+end;
+
+function TDsdMixSource.AcceptsChannels(ACount: integer): Boolean;
+begin
+  Result := (ACount > 2) and (ACount <= DOWNMIX_MAX_CHANNELS);
+end;
+
+procedure TDsdMixSource.ClearMixState;
+var
+  C: integer;
+begin
+  for C := 0 to High(FHist) do
+  begin
+    FillChar(FHist[C], SizeOf(FHist[C]), 0);
+    FLastIn[C] := 0.0;
+    FDcOut[C]  := 0.0;
+  end;
+  FHistPos := 0;
+end;
+
+function TDsdMixSource.GetChannels: word;
+begin
+  Result := 2;
+end;
+
+procedure TDsdMixSource.Seek(Percent: double);
+begin
+  inherited Seek(Percent);   // the file's position and the fade-in
+  ClearMixState;
+end;
+
+procedure TDsdMixSource.PrepareGapless(Previous: TAudioSource);
+var
+  Prev: TDsdMixSource;
+  Layer: TAudioSource;
+begin
+  if not Assigned(Previous) then
+    Exit;
+  Layer := Previous.FindLayer(TDsdMixSource);
+  if not Assigned(Layer) then
+    Exit;
+  Prev := TDsdMixSource(Layer);
+  // The windows hold DSD bytes: only from a stream of the same channels,
+  // DSD rate and decimation (another one starts with its fade-in)
+  if (Prev.FMixCh = FMixCh) and (Prev.FDecim = FDecim) and Assigned(Prev.FSource) and
+     (Prev.FSource.GetSampleRate = FSource.GetSampleRate) then
+  begin
+    Move(Prev.FHist, FHist, SizeOf(FHist));
+    Move(Prev.FLastIn, FLastIn, SizeOf(FLastIn));
+    Move(Prev.FDcOut, FDcOut, SizeOf(FDcOut));
+    FHistPos       := Prev.FHistPos;
+    FFadeInSamples := 0;
+  end;
+end;
+
+function TDsdMixSource.ReadData(Buffer: Pointer; BytesToRead: integer): integer;
+var
+  SamplesWanted, SamplesDone, MaxChunk, Chunk, StepsPerOut, StepsRead, SamplesRead: integer;
+  I, K, C, P: integer;
+  PIn: pbyte;
+  PO32: PInteger;
+  B: byte;
+  Val: array[0..DOWNMIX_MAX_CHANNELS - 1] of double;
+  Dc, Dummy, SumL, SumR, Scale, FadeScale: double;
+  Reader: TDsfReader;
+begin
+  Result := 0;
+  if BytesToRead <= 0 then
+    Exit;
+  SamplesWanted := BytesToRead div PCM32_STEREO_BYTES;
+  StepsPerOut   := 4 * FDecim;
+  MaxChunk      := Length(FRaw) div (StepsPerOut * FMixCh);
+  if (SamplesWanted <= 0) or (MaxChunk <= 0) then
+    Exit;
+
+  Reader      := TDsfSource(FSource).Reader;
+  SamplesDone := 0;
+  PO32        := PInteger(Buffer);
+  Scale       := FGainLinear * PCM32_SCALE_FLT / FMakeup;
+
+  while SamplesDone < SamplesWanted do
+  begin
+    Chunk := SamplesWanted - SamplesDone;
+    if Chunk > MaxChunk then
+      Chunk := MaxChunk;
+
+    StepsRead   := Reader.ReadRaw(@FRaw[0], Chunk * StepsPerOut);
+    SamplesRead := StepsRead div StepsPerOut;
+    if SamplesRead <= 0 then
+      Break;
+
+    PIn := @FRaw[0];
+    for I := 0 to SamplesRead - 1 do
+    begin
+      // The new bytes of every channel into its ring, oldest first; the
+      // window is then the newest 256 bytes
+      P := FHistPos;
+      for K := 1 to StepsPerOut do
+      begin
+        for C := 0 to FMixCh - 1 do
+        begin
+          B := PIn[C];
+          FHist[C][P] := B;
+          FHist[C][P + DSD_FIR_BYTES] := B;
+        end;
+        P := (P + 1) and (DSD_FIR_BYTES - 1);
+        Inc(PIn, FMixCh);
+      end;
+      FHistPos := P;
+
+      // The filter takes two channels at a time
+      C := 0;
+      while C < FMixCh do
+      begin
+        if C + 1 < FMixCh then
+          DsdFirStereo(@FLookupFIR[0, 0], @FHist[C][P], @FHist[C + 1][P], Val[C], Val[C + 1])
+        else
+          DsdFirStereo(@FLookupFIR[0, 0], @FHist[C][P], @FHist[C][P], Val[C], Dummy);
+        Inc(C, 2);
+      end;
+
+      SumL := 0.0;
+      SumR := 0.0;
+      for C := 0 to FMixCh - 1 do
+      begin
+        Dc         := Val[C] - FLastIn[C] + (FDcPole * FDcOut[C]);
+        FLastIn[C] := Val[C];
+        FDcOut[C]  := Dc;
+        SumL       := SumL + Dc * FCoefL[C];
+        SumR       := SumR + Dc * FCoefR[C];
+      end;
+      SumL := SumL * Scale;
+      SumR := SumR * Scale;
+
+      if FFadeInSamples > 0 then
+      begin
+        FadeScale := 1.0 - (FFadeInSamples * FInvFadeLength);
+        SumL      := SumL * FadeScale;
+        SumR      := SumR * FadeScale;
+        Dec(FFadeInSamples);
+      end;
+
+      if SumL > PCM32_MAX_FLT then begin SumL := PCM32_MAX_FLT; FClipped := True; end
+      else if SumL < PCM32_MIN_FLT then begin SumL := PCM32_MIN_FLT; FClipped := True; end;
+      if SumR > PCM32_MAX_FLT then begin SumR := PCM32_MAX_FLT; FClipped := True; end
+      else if SumR < PCM32_MIN_FLT then begin SumR := PCM32_MIN_FLT; FClipped := True; end;
+
+      PO32^ := Round(SumL);
+      Inc(PO32);
+      PO32^ := Round(SumR);
+      Inc(PO32);
+    end;
+
+    Inc(SamplesDone, SamplesRead);
+    if StepsRead < Chunk * StepsPerOut then
+      Break;
+  end;
+
+  Result := SamplesDone * PCM32_STEREO_BYTES;
 end;
 
 { TResamplerSource }
@@ -1955,6 +2388,322 @@ begin
   end;
 
   Result := TotalFramesDone * 2 * BytesPerSample;
+end;
+
+{ TDownmixSource }
+
+procedure DownmixMatrix(AChannels: integer;
+  out ACoefL, ACoefR: TDownmixWeights; out ANorm: double);
+const
+  SIDE = 0.70710678118654752;   // -3 dB
+  REAR = 0.5;                   // one rear channel into both sides: -6 dB each
+
+  procedure Put(AIndex: integer; AL, AR: double);
+  begin
+    ACoefL[AIndex] := AL;
+    ACoefR[AIndex] := AR;
+  end;
+
+var
+  I: integer;
+  SumL, SumR: double;
+begin
+  for I := 0 to High(ACoefL) do
+  begin
+    ACoefL[I] := 0.0;
+    ACoefR[I] := 0.0;
+  end;
+
+  Put(0, 1.0, 0.0);              // front left
+  Put(1, 0.0, 1.0);              // front right
+  case AChannels of
+    3: Put(2, SIDE, SIDE);                       // L R C
+    4: begin                                     // L R Ls Rs
+         Put(2, SIDE, 0.0);
+         Put(3, 0.0, SIDE);
+       end;
+    5: begin                                     // L R C Ls Rs
+         Put(2, SIDE, SIDE);
+         Put(3, SIDE, 0.0);
+         Put(4, 0.0, SIDE);
+       end;
+    6: begin                                     // L R C LFE Ls Rs
+         Put(2, SIDE, SIDE);
+         Put(4, SIDE, 0.0);
+         Put(5, 0.0, SIDE);
+       end;
+    7: begin                                     // L R C LFE Cs Sl Sr
+         Put(2, SIDE, SIDE);
+         Put(4, REAR, REAR);
+         Put(5, SIDE, 0.0);
+         Put(6, 0.0, SIDE);
+       end;
+    8: begin                                     // L R C LFE Bl Br Sl Sr
+         Put(2, SIDE, SIDE);
+         Put(4, SIDE, 0.0);
+         Put(5, 0.0, SIDE);
+         Put(6, SIDE, 0.0);
+         Put(7, 0.0, SIDE);
+       end;
+  end;
+
+  SumL := 0.0;
+  SumR := 0.0;
+  for I := 0 to High(ACoefL) do SumL := SumL + Abs(ACoefL[I]);
+  for I := 0 to High(ACoefR) do SumR := SumR + Abs(ACoefR[I]);
+  ANorm := Max(1.0, Max(SumL, SumR));
+end;
+
+function DownmixWeights(const ARoles: TChannelRoles;
+  out ACoefL, ACoefR: TDownmixWeights; out ANorm: double): Boolean;
+const
+  SIDE = 0.70710678118654752;
+  REAR = 0.5;
+var
+  I: integer;
+  SumL, SumR: double;
+  HasL, HasR: Boolean;
+begin
+  for I := 0 to High(ACoefL) do
+  begin
+    ACoefL[I] := 0.0;
+    ACoefR[I] := 0.0;
+  end;
+  HasL := False;
+  HasR := False;
+  for I := 0 to Min(High(ARoles), High(ACoefL)) do
+    case ARoles[I] of
+      chLeft:          begin ACoefL[I] := 1.0; HasL := True; end;
+      chRight:         begin ACoefR[I] := 1.0; HasR := True; end;
+      chCentre:        begin ACoefL[I] := SIDE; ACoefR[I] := SIDE; end;
+      chSurroundLeft:  ACoefL[I] := SIDE;
+      chSurroundRight: ACoefR[I] := SIDE;
+      chRear:          begin ACoefL[I] := REAR; ACoefR[I] := REAR; end;
+    end;
+  SumL := 0.0;
+  SumR := 0.0;
+  for I := 0 to High(ACoefL) do
+  begin
+    SumL := SumL + ACoefL[I];
+    SumR := SumR + ACoefR[I];
+  end;
+  ANorm  := Max(1.0, Max(SumL, SumR));
+  Result := HasL and HasR;
+end;
+
+function DsdFileChannels(const AFileName: string): integer;
+var
+  R: TDsfReader;
+begin
+  Result := 0;
+  try
+    R := TDsfReader.Create(AFileName);
+    try
+      Result := R.FileChannels;
+    finally
+      R.Free;
+    end;
+  except
+    Result := 0;
+  end;
+end;
+
+function DownmixOf(ASource: TAudioSource; out ASourceBits: integer; out AMakeup: double): integer;
+var
+  Layer: TAudioSource;
+begin
+  Result      := 0;
+  ASourceBits := 0;
+  AMakeup     := 1.0;
+  if ASource = nil then
+    Exit;
+  Layer := ASource.FindLayer(TDownmixSource);
+  if Assigned(Layer) then
+  begin
+    Result      := TDownmixSource(Layer).SourceChannels;
+    ASourceBits := TDownmixSource(Layer).SourceBits;
+    AMakeup     := TDownmixSource(Layer).MakeupGain;
+    Exit;
+  end;
+  Layer := ASource.FindLayer(TDsdMixSource);
+  if Assigned(Layer) then
+  begin
+    Result      := TDsdMixSource(Layer).SourceChannels;
+    ASourceBits := 1;
+    AMakeup     := TDsdMixSource(Layer).MakeupGain;
+  end;
+end;
+
+function ChannelLayoutName(AChannels: integer): string;
+begin
+  case AChannels of
+    3: Result := '3.0';
+    4: Result := 'quadraphonic';
+    5: Result := '5.0';
+    6: Result := '5.1';
+    7: Result := '6.1';
+    8: Result := '7.1';
+  else
+    Result := IntToStr(AChannels) + ' channels';
+  end;
+end;
+
+constructor TDownmixSource.Create(Base: TAudioSource);
+begin
+  inherited Create;
+  FBaseSource := Base;
+  FInChannels := Base.GetChannels;
+  // By what each channel is when the source says so, else by the usual order
+  if not DownmixWeights(Base.ChannelRoles, FCoefL, FCoefR, FMakeup) then
+    DownmixMatrix(FInChannels, FCoefL, FCoefR, FMakeup);
+  SetLength(FTempBuffer, CONV_TEMP_BUF_BYTES);
+end;
+
+destructor TDownmixSource.Destroy;
+begin
+  FBaseSource.Free;
+  inherited;
+end;
+
+function TDownmixSource.GetSampleRate: cardinal;
+begin
+  Result := FBaseSource.GetSampleRate;
+end;
+
+function TDownmixSource.GetChannels: word;
+begin
+  Result := 2;
+end;
+
+function TDownmixSource.GetBitsPerSample: word;
+begin
+  Result := 32;
+end;
+
+function TDownmixSource.SourceBits: integer;
+begin
+  Result := FBaseSource.GetBitsPerSample;
+end;
+
+function TDownmixSource.GetProgress: double;
+begin
+  Result := FBaseSource.GetProgress;
+end;
+
+function TDownmixSource.GetDuration: double;
+begin
+  Result := FBaseSource.GetDuration;
+end;
+
+procedure TDownmixSource.Seek(Percent: double);
+begin
+  FBaseSource.Seek(EnsureRange(Percent, 0.0, 1.0));
+end;
+
+procedure TDownmixSource.PrepareGapless(Previous: TAudioSource);
+begin
+  FBaseSource.PrepareGapless(Previous);
+end;
+
+function TDownmixSource.FindLayer(AClass: TClass): TAudioSource;
+begin
+  if Self is AClass then
+    Result := Self
+  else if Assigned(FBaseSource) then
+    Result := FBaseSource.FindLayer(AClass)
+  else
+    Result := nil;
+end;
+
+function TDownmixSource.ReadData(B: Pointer; len: integer): integer;
+var
+  BytesPerSample, InFrameBytes, Used, C: integer;
+  FramesWanted, FramesDone, MaxChunkFrames, ChunkFrames, BytesRead, FramesRead, I: integer;
+  PIn: pbyte;
+  PO32: PInteger;
+  Scale, V, SumL, SumR: double;
+begin
+  Result := 0;
+  if len <= 0 then
+    Exit;
+
+  BytesPerSample := FBaseSource.GetBitsPerSample div 8;
+  if (BytesPerSample < 2) or (BytesPerSample > 4) or (FInChannels < 1) then
+    Exit;
+
+  InFrameBytes   := FInChannels * BytesPerSample;
+  MaxChunkFrames := Length(FTempBuffer) div InFrameBytes;
+  FramesWanted   := len div PCM32_STEREO_BYTES;
+  if (MaxChunkFrames <= 0) or (FramesWanted <= 0) then
+    Exit;
+
+  // Input samples to the 32 bit scale, and the mix down by its largest sum
+  case BytesPerSample of
+    2: Scale := 65536.0;
+    3: Scale := 256.0;
+  else
+    Scale := 1.0;
+  end;
+  Scale := Scale / FMakeup;
+
+  Used := FInChannels;
+  if Used > DOWNMIX_MAX_CHANNELS then
+    Used := DOWNMIX_MAX_CHANNELS;
+
+  FramesDone := 0;
+  PO32       := PInteger(B);
+
+  while FramesDone < FramesWanted do
+  begin
+    ChunkFrames := FramesWanted - FramesDone;
+    if ChunkFrames > MaxChunkFrames then
+      ChunkFrames := MaxChunkFrames;
+
+    BytesRead := FBaseSource.ReadData(@FTempBuffer[0], ChunkFrames * InFrameBytes);
+    if BytesRead <= 0 then
+      Break;
+    FramesRead := BytesRead div InFrameBytes;
+    if FramesRead <= 0 then
+      Break;
+
+    PIn := @FTempBuffer[0];
+    for I := 0 to FramesRead - 1 do
+    begin
+      SumL := 0.0;
+      SumR := 0.0;
+      for C := 0 to Used - 1 do
+      begin
+        case BytesPerSample of
+          2: V := PSmallInt(PIn + C * 2)^;
+          3: V := Integer(PIn[C * 3]) or (Integer(PIn[C * 3 + 1]) shl 8) or
+                  (Integer(ShortInt(PIn[C * 3 + 2])) shl 16);
+        else
+          V := PInteger(PIn + C * 4)^;
+        end;
+        SumL := SumL + V * FCoefL[C];
+        SumR := SumR + V * FCoefR[C];
+      end;
+      Inc(PIn, InFrameBytes);
+
+      SumL := SumL * Scale;
+      SumR := SumR * Scale;
+      if SumL > PCM32_MAX_FLT then SumL := PCM32_MAX_FLT
+      else if SumL < PCM32_MIN_FLT then SumL := PCM32_MIN_FLT;
+      if SumR > PCM32_MAX_FLT then SumR := PCM32_MAX_FLT
+      else if SumR < PCM32_MIN_FLT then SumR := PCM32_MIN_FLT;
+
+      PO32^ := Round(SumL);
+      Inc(PO32);
+      PO32^ := Round(SumR);
+      Inc(PO32);
+    end;
+
+    Inc(FramesDone, FramesRead);
+    if FramesRead < ChunkFrames then
+      Break;
+  end;
+
+  Result := FramesDone * PCM32_STEREO_BYTES;
 end;
 
 end.

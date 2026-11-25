@@ -27,7 +27,7 @@ type
 
   TAuBufReader = class
   private
-    FStream: TFileStream;
+    FStream: TStream;
     FBuf: array of Byte;
     FBufPos, FBufLen: Integer;
     FBufStart: Int64;
@@ -95,7 +95,7 @@ constructor TAuBufReader.Create(const FileName: string; BufSize: Integer);
 begin
   inherited Create;
   try
-    FStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyWrite);
+    FStream := AuOpenFile(FileName, fmOpenRead or fmShareDenyWrite);
   except
     on E: Exception do raise EAuAudio.CreateKind(aekFile, 'Cannot open file: ' + E.Message);
   end;
@@ -334,6 +334,7 @@ procedure ParseId3ReplayGain(const Data: TBytes; var RG: TAuReplayGain; var Tags
 var
   Ver, Flags: Byte;
   TagSize, P, FrameSize, EndP, I, Q: Integer;
+  Wide: Int64;
   Id: string;
   Enc: Byte;
   Frame: TBytes;
@@ -426,17 +427,23 @@ begin
   P := 10;
   if Flags and $40 <> 0 then
   begin
-    if Ver = 4 then Inc(P, SyncSafe(P))
-    else Inc(P, (Data[P] shl 24 or Data[P + 1] shl 16 or Data[P + 2] shl 8 or Data[P + 3]) + 4);
+    // the size of the extended header as a 64-bit number: four bytes of a
+    // damaged tag do not fit a signed 32-bit one
+    if P + 4 > EndP then Exit;
+    if Ver = 4 then Wide := SyncSafe(P)
+    else Wide := (Int64(Data[P]) shl 24 or Int64(Data[P + 1]) shl 16 or Int64(Data[P + 2]) shl 8 or Data[P + 3]) + 4;
+    if (Wide < 0) or (P + Wide > EndP) then Exit;
+    Inc(P, Integer(Wide));
   end;
   while P + 10 <= EndP do
   begin
     if Data[P] = 0 then Break;                       // padding
     SetString(Id, PAnsiChar(@Data[P]), 4);
-    if Ver = 4 then FrameSize := SyncSafe(P + 4)
-    else FrameSize := Data[P + 4] shl 24 or Data[P + 5] shl 16 or Data[P + 6] shl 8 or Data[P + 7];
+    if Ver = 4 then Wide := SyncSafe(P + 4)
+    else Wide := Int64(Data[P + 4]) shl 24 or Int64(Data[P + 5]) shl 16 or Int64(Data[P + 6]) shl 8 or Data[P + 7];
     Q := P + 10;
-    if (FrameSize <= 0) or (Q + FrameSize > EndP) then Break;
+    if (Wide <= 0) or (Q + Wide > EndP) then Break;
+    FrameSize := Integer(Wide);
     if (Id = 'TXXX') or (Id = 'TIT2') or (Id = 'TPE1') or (Id = 'TALB') or (Id = 'TPE2') or (Id = 'TRCK') then
     begin
       Frame := nil;

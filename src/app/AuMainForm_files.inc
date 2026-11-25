@@ -306,6 +306,21 @@ begin
   if Length(Sel) > 0 then RevealPath(FPl.Entry(Sel[0]).FilePath);
 end;
 
+{ a right-click on the Now Playing banner: the folder of the playing track }
+procedure TMainForm.BannerContext(Sender: TObject; ScreenPt: TPoint);
+begin
+  if FPlayingPath = '' then Exit;
+  FCtxMenu.Free;
+  FCtxMenu := TAuMenu.Create;
+  FCtxMenu.Add('Open folder...', @MnBannerOpenFolder, icFolder);
+  FCtxMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
+procedure TMainForm.MnBannerOpenFolder(Sender: TObject);
+begin
+  if FPlayingPath <> '' then RevealPath(FPlayingPath);
+end;
+
 { Explorer at a file or folder. Its drive is woken first on a
   worker thread ("Waiting for drive..." with Cancel when it takes a moment):
   RevealFileInExplorer's FileExists would freeze the window while a NAS wakes up. A

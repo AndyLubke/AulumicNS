@@ -128,6 +128,7 @@ type
       ApplyDSP / ApplyResamplerFloatDSP to DSD converted to PCM (also with the
       volume locked); the converter itself works at 0 dB }
     FDsdGainLin         : double;
+    FMixGainLin         : double;   // see UpdateMixGain
     { The gain the block routines work with (FGainNow), the
       gain of the last frame played (FGainCur; -1 = no block yet) and the
       glide in work: from FRampFrom to FRampTo over FRampLen frames, FRampPos
@@ -160,6 +161,9 @@ type
     FHeadOverCap        : double;
     FBlockOutPeak       : double;
     FVolatileHeadroom   : integer;
+    // the dropouts of the stream that plays, for GetSignalInfo (the count
+    // itself lives in RunOutput)
+    FVolatileDropouts   : integer;
 
     FVolatilePeakL      : integer;
     FVolatilePeakR      : integer;
@@ -195,6 +199,7 @@ type
     procedure ApplyFloatDSPBlock(Buffer: PDouble; FrameCount, Channels, OutBits: Integer;
                                  out OutClipped: Boolean);
     function  TargetGain: Double;
+    procedure UpdateMixGain;
     procedure RunGain(AKind: TGainKind; ABuffer: Pointer;
                       AFrames, AChannels, ABits, ARate: Integer; out AClipped: Boolean);
     procedure HeadroomForTrack(const AKey: string);
@@ -449,6 +454,7 @@ begin
   FNextReplayGainPeak  := 0.0;
   FNextRGFactor        := 1.0;
   FDsdGainLin          := Power(10.0, FConfig.DsdGainDB / 20.0);
+  FMixGainLin          := 1.0;
   FGainNow             := 1.0;
   FGainCur             := -1.0;   // the first block starts at its gain, no glide
   FRampFrom            := 1.0;
@@ -710,7 +716,7 @@ begin
     if Assigned(FSource) then
     begin
       // Keep ReplayGain compensation in sync during live DSD gain changes
-      if FCurrentIsDSD and (not FConfig.UseDoP) and (FConfig.ReplayGainMode > 0) and (DeltaDB <> 0) then
+      if FCurrentIsDSD and (not FSource.IsDoP) and (FConfig.ReplayGainMode > 0) and (DeltaDB <> 0) then
       begin
         FReplayGainDB := EnsureRange(FReplayGainDB - DeltaDB, RG_MIN_GAIN_DB, RG_MAX_GAIN_DB);
         if FReplayGainPeak > 0.0 then
@@ -721,7 +727,7 @@ begin
 
     if Assigned(FNextSource) then
     begin
-      if FNextIsDSD and (not FConfig.UseDoP) and (FConfig.ReplayGainMode > 0) and (DeltaDB <> 0) then
+      if FNextIsDSD and (not FNextSource.IsDoP) and (FConfig.ReplayGainMode > 0) and (DeltaDB <> 0) then
       begin
         FNextReplayGainDB := EnsureRange(FNextReplayGainDB - DeltaDB, RG_MIN_GAIN_DB, RG_MAX_GAIN_DB);
         if FNextReplayGainPeak > 0.0 then
@@ -913,7 +919,7 @@ begin
       DeltaDB := FConfig.DsdGainDB - APrep.DsdGainDB;
       if DeltaDB <> 0 then
       begin
-        if APrep.IsDSD and (not FConfig.UseDoP) and (FConfig.ReplayGainMode > 0) then
+        if APrep.IsDSD and (not NewSource.IsDoP) and (FConfig.ReplayGainMode > 0) then
         begin
           APrep.GainDB := EnsureRange(APrep.GainDB - DeltaDB, RG_MIN_GAIN_DB, RG_MAX_GAIN_DB);
           if APrep.Peak > 0.0 then
@@ -1270,6 +1276,23 @@ begin
   end;
   if FCurrentIsDSD then
     Result := Result * FDsdGainLin;
+  Result := Result * FMixGainLin;
+end;
+
+// A source mixed down from more than two channels was scaled by the largest
+// sum its channels can reach. With the automatic headroom that gain is given
+// back here (the headroom lowers it by what the album's peaks need); without
+// it the mix stays at its safe level. Play thread, after FSource changed.
+procedure TPlayThread.UpdateMixGain;
+var
+  Bits: Integer;
+  Makeup: Double;
+begin
+  FMixGainLin := 1.0;
+  if (FSource = nil) or (not FConfig.AutoHeadroom) then
+    Exit;
+  if DownmixOf(FSource, Bits, Makeup) > 0 then
+    FMixGainLin := Makeup;
 end;
 
 // The track in work belongs to this album and chain (CalcHeadroomKey): its
@@ -1812,7 +1835,8 @@ begin
   if (ValidBits <= 0) or (ValidBits > Bits) then
     ValidBits := Bits;
   // Kept in Untouched for the rounding to the valid bits below
-  Untouched := IsBitPerfectBypass and (not FCurrentIsDSD) and (SrcBits <= ValidBits);
+  Untouched := IsBitPerfectBypass and (not FCurrentIsDSD) and (SrcBits <= ValidBits) and
+               (FSource.FindLayer(TDownmixSource) = nil);   // (a DSD mix is DSD)
   if Untouched then
     InterlockedExchange(FBitPerfect, 1)
   else
@@ -2785,6 +2809,7 @@ begin
         finally
           LeaveCriticalSection(FLock);
         end;
+        UpdateMixGain;
 
         if Assigned(FSource) then
         begin
@@ -2995,6 +3020,7 @@ var
     FReplayGainPeak   := FNextReplayGainPeak;
     FRGFactor         := FNextRGFactor;
     FCurrentIsDSD     := FNextIsDSD;
+    UpdateMixGain;
     HeadroomForTrack(FNextHeadKey);   // the same album keeps its level
 
     FTotalFrames := Trunc(FDurationCache * OutFmt.SampleRate);
@@ -3020,6 +3046,7 @@ var
     FRGFactor            := FNextRGFactor;
 
     FCurrentIsDSD        := FNextIsDSD;
+    UpdateMixGain;
     // The device opens anew: the stream starts at its gain
     HeadroomForTrack(FNextHeadKey);
     FGainCur             := -1.0;
@@ -3093,6 +3120,7 @@ var
     if N > LastDropouts then
     begin
       LastDropouts := N;
+      InterlockedExchange(FVolatileDropouts, N);
       Secs := Round(EnsureRange(FProgressCache, 0.0, 1.0) * FDurationCache);
       LogEvent64(ord(alOutputDropout), Int64(Min(N, $FFFFF)) or (Min(Secs, $FFFFF) shl 20));
     end;
@@ -3334,6 +3362,7 @@ begin
       NeedsRateSwitch  := False;
       DrainBeforeClose := False;
       LastDropouts     := 0;
+      InterlockedExchange(FVolatileDropouts, 0);
       WorkStartUs      := 0;
       MaxWorkUs        := 0;
       BuffersOut       := 0;
@@ -3836,6 +3865,7 @@ end;
 function TPlayThread.GetSignalInfo: TSignalInfo;
 var
   Conv: TAudioSource;
+  Makeup: Double;
 begin
   Result := Default(TSignalInfo);
   EnterCriticalSection(FLock);
@@ -3855,6 +3885,11 @@ begin
     Conv := FSource.FindLayer(TBitDepthConverterSource);
     if Assigned(Conv) then Result.SourceBits := TBitDepthConverterSource(Conv).GetSourceBitsPerSample;
     Result.Channels := FSource.GetChannels;
+    Result.DownmixFrom := DownmixOf(FSource, Result.DownmixBits, Makeup);
+    // What the mix is played at before volume and headroom: its safe level,
+    // or that given back
+    if Result.DownmixFrom > 0 then
+      Result.DownmixDB := 20.0 * Log10(FMixGainLin / Makeup);
     Result.RGFactor := FRGFactor;
   finally
     LeaveCriticalSection(FLock);
@@ -3875,6 +3910,7 @@ begin
   Result.Clipped := FWasClipped;
   Result.HeadroomOn := FConfig.AutoHeadroom;
   Result.HeadroomDB := -InterlockedCompareExchange(FVolatileHeadroom, 0, 0) / 1000.0;
+  Result.Dropouts := InterlockedCompareExchange(FVolatileDropouts, 0, 0);
 end;
 
 function TPlayThread.GetBitDepth: integer;

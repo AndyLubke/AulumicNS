@@ -112,6 +112,9 @@ type
     FCtxNode: TAuTreeNode;       // the node of the library context menu
     FCtxTile: Integer;           // the tile of the library context menu
     FStartupScanDone: Boolean;
+    FStopAfterItem: TAuMenuItem;     // Main menu > Playback > Stop after current track (its tick)
+    FPrefsOld: TAppSettingsData;     // the settings before Preferences changed them (ApplyPrefs)
+    FPrefsOldDevName: string;
     FUpdateCheck: TUpdateCheck;      // the check for a newer version at start, nil when done
     FUpdateCheckTick: QWord;         // when it began
     FUpdateFound: string;            // the version the New version box is shown for
@@ -192,6 +195,7 @@ type
     // an access violation shows the plain LCL message and leaves no trace)
     procedure AppException(Sender: TObject; E: Exception);
     procedure ShowPrefsPage(APage: Integer);
+    procedure ApplyPrefs(ANewFolders: TStrings);
     { theme }
     procedure SetThemeMode(M: TAuThemeMode);
     procedure SetAccent(A: Integer);
@@ -293,6 +297,9 @@ type
     function LibLookup(const APath: string; out ATrack: TTrackInfo): Boolean;
     procedure RequestLibraryScan(FullRebuild, SilentQueue: Boolean);
     procedure AskLibraryRebuild(Data: PtrInt);
+    procedure MnStopAfter(Sender: TObject);
+    procedure ManagerStopAfterChange(Sender: TObject);
+    procedure ManagerStoppedAfter(ANextTrackId: Integer);
     function UpdateOwnVersion: string;
     procedure CheckUpdateAtStart;
     procedure ShowUpdateAtStart(Data: PtrInt);
@@ -415,6 +422,8 @@ type
     procedure MnRemoveSelected(Sender: TObject);
     procedure MnClearList(Sender: TObject);
     procedure MnShowInExplorer(Sender: TObject);
+    procedure BannerContext(Sender: TObject; ScreenPt: TPoint);
+    procedure MnBannerOpenFolder(Sender: TObject);
     procedure RevealPath(const APath: string);
     function DriveAwakeFor(const APath: string): Boolean;
     function IdleCaption: string;
@@ -1059,6 +1068,7 @@ begin
   FBanner.OnBadge := @BannerBadge;
   FBanner.OnHeart := @BannerHeart;
   FBanner.OnBooklet := @BannerBooklet;
+  FBanner.OnContext := @BannerContext;
   FTopSplit := TAuSplitter.Create(Self);
   FTopSplit.Parent := Self;
   FTopSplit.Align := alTop;
@@ -1153,6 +1163,7 @@ begin
   M := FMainMenu.AddSub('Playback', icPlay);
   M.Add('Play / pause', @PlayClick, icPlay, 'Space');
   M.Add('Stop', @StopClick, icStopSolid);
+  FStopAfterItem := M.Add('Stop after current track', @MnStopAfter, icNone, 'Ctrl+E');
   M.Add('Previous', @PrevClick, icPrev);
   M.Add('Next', @NextClick, icNext);
   M.AddSeparator;
@@ -1806,21 +1817,37 @@ end;
   tree is filled again for other groups, new folders are scanned }
 procedure TMainForm.ShowPrefsPage(APage: Integer);
 var
+  NewFolders: TStringList;
+begin
+  if FShuttingDown or PrefsOpen then Exit;
+  { what the settings were, to see what changed (ApplyPrefs moves it on) }
+  FPrefsOldDevName := CurrentDeviceName;
+  FPrefsOld := AppSettings.Data;
+  NewFolders := TStringList.Create;
+  try
+    if FLibrary <> nil then FLibrary.GetScanFolders(NewFolders);
+    { with OK the dialog's settings are in AppSettings.Data; Apply has put
+      them there, and to work, while the dialog was open }
+    if not ShowPreferences(Self, NewFolders, FLibrary, @PrefsScan, @ApplyPrefs, APage) then Exit;
+    ApplyPrefs(NewFolders);
+  finally
+    NewFolders.Free;
+  end;
+end;
+
+{ The settings of the Preferences dialog (they are in AppSettings.Data) are
+  put to work, compared with what they were when the dialog opened or was
+  applied last: OK, and the Apply button while the dialog is open. }
+procedure TMainForm.ApplyPrefs(ANewFolders: TStrings);
+var
   Old, New: TAppSettingsData;
-  OldFolders, NewFolders: TStringList;
   OldDevName, NewDevName: string;
   DeviceChanged, Restart, FormatsChanged, FoldersChanged: Boolean;
 begin
-  if FShuttingDown or PrefsOpen then Exit;
-  OldDevName := CurrentDeviceName;
-  Old := AppSettings.Data;
-  OldFolders := TStringList.Create;
-  NewFolders := TStringList.Create;
-  try
-    if FLibrary <> nil then FLibrary.GetScanFolders(OldFolders);
-    NewFolders.Assign(OldFolders);
-    { with OK the dialog's settings are in AppSettings.Data }
-    if not ShowPreferences(Self, NewFolders, FLibrary, @PrefsScan, APage) then Exit;
+  if FShuttingDown then Exit;
+  Old := FPrefsOld;
+  OldDevName := FPrefsOldDevName;
+  begin
     AppSettings.SyncOutputDevice;
     New := AppSettings.Data;
     DeviceChanged := (Old.OutputApi <> New.OutputApi) or not SameText(Old.Audio.DeviceID, New.Audio.DeviceID);
@@ -1879,7 +1906,7 @@ begin
       end;
     end;
     { the library }
-    FoldersChanged := (FLibrary <> nil) and ApplyLibraryFolders(NewFolders);
+    FoldersChanged := (FLibrary <> nil) and ApplyLibraryFolders(ANewFolders);
     if (not FoldersChanged) and ((Old.ShowLibArtist <> New.ShowLibArtist) or
        (Old.ShowLibComposer <> New.ShowLibComposer) or
        (Old.ShowLibAlbum <> New.ShowLibAlbum) or (Old.ShowLibGenre <> New.ShowLibGenre)) then
@@ -1887,10 +1914,10 @@ begin
     if Old.WatchFolders <> New.WatchFolders then RestartWatcher;
     if FoldersChanged then RequestLibraryScan(False, False);
     SaveWindowSettings;
-  finally
-    OldFolders.Free;
-    NewFolders.Free;
   end;
+  { the next Apply or OK compares with this }
+  FPrefsOld := AppSettings.Data;
+  FPrefsOldDevName := NewDevName;
 end;
 
 { the help (the Markdown window with the screenshots built in) }
@@ -2572,7 +2599,7 @@ begin
           'The Example Quartet is a made-up band for the screenshots of the help. ' +
           'It was founded in a rehearsal room that never existed and has recorded ' +
           'three albums of quiet, warm chamber jazz.' + LineEnding + LineEnding +
-          'The biography of a real artist comes from Last.fm and is saved next to ' +
+          'The biography of a real artist comes from Last.fm or Wikipedia and is saved next to ' +
           'the program, so it is shown at once the next time. Press F2 to edit it; ' +
           'an edited text and a chosen picture are kept when the information is refreshed.',
           SafeFormat(FMT_ARTIST_LIB_STATS, [3, 34]), AIndex = 22);
@@ -2685,6 +2712,11 @@ begin
           AName := '51-update-prompt';
           Result := CreateUpdatePromptForm(Self, '1.2.0.25');
         end;
+    40: begin
+          { the folder dialog (a made-up folder) }
+          AName := '52-folder-picker';
+          Result := CreateFolderPickerDemo('Add a library folder');
+        end;
   end;
 end;
 {$ENDIF}
@@ -2712,6 +2744,7 @@ begin
       Ord('M'): ToggleMute;
       Ord('S'): ShuffleClick(nil);
       Ord('R'): RepeatClick(nil);
+      Ord('E'): MnStopAfter(nil);
       VK_UP: ChangeVolume(20);
       VK_DOWN: ChangeVolume(-20);
       VK_LEFT: if InEdit then Exit else SeekBy(-10);

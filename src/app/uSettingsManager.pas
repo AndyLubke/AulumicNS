@@ -153,6 +153,9 @@ type
     constructor Create;
     destructor  Destroy; override;
     procedure   Load;
+    // The settings as a first start has them (nothing is read from the
+    // settings file, and Data is left as it is)
+    function    DefaultData: TAppSettingsData;
     procedure   Save(AForm: TForm);
     // Audio.OutputApi / DeviceID from OutputApi and the device
     // of that interface (WasapiDeviceID / AsioDriverID)
@@ -629,6 +632,25 @@ begin
     ReleaseDC(0, DC);
   end;
   if Result < 48 then Result := 96;
+end;
+
+function TAppSettings.DefaultData: TAppSettingsData;
+var
+  KeptIni  : TMemIniFile;
+  KeptData : TAppSettingsData;
+begin
+  KeptIni  := FIniFile;
+  KeptData := Data;
+  // an empty settings file: every key gives its default
+  FIniFile := TMemIniFile.Create('');
+  try
+    Load;
+    Result := Data;
+  finally
+    FIniFile.Free;
+    FIniFile := KeptIni;
+    Data     := KeptData;
+  end;
 end;
 
 procedure TAppSettings.Load;

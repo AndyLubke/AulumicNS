@@ -152,7 +152,7 @@ end;
 
 function TWaveReader.LoadFromFile(const AFileName: Tfilename): boolean;
 var
-  fStream: TFileStream;
+  fStream: TStream;
   TagMem: TMemoryStream;
   WaveH: WAVHeader;
   Chunk: ChunkHeader;
@@ -224,7 +224,7 @@ begin
   fStream := nil;
   try
     try
-      fStream   := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
+      fStream   := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
       fFileSize := fStream.Size;
 
       if fFileSize < SizeOf(WAVHeader) then
@@ -312,7 +312,7 @@ end;
 
 function TWaveReader.SaveToFile(const AFileName: Tfilename): boolean;
 var
-  SourceStream, DestStream: TFileStream;
+  SourceStream, DestStream: TStream;
   MemoryStream: TMemoryStream;
   WaveH: WAVHeader;
   Chunk: ChunkHeader;
@@ -338,7 +338,7 @@ begin
 
   try
     try
-      SourceStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
+      SourceStream := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
       // Refuse to rewrite WAV files larger than the 4 GB RIFF limit
       if (SourceStream.Size < SizeOf(WAVHeader)) or (SourceStream.Size > (MAX_RIFF_WAV_SIZE + 8)) then
         Exit(False);
@@ -349,7 +349,7 @@ begin
       if (not HeaderIsValid(WaveH)) or (WaveH.FileSize = $FFFFFFFF) then
         Exit(False);
 
-      DestStream   := TFileStream.Create(LongPath(AFileName), fmCreate or fmOpenReadWrite);
+      DestStream   := AuOpenFile(AFileName, fmCreate or fmOpenReadWrite);
       MemoryStream := TMemoryStream.Create;
 
       // Bound chunk parsing to the declared RIFF payload

@@ -176,7 +176,7 @@ end;
 
 function TFlacReader.LoadFromFile(const AFileName: Tfilename): boolean;
 var
-  fStream: TFileStream;
+  fStream: TStream;
   BlockMem: TMemoryStream;
   Header: TFlacHeader;
   BlockHeader: TMetaDataBlockHeader;
@@ -204,7 +204,7 @@ begin
   fStream := nil;
   try
     try
-      fStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
+      fStream := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
 
       if not SkipID3AndFindFlacMarker(fStream) then
         Exit(False);
@@ -339,7 +339,7 @@ type
     Data: TMemoryStream;
   end;
 var
-  SourceStream, DestStream: TFileStream;
+  SourceStream, DestStream: TStream;
   Header: TFlacHeader;
   BlockHeader: TMetaDataBlockHeader;
   BlockType, BlockLength, I, NewIdx: integer;
@@ -361,8 +361,8 @@ begin
 
   try
     try
-      SourceStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
-      DestStream   := TFileStream.Create(LongPath(AFileName), fmCreate or fmOpenReadWrite);
+      SourceStream := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
+      DestStream   := AuOpenFile(AFileName, fmCreate or fmOpenReadWrite);
 
       if not SkipID3AndFindFlacMarker(SourceStream) then
         Exit(False);

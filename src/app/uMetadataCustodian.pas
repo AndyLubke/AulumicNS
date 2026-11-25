@@ -1181,7 +1181,7 @@ begin
     begin
       MimeStr := ResolveCoverMimeType(P.CoverData, P.CoverMimeType);
 
-      if IsFLAC then
+      if IsFLAC or (ReaderObj.Tags is TVorbisTags) then
       begin
         imgEl := TImageElement.Create;
         try

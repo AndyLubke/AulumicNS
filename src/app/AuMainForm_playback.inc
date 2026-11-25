@@ -23,8 +23,8 @@
 function SignalKey(const S: TSignalInfo): string;
 begin
   if not S.Valid then Exit('');
-  Result := Format('%d|%d|%d|%d|%d|%d|%d', [Ord(S.DoP), Ord(S.NativeDsd), Ord(S.DsdToPcm),
-    Ord(S.Resampled), Ord(S.BitPerfect), S.InRate, S.OutRate]);
+  Result := Format('%d|%d|%d|%d|%d|%d|%d|%d', [Ord(S.DoP), Ord(S.NativeDsd), Ord(S.DsdToPcm),
+    Ord(S.Resampled), Ord(S.BitPerfect), S.InRate, S.OutRate, S.DownmixFrom]);
 end;
 
 { ---- setup ---- }
@@ -41,6 +41,8 @@ begin
   FPlayback.OnModeChange := @ManagerModeChange;
   FPlayback.OnSampleRateError := @ManagerSampleRateError;
   FPlayback.OnBackgroundRequest := @ManagerBackgroundRequest;
+  FPlayback.OnStopAfterChange := @ManagerStopAfterChange;
+  FPlayback.OnStoppedAfter := @ManagerStoppedAfter;
   if HandleAllocated then FPlayback.NotifyHandle := Handle;
   UpdateManagerConfig;
   InitCustodian;
@@ -536,7 +538,9 @@ begin
   end
   else
   begin
-    Ext := UpperCase(Copy(ExtractFileExt(FPlayingPath), 2, 10));
+    Ext := FormatNameOf(FPlayingPath);
+    { an M4A file that plays holds Apple Lossless }
+    if IsM4aFile(FPlayingPath) then Ext := 'ALAC';
     FBanner.Codec := Ext;
     if (M.BitDepth > 0) and (M.SampleRate > 0) then
       FBanner.Resolution := Format('%d bit / %s kHz', [M.BitDepth, KHzText(M.SampleRate)])
@@ -630,6 +634,7 @@ begin
   else if FIsCurrentDoP then T := 'DSD Direct: ' + OutText
   else if FIsCurrentDsdToPcm then T := 'DSD to PCM: ' + OutText
   else if Si.Resampled then T := 'Resample: ' + OutText
+  else if Si.DownmixFrom > 0 then T := 'Downmix: ' + OutText
   else T := 'Native Rate: ' + OutText;
   FRateKey := SignalKey(Si);
   FBanner.RateText := T;
@@ -1104,8 +1109,9 @@ begin
   if FCurrentMeta.AlbumArtist = '' then FCurrentMeta.AlbumArtist := FCurrentMeta.Artist;
   if FCurrentMeta.Album = '' then FCurrentMeta.Album := LBL_UNKNOWN_ALBUM;
   FIsCurrentDsd := IsDSDFile(Item.FilePath);
-  FIsCurrentDoP := FIsCurrentDsd and AppSettings.Data.Audio.UseDoP;
-  FIsCurrentDsdToPcm := FIsCurrentDsd and not AppSettings.Data.Audio.UseDoP;
+  { more than two channels are mixed as PCM, whatever the DSD setting }
+  FIsCurrentDoP := FIsCurrentDsd and AppSettings.Data.Audio.UseDoP and (Meta.Channels <= 2);
+  FIsCurrentDsdToPcm := FIsCurrentDsd and not FIsCurrentDoP;
   FTrackTick := GetTickCount64;
   FPl.PlayingEntry := FPl.IndexOfId(Item.TrackId);
   { the selection goes with the track, and the track
@@ -1278,7 +1284,45 @@ end;
 
 procedure TMainForm.StopPlayback;
 begin
-  if FPlayback <> nil then FPlayback.Stop;
+  if FPlayback = nil then Exit;
+  { stopped by hand: the wish to stop after this track is fulfilled }
+  FPlayback.StopAfterCurrent := False;
+  FPlayback.Stop;
+end;
+
+{ "Stop after current track": the playing track is the last one. It can be
+  set while nothing plays: it then holds for the track that is started. }
+procedure TMainForm.MnStopAfter(Sender: TObject);
+begin
+  if FPlayback <> nil then FPlayback.StopAfterCurrent := not FPlayback.StopAfterCurrent;
+end;
+
+{ the tick in the menu and the mark on the Stop button }
+procedure TMainForm.ManagerStopAfterChange(Sender: TObject);
+var
+  On_: Boolean;
+begin
+  if FShuttingDown or (FPlayback = nil) then Exit;
+  On_ := FPlayback.StopAfterCurrent;
+  if FStopAfterItem <> nil then FStopAfterItem.Checked := On_;
+  FTransport.BtnStop.Active := On_;
+  FTransport.BtnStop.ShowDot := On_;
+  if On_ then FTransport.BtnStop.Hint := 'Stop (stops after this track)'
+  else FTransport.BtnStop.Hint := 'Stop';
+  FTransport.BtnStop.Invalidate;
+end;
+
+{ Playback stopped at the end of the track, as asked. The track that would
+  have followed becomes the selected one, so Play goes on from there. }
+procedure TMainForm.ManagerStoppedAfter(ANextTrackId: Integer);
+var
+  E: Integer;
+begin
+  if FShuttingDown or (ANextTrackId = 0) then Exit;
+  { only in the playlist that was playing: the ids are that playlist's }
+  if not SameText(FShownPl, FPlayingPl) then Exit;
+  E := FPl.IndexOfId(ANextTrackId);
+  if E >= 0 then FPl.SelectEntry(E);
 end;
 
 procedure TMainForm.NextTrack;

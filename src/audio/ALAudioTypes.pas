@@ -77,6 +77,11 @@ const
   METER_RING_SIZE = 256;
 
 type
+  // What one channel of a file with more than two channels carries
+  TChannelRole = (chNone, chLeft, chRight, chCentre, chLfe,
+                  chSurroundLeft, chSurroundRight, chRear);
+  TChannelRoles = array of TChannelRole;
+
   // Peak of one meter slice, 0.0 .. 1.0 (1.0 = full scale)
   TMeterSlice = record
     PeakL: Single;

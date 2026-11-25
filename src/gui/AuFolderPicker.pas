@@ -8,10 +8,12 @@ unit AuFolderPicker;
   Themed folder picker (replaces the system folder dialog).
 
   The list shows the sub folders of the current folder, or the drives at the
-  top level ("This PC"). Double click / Enter opens a folder, Backspace or
-  the Up button goes one level up. Selecting a row puts its path in the path
-  field; "Select folder" returns the path in the field. The path can also be
-  typed or pasted.
+  top level ("This PC"). A row is opened with the arrow at its end, a double
+  click, Enter or the right arrow key. The path of the current folder stands
+  above the list as links: a click on a part goes back to it (Backspace and
+  the left arrow key go one level up). Selecting a row puts its path in the
+  path field; "Select folder" returns the path in the field, and the line
+  beside the buttons names that folder. The path can also be typed or pasted.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -21,13 +23,12 @@ interface
 
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, LCLType,
-  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms;
+  AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuForms, AuCrumbBar;
 
 function AuPickFolder(const Title: string; var Path: string): Boolean;
-{$IFDEF DEBUG}
-{ screenshot mode: the picker, shown modeless, after opening the drive Drive }
-function DebugPicker(const Drive: string): TCustomForm;
-{$ENDIF}
+{ the picker, not shown, in a made-up folder with made-up sub folders (the
+  screenshots: no drive or folder of this PC) }
+function CreateFolderPickerDemo(const ATitle: string): TAuForm;
 
 implementation
 
@@ -41,16 +42,23 @@ type
 
   TFolderPickForm = class(TAuForm)
   private
-    FUp: TAuIconButton;
+    FCrumb: TCrumbBar;
+    FCrumbPaths: array of string;          // the folder each part of FCrumb stands for ('' = This PC)
     FPathEdit: TAuEdit;
     FList: TAuListView;
     FInfo: TAuLabel;
     FOk, FCancel: TAuButton;
     FCurrent: string;                      // '' = This PC
     FEntries: array of TPickEntry;
+    FCellW: Single;                        // the width of a row as it was drawn
     { APath / SelectName by value: callers pass strings of FEntries, which Navigate replaces }
     procedure Navigate(APath: string; SelectName: string = '');
-    procedure UpClick(Sender: TObject);
+    procedure GoUp;
+    procedure ShowCrumb;
+    procedure ShowChoice;
+    procedure CrumbClick(Sender: TObject; Index: Integer);
+    procedure PathChange(Sender: TObject);
+    procedure ListCellClick(Sender: TObject; Row, Col, XInCell: Integer);
     procedure ListActivate(Sender: TObject; Row: Integer);
     procedure ListSel(Sender: TObject);
     procedure ListDraw(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
@@ -61,7 +69,8 @@ type
     procedure DpiUpdated; override;
     procedure Resize; override;
   public
-    constructor CreatePicker(const ATitle, AStart: string);
+    { ADemo: nothing is read from the disk; the caller fills the list }
+    constructor CreatePicker(const ATitle, AStart: string; ADemo: Boolean = False);
     function Chosen: string;
   end;
 
@@ -98,7 +107,7 @@ end;
 
 { ---- TFolderPickForm ---- }
 
-constructor TFolderPickForm.CreatePicker(const ATitle, AStart: string);
+constructor TFolderPickForm.CreatePicker(const ATitle, AStart: string; ADemo: Boolean);
 var
   St: string;
 begin
@@ -109,16 +118,15 @@ begin
   Constraints.MinHeight := S(320);
   FitToWorkArea;          // a small screen at a large scaling
 
-  FUp := TAuIconButton.Create(Self);
-  FUp.Parent := Body;
-  FUp.Icon := icChevronUp;
-  FUp.Hint := 'Up one level (Backspace)';
-  FUp.ShowHint := True;
-  FUp.OnClick := @UpClick;
-  FUp.TabOrder := 0;
+  FCrumb := TCrumbBar.Create(Self);
+  FCrumb.Parent := Body;
+  FCrumb.FontSize := 13;
+  FCrumb.FocusOnClick := False;
+  FCrumb.OnPartClick := @CrumbClick;
 
-  FPathEdit := AddEdit(Self, 64, 20, 400);
+  FPathEdit := AddEdit(Self, 20, 20, 400);
   FPathEdit.Placeholder := 'Folder path';
+  FPathEdit.OnChange := @PathChange;
   FPathEdit.TabOrder := 1;
 
   FList := TAuListView.Create(Self);
@@ -129,11 +137,12 @@ begin
   FList.EmptyText := 'No sub folders';
   FList.OnDrawCell := @ListDraw;
   FList.OnActivate := @ListActivate;
+  FList.OnCellClick := @ListCellClick;
   FList.OnSelChange := @ListSel;
   FList.OnKeyDown := @ListKey;
-  FList.TabOrder := 2;
+  FList.TabOrder := 0;
 
-  FInfo := AddLabel(Self, 'Double click opens a folder', 24, 0, 300);
+  FInfo := AddLabel(Self, '', 24, 0, 300);
 
   FCancel := AddButton(Self, 'Cancel', 0, 0, 96);
   FCancel.ModalResult := mrCancel;
@@ -143,6 +152,7 @@ begin
   DefaultButton := FOk;
   ActiveControl := FList;
   Layout;
+  if ADemo then Exit;
   St := ExcludeTrailingPathDelimiter(AStart);
   if (AStart = '') or not DirectoryExists(AStart) then Navigate('')
   else if Length(St) <= 2 then Navigate('', IncludeTrailingPathDelimiter(St))     // a drive root
@@ -155,9 +165,9 @@ var
 begin
   W := ClientWidth;
   H := BodyHeight;
-  FUp.SetBounds(S(20), S(18), S(36), S(36));
-  FPathEdit.SetBounds(S(64), S(18), W - S(84), S(36));
-  FList.SetBounds(S(20), S(66), W - S(40), H - S(66) - S(76));
+  FCrumb.SetBounds(S(24), S(12), W - S(48), S(30));
+  FList.SetBounds(S(20), S(46), W - S(40), H - S(46) - S(124));
+  FPathEdit.SetBounds(S(20), H - S(114), W - S(40), S(36));
   FInfo.SetBounds(S(24), H - S(54), W - S(300), S(32));
   FOk.Width := Math.Max(S(130), FOk.PreferredWidth);
   FOk.SetBounds(W - S(20) - FOk.Width, H - S(56), FOk.Width, S(36));
@@ -201,8 +211,7 @@ begin
         Inc(N);
       end;
     FPathEdit.Text := '';
-    FPathEdit.Placeholder := 'This PC';
-    FUp.Enabled := False;
+    FPathEdit.Placeholder := 'Folder path';
   end
   else
   begin
@@ -232,7 +241,6 @@ begin
     end;
     FPathEdit.Text := ExcludeTrailingPathDelimiter(FCurrent);
     if Length(FCurrent) = 3 then FPathEdit.Text := FCurrent;
-    FUp.Enabled := True;
   end;
   FList.ClearSelection;
   FList.RowCount := N;
@@ -246,13 +254,83 @@ begin
     FList.EnsureVisible(Sel);
     FPathEdit.Text := FEntries[Sel].Path;
   end;
-  if FCurrent = '' then FInfo.Caption := Format('%d drives', [N])
-  else if N = 1 then FInfo.Caption := '1 folder'
-  else FInfo.Caption := Format('%d folders', [N]);
+  ShowCrumb;
+  ShowChoice;
   FList.Changed;
 end;
 
-procedure TFolderPickForm.UpClick(Sender: TObject);
+{ the current folder as the parts of the bar above the list }
+procedure TFolderPickForm.ShowCrumb;
+var
+  Parts, Rest, Acc: string;
+  P, N: Integer;
+begin
+  Parts := 'This PC';
+  SetLength(FCrumbPaths, 1);
+  FCrumbPaths[0] := '';
+  N := 1;
+  Rest := ExcludeTrailingPathDelimiter(FCurrent);
+  Acc := '';
+  while Rest <> '' do
+  begin
+    P := Pos(PathDelim, Rest);
+    if P = 0 then P := Length(Rest) + 1;
+    if Acc = '' then Acc := Copy(Rest, 1, P - 1) + PathDelim       // 'C:\'
+    else Acc := IncludeTrailingPathDelimiter(Acc) + Copy(Rest, 1, P - 1);
+    Parts := Parts + #1 + Copy(Rest, 1, P - 1);
+    SetLength(FCrumbPaths, N + 1);
+    FCrumbPaths[N] := Acc;
+    Inc(N);
+    Delete(Rest, 1, P);
+  end;
+  FCrumb.SetPath(Parts);
+end;
+
+{ the line beside the buttons: the folder "Select folder" would return }
+procedure TFolderPickForm.ShowChoice;
+var
+  P, Leaf: string;
+begin
+  P := Trim(FPathEdit.Text);
+  if P = '' then
+  begin
+    FInfo.Caption := 'Open a drive to choose a folder';
+    FInfo.Invalidate;
+    Exit;
+  end;
+  Leaf := ExtractFileName(ExcludeTrailingPathDelimiter(P));
+  if Leaf = '' then Leaf := ExcludeTrailingPathDelimiter(P);         // a drive
+  FInfo.Caption := 'Selects: ' + Leaf;
+  FInfo.Invalidate;
+end;
+
+procedure TFolderPickForm.PathChange(Sender: TObject);
+begin
+  ShowChoice;
+end;
+
+procedure TFolderPickForm.CrumbClick(Sender: TObject; Index: Integer);
+var
+  Target, From: string;
+begin
+  if (Index < 0) or (Index > High(FCrumbPaths)) then Exit;
+  Target := FCrumbPaths[Index];
+  { the folder that was left is the selected row, as after one level up }
+  From := '';
+  if Index + 1 <= High(FCrumbPaths) then From := FCrumbPaths[Index + 1];
+  if Target = '' then Navigate('', From)
+  else Navigate(Target, ExtractFileName(ExcludeTrailingPathDelimiter(From)));
+  if FList.CanFocus then FList.SetFocus;
+end;
+
+{ one click on the arrow at the end of a row opens that folder }
+procedure TFolderPickForm.ListCellClick(Sender: TObject; Row, Col, XInCell: Integer);
+begin
+  if (Row < 0) or (Row > High(FEntries)) then Exit;
+  if (FCellW > 0) and (XInCell >= FCellW - S(44)) then Navigate(FEntries[Row].Path);
+end;
+
+procedure TFolderPickForm.GoUp;
 var
   Cur, UpDir: string;
 begin
@@ -276,14 +354,20 @@ begin
   R := FList.FocusedRow;
   if (R >= 0) and (R <= High(FEntries)) and FList.Selected[R] then FPathEdit.Text := FEntries[R].Path
   else if FCurrent <> '' then FPathEdit.Text := ExcludeTrailingPathDelimiter(FCurrent);
+  ShowChoice;
 end;
 
 procedure TFolderPickForm.ListKey(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  if Key = VK_BACK then
+  if (Key = VK_BACK) or (Key = VK_LEFT) then
   begin
     Key := 0;
-    UpClick(nil);
+    GoUp;
+  end
+  else if Key = VK_RIGHT then
+  begin
+    Key := 0;
+    ListActivate(FList, FList.FocusedRow);
   end;
 end;
 
@@ -294,8 +378,11 @@ var
 begin
   if (Row < 0) or (Row > High(FEntries)) then Exit;
   if FEntries[Row].IsDrive then Ic := icDrive else Ic := icFolder;
+  FCellW := W;
   DrawIcon(G, Ic, X + S(18), Y + H / 2, S(16), clTextDim);
-  G.Text(FEntries[Row].Name, X + S(36), Y, W - S(44), H, UIFont(13), clText, 0, 1);
+  G.Text(FEntries[Row].Name, X + S(36), Y, W - S(84), H, UIFont(13), clText, 0, 1);
+  { the arrow that opens the row }
+  DrawIcon(G, icChevronRight, X + W - S(22), Y + H / 2, S(12), clTextDim);
   Handled := True;
 end;
 
@@ -319,25 +406,32 @@ begin
   if Length(Result) > 3 then Result := ExcludeTrailingPathDelimiter(Result);
 end;
 
-{$IFDEF DEBUG}
-function DebugPicker(const Drive: string): TCustomForm;
+function CreateFolderPickerDemo(const ATitle: string): TAuForm;
+const
+  DEMO_DIR = 'M:\Music\Jazz\';
+  DEMO_NAMES: array[0..5] of string = ('Evening Standards', 'Late Night Sessions', 'Northern Lights',
+    'Quiet Hours', 'The Blue Room', 'Winter Trio');
 var
   F: TFolderPickForm;
   I: Integer;
 begin
-  F := TFolderPickForm.CreatePicker('Add music folder', '');
-  F.Show;
-  for I := 0 to High(F.FEntries) do
-    if SameText(F.FEntries[I].Path, Drive) then
-    begin
-      F.FList.SelectOnly(I);
-      F.ListActivate(F.FList, I);
-      Break;
-    end;
+  F := TFolderPickForm.CreatePicker(ATitle, '', True);
+  F.FCurrent := DEMO_DIR;
+  SetLength(F.FEntries, Length(DEMO_NAMES));
+  for I := 0 to High(DEMO_NAMES) do
+  begin
+    F.FEntries[I].Name := DEMO_NAMES[I];
+    F.FEntries[I].Path := DEMO_DIR + DEMO_NAMES[I];
+    F.FEntries[I].IsDrive := False;
+  end;
+  F.FList.RowCount := Length(DEMO_NAMES);
+  F.FList.SelectOnly(2);
+  F.FPathEdit.Text := F.FEntries[2].Path;
+  F.ShowCrumb;
+  F.ShowChoice;
+  F.FList.Changed;
   Result := F;
 end;
-{$ENDIF}
-
 function AuPickFolder(const Title: string; var Path: string): Boolean;
 var
   F: TFolderPickForm;

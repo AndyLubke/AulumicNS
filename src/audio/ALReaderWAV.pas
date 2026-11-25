@@ -20,7 +20,7 @@ uses
 type
   TWavReader = class
   private
-    FFileStream: TFileStream;
+    FFileStream: TStream;
     FDataStart: int64;
     FDataSize: int64;
     FBytesRead: int64;
@@ -76,10 +76,10 @@ begin
   SubFormatTag := 0;
   HasFmtChunk  := False;
 
-  if not FileExists(LongPath(FileName)) then
+  if not AuFileExists(FileName) then
     raise Exception.Create(ERR_FILE_NOT_FOUND + ' ' + FileName);
 
-  FFileStream    := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyWrite);
+  FFileStream    := AuOpenFile(FileName, fmOpenRead or fmShareDenyWrite);
   FileSizeCached := FFileStream.Size;
   FBytesRead     := 0;
   FBlockAlign    := 0;
@@ -153,7 +153,11 @@ begin
         if (ChunkSize and 1) <> 0 then
           Inc(SkipBytes);
         if SkipBytes > 0 then
-          FFileStream.Seek(SkipBytes, soFromCurrent);
+        begin
+          if FFileStream.Position + SkipBytes > FileSizeCached then
+            Break;
+          FFileStream.Position := FFileStream.Position + SkipBytes;
+        end;
         Continue;
       end
       else
@@ -164,7 +168,14 @@ begin
       if (ChunkSize and 1) <> 0 then
         Inc(SkipBytes);
       if SkipBytes > 0 then
-        FFileStream.Seek(SkipBytes, soFromCurrent);
+      begin
+        // The position as a 64-bit number: a size of 2 GB and more must
+        // never become a step backwards. A chunk that reaches beyond the
+        // file ends the chunks.
+        if FFileStream.Position + SkipBytes > FileSizeCached then
+          Break;
+        FFileStream.Position := FFileStream.Position + SkipBytes;
+      end;
     end
     else if ChunkID = 'data' then
     begin
@@ -182,7 +193,9 @@ begin
       SkipBytes := ChunkSize;
       if (ChunkSize and 1) <> 0 then
         Inc(SkipBytes);
-      FFileStream.Seek(SkipBytes, soFromCurrent);
+      if FFileStream.Position + SkipBytes > FileSizeCached then
+        Break;
+      FFileStream.Position := FFileStream.Position + SkipBytes;
     end;
   end;
 

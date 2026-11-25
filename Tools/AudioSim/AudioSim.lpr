@@ -1384,6 +1384,252 @@ begin
   WriteLn('RESULT mode=silent dir=', D);
 end;
 
+{ ---- DSD files with a channel check that can be heard ---- }
+
+type
+  TDsdChannels = array of TBytes;
+
+{ One channel of the channel check of the format test files as DSD, one bit
+  per sample, MSB first: in second AChannel as many beeps as its number, then
+  two seconds of sound when all channels have had their turn. A second-order
+  delta-sigma modulator (about 85 dB in the audio band at DSD64, more at the
+  higher rates). }
+function DsdCheckBits(ADsdRate, AChannel, AChannels: Integer; AFreq: Double): TBytes;
+const
+  BEEP    = 0.12;            // one beep and its pause
+  BEEP_ON = 0.07;
+  LEVEL   = 0.25;
+var
+  N, I: Int64;
+  T, Rel, X, S1, S2, V, Phase, Step: Double;
+  B: Byte;
+  Bit: Integer;
+  Sounding: Boolean;
+begin
+  Result := nil;
+  N := Int64(ADsdRate) * (AChannels + 2);
+  SetLength(Result, N div 8);
+  S1 := 0.0;
+  S2 := 0.0;
+  Phase := 0.0;
+  Step := 2.0 * Pi * AFreq / ADsdRate;
+  B := 0;
+  Bit := 0;
+  for I := 0 to (N div 8) * 8 - 1 do
+  begin
+    T := I / ADsdRate;
+    if T >= AChannels then
+      Sounding := True
+    else
+    begin
+      Rel := T - AChannel;                      // inside this channel's second
+      Sounding := (Rel >= 0.0) and (Rel < 1.0) and
+                  (Rel - Floor(Rel / BEEP) * BEEP < BEEP_ON) and
+                  (Floor(Rel / BEEP) <= AChannel);
+    end;
+    if Sounding then X := LEVEL * Sin(Phase) else X := 0.0;
+    Phase := Phase + Step;
+    if Phase > 2.0 * Pi then Phase := Phase - 2.0 * Pi;
+
+    if S2 >= 0.0 then V := 1.0 else V := -1.0;
+    S1 := S1 + X - V;
+    S2 := S2 + S1 - V;
+
+    B := Byte(B shl 1);
+    if V > 0.0 then B := B or 1;
+    Inc(Bit);
+    if Bit = 8 then
+    begin
+      Result[I div 8] := B;
+      Bit := 0;
+      B := 0;
+    end;
+  end;
+end;
+
+function ReverseBitsOf(AByte: Byte): Byte;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := 0 to 7 do
+    if (AByte and (1 shl I)) <> 0 then
+      Result := Result or Byte(1 shl (7 - I));
+end;
+
+{ DSF: blocks of 4096 bytes per channel, the bits LSB first; the last block
+  is filled up with the idle pattern. AChannelType as the format names the
+  layouts (2 stereo, 3 three channels, 4 quadraphonic, 6 five channels,
+  7 5.1). }
+procedure WriteCheckDsf(const APath: string; ADsdRate, AChannelType: Integer; const AData: TDsdChannels);
+const
+  BLOCK = 4096;
+var
+  FS: TFileStream;
+  Blocks, B, DataSize: Int64;
+  Buf: TBytes;
+  I, Ch, N: Integer;
+
+  procedure Tag(const S: AnsiString);
+  begin
+    FS.WriteBuffer(S[1], 4);
+  end;
+
+  procedure I32(V: Integer);
+  begin
+    FS.WriteBuffer(V, 4);
+  end;
+
+  procedure I64(V: Int64);
+  begin
+    FS.WriteBuffer(V, 8);
+  end;
+
+begin
+  N := Length(AData);
+  Blocks := (Length(AData[0]) + BLOCK - 1) div BLOCK;
+  DataSize := Blocks * BLOCK * N;
+  SetLength(Buf, BLOCK);
+  FS := TFileStream.Create(APath, fmCreate);
+  try
+    Tag('DSD '); I64(28); I64(28 + 52 + 12 + DataSize); I64(0);
+    Tag('fmt '); I64(52); I32(1); I32(0); I32(AChannelType); I32(N); I32(ADsdRate); I32(1);
+    I64(Int64(Length(AData[0])) * 8); I32(BLOCK); I32(0);
+    Tag('data'); I64(12 + DataSize);
+    for B := 0 to Blocks - 1 do
+      for Ch := 0 to N - 1 do
+      begin
+        for I := 0 to BLOCK - 1 do
+          if B * BLOCK + I < Length(AData[Ch]) then
+            Buf[I] := ReverseBitsOf(AData[Ch][B * BLOCK + I])
+          else
+            Buf[I] := $69;
+        FS.WriteBuffer(Buf[0], BLOCK);
+      end;
+  finally
+    FS.Free;
+  end;
+end;
+
+{ DFF (DSDIFF, not compressed): the bytes of the channels in turn, the bits
+  MSB first, sizes big-endian; AIds names every channel ('SLFT', 'C   ' ...) }
+procedure WriteCheckDff(const APath: string; ADsdRate: Integer; const AIds: array of AnsiString;
+  const AData: TDsdChannels);
+const
+  CMPR_NAME: AnsiString = 'not compressed';
+var
+  FS: TFileStream;
+  Data: TBytes;
+  I, C, N: Integer;
+  DataSize, PropSize, ChnlSize: Int64;
+
+  procedure Tag(const S: AnsiString);
+  begin
+    FS.WriteBuffer(S[1], 4);
+  end;
+
+  procedure U32(AValue: Cardinal);
+  var
+    Q: array[0..3] of Byte;
+  begin
+    Q[0] := Byte(AValue shr 24);
+    Q[1] := Byte(AValue shr 16);
+    Q[2] := Byte(AValue shr 8);
+    Q[3] := Byte(AValue);
+    FS.WriteBuffer(Q, 4);
+  end;
+
+  procedure U64(AValue: Int64);
+  begin
+    U32(Cardinal(AValue shr 32));
+    U32(Cardinal(AValue and $FFFFFFFF));
+  end;
+
+begin
+  N := Length(AData);
+  DataSize := Int64(Length(AData[0])) * N;
+  Data := nil;
+  SetLength(Data, DataSize);
+  for I := 0 to Length(AData[0]) - 1 do
+    for C := 0 to N - 1 do
+      Data[Int64(I) * N + C] := AData[C][I];
+  ChnlSize := 2 + 4 * N;
+  PropSize := 4 + (12 + 4) + (12 + ChnlSize) + (12 + 20);
+  FS := TFileStream.Create(APath, fmCreate);
+  try
+    Tag('FRM8'); U64(4 + (12 + 4) + (12 + PropSize) + (12 + DataSize + (DataSize and 1))); Tag('DSD ');
+    Tag('FVER'); U64(4); U32($01050000);
+    Tag('PROP'); U64(PropSize); Tag('SND ');
+    Tag('FS  '); U64(4); U32(Cardinal(ADsdRate));
+    Tag('CHNL'); U64(ChnlSize); FS.WriteByte(0); FS.WriteByte(N);
+    for C := 0 to N - 1 do Tag(AIds[C]);
+    Tag('CMPR'); U64(19); Tag('DSD ');
+    FS.WriteByte(Length(CMPR_NAME));
+    FS.WriteBuffer(CMPR_NAME[1], Length(CMPR_NAME));
+    FS.WriteByte(0);                     // pad to an even length
+    Tag('DSD '); U64(DataSize);
+    FS.WriteBuffer(Data[0], DataSize);
+    if Odd(DataSize) then FS.WriteByte(0);
+  finally
+    FS.Free;
+  end;
+end;
+
+{ dsdtest <folder>: the channel check as DSF and as DFF - stereo at DSD64 ..
+  DSD512, the layouts with more channels at DSD64 (and 5.1 at DSD128) }
+procedure MakeDsdTestFiles(const ADir: string);
+const
+  F_L = 440.0; F_R = 554.37; F_C = 659.26; F_LFE = 80.0; F_SL = 880.0; F_SR = 1108.73;
+var
+  D: string;
+  I: Integer;
+
+  function Channels(ARate: Integer; const AFreq: array of Double): TDsdChannels;
+  var
+    C: Integer;
+  begin
+    Result := nil;
+    SetLength(Result, Length(AFreq));
+    for C := 0 to High(AFreq) do
+      Result[C] := DsdCheckBits(ARate, C, Length(AFreq), AFreq[C]);
+  end;
+
+  procedure Dsf(const ALayout: string; ARate, AType: Integer; const AFreq: array of Double);
+  begin
+    ForceDirectories(D + 'DSF\' + ALayout);
+    WriteCheckDsf(D + Format('DSF\%s\DSF DSD%d %s.dsf', [ALayout, ARate div 44100, ALayout]),
+      ARate, AType, Channels(ARate, AFreq));
+    WriteLn('WROTE DSF DSD', ARate div 44100, ' ', ALayout);
+  end;
+
+  procedure Dff(const ALayout: string; ARate: Integer; const AIds: array of AnsiString;
+    const AFreq: array of Double);
+  begin
+    ForceDirectories(D + 'DFF\' + ALayout);
+    WriteCheckDff(D + Format('DFF\%s\DFF DSD%d %s.dff', [ALayout, ARate div 44100, ALayout]),
+      ARate, AIds, Channels(ARate, AFreq));
+    WriteLn('WROTE DFF DSD', ARate div 44100, ' ', ALayout);
+  end;
+
+begin
+  D := IncludeTrailingPathDelimiter(ADir);
+  for I := 0 to 3 do
+  begin
+    Dsf('stereo', 2822400 shl I, 2, [F_L, F_R]);
+    Dff('stereo', 2822400 shl I, ['SLFT', 'SRGT'], [F_L, F_R]);
+  end;
+  Dsf('3.0', 2822400, 3, [F_L, F_R, F_C]);
+  Dsf('quadraphonic', 2822400, 4, [F_L, F_R, F_SL, F_SR]);
+  Dsf('5.0', 2822400, 6, [F_L, F_R, F_C, F_SL, F_SR]);
+  Dsf('5.1', 2822400, 7, [F_L, F_R, F_C, F_LFE, F_SL, F_SR]);
+  Dsf('5.1', 5644800, 7, [F_L, F_R, F_C, F_LFE, F_SL, F_SR]);
+  Dff('5.0', 2822400, ['MLFT', 'MRGT', 'C   ', 'LS  ', 'RS  '], [F_L, F_R, F_C, F_SL, F_SR]);
+  Dff('5.1', 2822400, ['MLFT', 'MRGT', 'C   ', 'LFE ', 'LS  ', 'RS  '], [F_L, F_R, F_C, F_LFE, F_SL, F_SR]);
+  { the surrounds stored before the centre: only the names in the file say so }
+  Dff('5.1 other order', 2822400, ['MLFT', 'MRGT', 'LS  ', 'RS  ', 'C   ', 'LFE '],
+    [F_L, F_R, F_SL, F_SR, F_C, F_LFE]);
+  WriteLn('RESULT mode=dsdtest dir=', D);
+end;
 { a stereo PCM WAV of a sine (AFreq, ADb dBFS), ASeconds long; ASkipAt > 0:
   one sample is left out there (a control: check must find it) }
 procedure WriteToneWav(const APath: string; ARate, ABits: Integer; AFreq, ADb, ASeconds: Double;
@@ -2061,6 +2307,7 @@ begin
       else if Mode = 'rt' then RealTime(F)
       else if Mode = 'silent' then MakeSilentFiles(F)
       else if Mode = 'tone' then MakeToneFiles(F)
+      else if Mode = 'dsdtest' then MakeDsdTestFiles(F)
       else if Mode = 'check' then CheckSignal(F)
       else if Mode = 'rgcheck' then RgCheck(F)
       else if Mode = 'rgtags' then RgTags(F)

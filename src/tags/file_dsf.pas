@@ -80,7 +80,7 @@ end;
 
 function TDsfReader.LoadFromFile(const AFileName: TFileName): boolean;
 var
-  fStream: TFileStream;
+  fStream: TStream;
   MemStream: TMemoryStream;
   ChunkID: array[0..3] of ansichar;
   ID3Header: array[0..9] of byte;
@@ -106,7 +106,7 @@ begin
   fStream := nil;
   try
     try
-      fStream := TFileStream.Create(LongPath(AFileName), fmOpenRead or fmShareDenyNone);
+      fStream := AuOpenFile(AFileName, fmOpenRead or fmShareDenyNone);
 
       if fStream.Read(ChunkID, 4) < 4 then
         Exit(False);
@@ -268,7 +268,7 @@ end;
 
 function TDsfReader.SaveToFile(const AFileName: TFileName): boolean;
 var
-  SourceStream, DestStream: TFileStream;
+  SourceStream, DestStream: TStream;
   ChunkID: array[0..3] of ansichar;
   ID3Header: array[0..9] of byte;
   TagSize: cardinal;
@@ -287,8 +287,8 @@ begin
 
   try
     try
-      SourceStream := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyNone);
-      DestStream   := TFileStream.Create(LongPath(AFileName), fmCreate or fmOpenReadWrite);
+      SourceStream := AuOpenFile(FileName, fmOpenRead or fmShareDenyNone);
+      DestStream   := AuOpenFile(AFileName, fmCreate or fmOpenReadWrite);
       MemoryStream := TMemoryStream.Create;
 
       StartOffset := 0;

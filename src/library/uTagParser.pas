@@ -495,7 +495,7 @@ function FormatTrackInfo(const Fmt: string; const Ctx: TTrackFormatContext): str
         if Ctx.IsDSD then
           Result := LBL_CODEC_DSD
         else
-          Result := UpperCase(Copy(ExtractFileExt(Ctx.FilePath), 2, 10));
+          Result := FormatNameOf(Ctx.FilePath);
 
       tiResolution:
         if Ctx.IsDSD then

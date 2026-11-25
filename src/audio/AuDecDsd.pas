@@ -46,6 +46,9 @@ type
     FR: TAuBufReader;
     FDataStart: Int64;
   public
+    // The channel names of the file in their order ('SLFT', 'C   ', 'LS  ' ...);
+    // empty when the file names none
+    ChannelIds: array of string;
     destructor Destroy; override;
     procedure Open(const AFileName: string); override;
     function ReadDsd(Dest: PByte; MaxFrames: Integer): Integer; override;
@@ -194,7 +197,7 @@ var
   Size, SubSize: QWord;
   Start, PropEnd, SubStart: Int64;
   Rate: Cardinal;
-  Ch: Integer;
+  Ch, I: Integer;
   Cmpr: string;
   DataSize: QWord;
 begin
@@ -212,6 +215,17 @@ begin
     Id := FR.ReadTag4;
     Size := FR.ReadU64BE;
     Start := FR.Position;
+    // A chunk that says it is longer than the file: the sound is taken as
+    // far as the file reaches, anything else ends the chunks
+    if Size > QWord(FR.Size - Start) then
+    begin
+      if (Id = 'DSD ') and (FDataStart < 0) then
+      begin
+        FDataStart := Start;
+        DataSize := QWord(FR.Size - Start);
+      end;
+      Break;
+    end;
     if Id = 'PROP' then
     begin
       PropEnd := Start + Int64(Size);
@@ -222,7 +236,16 @@ begin
           SubSize := FR.ReadU64BE;
           SubStart := FR.Position;
           if Sub = 'FS  ' then Rate := FR.ReadU32BE
-          else if Sub = 'CHNL' then Ch := FR.ReadU16BE
+          else if Sub = 'CHNL' then
+          begin
+            Ch := FR.ReadU16BE;
+            ChannelIds := nil;
+            if (Ch >= 1) and (Ch <= 6) and (SubSize >= QWord(2 + 4 * Ch)) then
+            begin
+              SetLength(ChannelIds, Ch);
+              for I := 0 to Ch - 1 do ChannelIds[I] := FR.ReadTag4;
+            end;
+          end
           else if Sub = 'CMPR' then Cmpr := FR.ReadTag4;
           FR.Seek(SubStart + Int64(SubSize) + (SubSize and 1));
         end;

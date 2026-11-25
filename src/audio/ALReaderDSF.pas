@@ -16,6 +16,7 @@ interface
 uses
   SysUtils, Classes, Math,
   AuAudioTypes,  // LongPath (paths of 260 characters and more)
+  ALAudioTypes,
   ALReaderDFF;   // DFF files are read by TDffReader
 
 type
@@ -24,7 +25,7 @@ type
 
   TDsfReader = class
   private
-    FFile: TFileStream;
+    FFile: TStream;
     FDataStart: int64;
     FDataSize: int64;
     FValidAudioBytes: int64;
@@ -43,6 +44,7 @@ type
     // from output DoP stream channels (2 for Mono/Stereo, >2 for Multi-Channel)
     FFileChannels: word;
     FChannelCount: word;
+    FChannelType: integer;   // of a DSF file (its fmt chunk)
     // A DSDIFF file is read by this reader (same output)
     FDff: TDffReader;
 
@@ -52,6 +54,13 @@ type
     destructor Destroy; override;
 
     function ReadData(Buffer: Pointer; BytesToRead: integer): integer;
+    // Every channel of the file: ASteps bytes per channel, the channels of
+    // one step side by side, the DSD bits MSB first. Returns the steps read.
+    // For files with more than two channels (ReadData gives the first two).
+    function ReadRaw(ADest: PByte; ASteps: Integer): Integer;
+    // What each channel is: from the channel type of a DSF file, the channel
+    // names of a DFF file (nil when unknown)
+    function Roles: TChannelRoles;
     function GetProgress: double;
     procedure Seek(Percent: double);
     function GetBitsPerSample: word;
@@ -61,6 +70,7 @@ type
 
     property GetSampleRate: cardinal read FSampleRate;
     property GetChannels: word read FChannelCount;
+    property FileChannels: word read FFileChannels;
     // Expose 2-channel normalized valid bytes so TDsfSource
     // calculates exact duration for both Mono and Stereo DSF files
     property DataSize: int64 read FValidAudioBytes;
@@ -124,7 +134,7 @@ begin
   Header := Default(TDsfChunkHeader);
   Fmt    := Default(TDsfFmtChunk);
 
-  if not FileExists(LongPath(FileName)) then
+  if not AuFileExists(FileName) then
     raise Exception.Create(ERR_FILE_NOT_FOUND + ' ' + FileName);
 
   // DSDIFF (.dff): the same DoP output from TDffReader
@@ -138,7 +148,7 @@ begin
     Exit;
   end;
 
-  FFile          := TFileStream.Create(LongPath(FileName), fmOpenRead or fmShareDenyWrite);
+  FFile          := AuOpenFile(FileName, fmOpenRead or fmShareDenyWrite);
   FileSizeCached := FFile.Size;
 
   // ===========================================================================
@@ -173,6 +183,7 @@ begin
 
   FBlockSize    := cardinal(Fmt.BlockSizePerChannel);
   FFileChannels := word(Fmt.ChannelNum);
+  FChannelType  := Fmt.ChannelType;
   FSampleRate   := cardinal(Fmt.SamplingFreq) div 16; // DoP Rate
 
   // Mono DSF files are natively output as 2-channel dual-mono DoP frames
@@ -380,6 +391,95 @@ begin
 
   FMarker := MarkerLocal;
   Result  := BytesProduced;
+end;
+
+function TDsfReader.ReadRaw(ADest: PByte; ASteps: Integer): Integer;
+var
+  N, I, C, Ch: Integer;
+  Left: Int64;
+  PSrc, POut: PByte;
+begin
+  if FDff <> nil then
+    Exit(FDff.ReadRaw(ADest, ASteps));
+
+  Result := 0;
+  Ch     := FFileChannels;
+  while Result < ASteps do
+  begin
+    if FBytesRead >= FValidAudioBytes then
+      Break;
+
+    if FBlockOffset >= FBlockSize then
+    begin
+      ReadNextBlocks;
+      if FCurrentBlockIndex >= FTotalBlocks then
+        Break;
+    end;
+
+    N := ASteps - Result;
+    if Integer(FBlockSize - FBlockOffset) < N then
+      N := Integer(FBlockSize - FBlockOffset);
+    // FBytesRead counts two channels' worth of bytes per step
+    Left := (FValidAudioBytes - FBytesRead + 1) div 2;
+    if Left < N then
+      N := Integer(Left);
+    if N <= 0 then
+      Break;
+
+    // A block holds FBlockSize bytes of every channel in turn, LSB first
+    for C := 0 to Ch - 1 do
+    begin
+      PSrc := FBlockMemory + Int64(C) * FBlockSize + FBlockOffset;
+      POut := ADest + Int64(Result) * Ch + C;
+      for I := 0 to N - 1 do
+      begin
+        POut^ := BIT_REVERSE_TABLE[PSrc[I]];
+        Inc(POut, Ch);
+      end;
+    end;
+
+    Inc(FBlockOffset, N);
+    Inc(FBytesRead, Int64(N) * 2);
+    if FBytesRead > FValidAudioBytes then
+      FBytesRead := FValidAudioBytes;
+    Inc(Result, N);
+  end;
+end;
+
+function TDsfReader.Roles: TChannelRoles;
+const
+  T3: array[0..2] of TChannelRole = (chLeft, chRight, chCentre);
+  T4: array[0..3] of TChannelRole = (chLeft, chRight, chSurroundLeft, chSurroundRight);
+  T5: array[0..3] of TChannelRole = (chLeft, chRight, chCentre, chLfe);
+  T6: array[0..4] of TChannelRole = (chLeft, chRight, chCentre, chSurroundLeft, chSurroundRight);
+  T7: array[0..5] of TChannelRole = (chLeft, chRight, chCentre, chLfe, chSurroundLeft, chSurroundRight);
+
+  function Copied(const A: array of TChannelRole): TChannelRoles;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    if Length(A) <> Integer(FFileChannels) then
+      Exit;
+    SetLength(Result, Length(A));
+    for I := 0 to High(A) do
+      Result[I] := A[I];
+  end;
+
+begin
+  if FDff <> nil then
+    Exit(FDff.Roles);
+  // The channel type of the fmt chunk: 3 = three channels, 4 = quadraphonic,
+  // 5 = four channels with LFE, 6 = five channels, 7 = 5.1
+  case FChannelType of
+    3: Result := Copied(T3);
+    4: Result := Copied(T4);
+    5: Result := Copied(T5);
+    6: Result := Copied(T6);
+    7: Result := Copied(T7);
+  else
+    Result := nil;
+  end;
 end;
 
 procedure TDsfReader.Seek(Percent: double);

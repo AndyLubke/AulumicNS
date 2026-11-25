@@ -47,7 +47,17 @@ type
     procedure APlayingTrackThatIsStillInTheListPlaysOn;
     procedure APlayingTrackTheUserRemovedStops;
     procedure APlayingTrackThatLeftAnAutoPlaylistPlaysOn;
+    // "Stop after current track"
+    procedure NothingFollowsWhileStopAfterIsOn;
+    procedure StopAfterStopsAtTheEndOfTheTrackOnce;
+    procedure StopAfterOnTheLastTrackNamesNoNext;
+    procedure StopAfterWithRepeatOneNamesTheSameTrack;
   private
+    FStopAfterChanges: Integer;       // how often OnStopAfterChange came
+    FStoppedAfterCalls: Integer;
+    FStoppedAfterNext: Integer;       // the track id OnStoppedAfter named
+    procedure StopAfterChanged(Sender: TObject);
+    procedure StoppedAfter(ANextTrackId: Integer);
     function NewList(ASkipId: Integer): TList;
   end;
 
@@ -79,6 +89,80 @@ end;
 procedure TTestPlaybackQueue.SetUp;
 begin
   FManager := TPlaybackManager.Create;
+  FStopAfterChanges := 0;
+  FStoppedAfterCalls := 0;
+  FStoppedAfterNext := -1;
+  FManager.OnStopAfterChange := @StopAfterChanged;
+  FManager.OnStoppedAfter := @StoppedAfter;
+end;
+
+procedure TTestPlaybackQueue.StopAfterChanged(Sender: TObject);
+begin
+  Inc(FStopAfterChanges);
+end;
+
+procedure TTestPlaybackQueue.StoppedAfter(ANextTrackId: Integer);
+begin
+  Inc(FStoppedAfterCalls);
+  FStoppedAfterNext := ANextTrackId;
+end;
+
+procedure TTestPlaybackQueue.NothingFollowsWhileStopAfterIsOn;
+begin
+  FillQueue(2, 3);
+  FManager.AssumePaused(1);
+  AssertEquals('The next track follows without a gap', TrackFileName(1, 3),
+    ExtractFileName(FManager.GaplessNextPath));
+  FManager.StopAfterCurrent := True;
+  AssertEquals('Nothing follows', '', FManager.GaplessNextPath);
+  AssertEquals('The owner is told', 1, FStopAfterChanges);
+  FManager.StopAfterCurrent := True;
+  AssertEquals('Set again: no second message', 1, FStopAfterChanges);
+  FManager.StopAfterCurrent := False;
+  AssertEquals('Switched off: the next track follows again', TrackFileName(1, 3),
+    ExtractFileName(FManager.GaplessNextPath));
+  AssertEquals(2, FStopAfterChanges);
+  AssertEquals('Nothing stopped', 0, FStoppedAfterCalls);
+end;
+
+procedure TTestPlaybackQueue.StopAfterStopsAtTheEndOfTheTrackOnce;
+begin
+  FillQueue(2, 3);
+  FManager.AssumePaused(1);
+  FManager.StopAfterCurrent := True;
+  FManager.TrackEnded;
+  AssertTrue('Playback has stopped', FManager.State = psStopped);
+  AssertFalse('The wish is used up', FManager.StopAfterCurrent);
+  AssertEquals('Told once that it stopped', 1, FStoppedAfterCalls);
+  AssertEquals('The track that would have followed (the third)', 3, FStoppedAfterNext);
+  AssertEquals('On, and off again', 2, FStopAfterChanges);
+end;
+
+procedure TTestPlaybackQueue.StopAfterOnTheLastTrackNamesNoNext;
+begin
+  FillQueue(2, 3);
+  FManager.AssumePaused(5);
+  FManager.StopAfterCurrent := True;
+  FManager.TrackEnded;
+  AssertTrue(FManager.State = psStopped);
+  AssertEquals(1, FStoppedAfterCalls);
+  AssertEquals('Nothing would have followed', 0, FStoppedAfterNext);
+end;
+
+procedure TTestPlaybackQueue.StopAfterWithRepeatOneNamesTheSameTrack;
+var
+  I: Integer;
+begin
+  FillQueue(2, 3);
+  FManager.AssumePaused(1);
+  for I := 1 to 3 do
+    if FManager.RepeatMode <> rmOne then FManager.ToggleRepeat;
+  AssertTrue('Repeat one track', FManager.RepeatMode = rmOne);
+  FManager.StopAfterCurrent := True;
+  AssertEquals('Not even the same track again', '', FManager.GaplessNextPath);
+  FManager.TrackEnded;
+  AssertTrue('It stops although the track repeats', FManager.State = psStopped);
+  AssertEquals('Play would start the same track (the second)', 2, FStoppedAfterNext);
 end;
 
 procedure TTestPlaybackQueue.TearDown;

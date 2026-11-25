@@ -6,6 +6,71 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.20 (25 November 2026)
+-------------------------------------------------------------------------------
+
+Playback
+  - Apple Lossless (ALAC) files now play: .m4a files, in every sample rate
+    and bit depth, bit-perfect, with ReplayGain, tags and covers, which
+    can be edited in Properties as for the other formats. An .m4a file with
+    AAC inside is refused with a message that says so.
+  - AIFF files now play (.aif, .aiff, .aifc; uncompressed, the usual kind):
+    in the library, with tags and covers in Properties, with ReplayGain,
+    in every sample rate and bit depth, bit-perfect as FLAC and WAV.
+  - Files with more than two channels (5.1, quadraphonic, 7.1 ...) now
+    play: they are mixed to stereo. The centre and the surround channels go
+    into their side a little lower, the subwoofer channel is left out. The
+    badge shows Processed and the Signal Path has a "Downmix" line. With
+    Headroom set to Automatic the mix plays at its full level and is only
+    lowered by what its peaks need; with a fixed headroom it plays lower,
+    so it can never clip.
+  - A DSD file (DSF, DFF) with more than two channels is converted to PCM
+    for this, also when "Play DSD natively" is on: DSD itself cannot be
+    mixed. DSD files with one or two channels follow the setting as before.
+  - Stop after current track: Main menu > Playback, or Ctrl+E. The playing
+    track is then the last one. The Stop button is marked while it is on,
+    and Play later goes on with the next track. It holds for one time only.
+  - The Signal Path shows a "Dropouts" line with their number when the
+    music was interrupted since the device was opened.
+
+Preferences
+  - Apply: uses the changed settings at once and keeps Preferences open, to
+    try a setting while listening. What was applied stays, also after
+    Cancel.
+  - Reset this page: sets the settings of the page in view back to their
+    defaults. Nothing changes until OK or Apply. The output device, the
+    library folders, the volume lock and the Last.fm key are kept.
+
+Artist Info
+  - Biographies without a Last.fm key: Artist Info now takes the
+    introduction of the artist's English Wikipedia article. With a Last.fm
+    key the text comes from Last.fm as before, and from Wikipedia when
+    Last.fm has none. The key is optional now.
+  - A line under the biography names its source; a click on it opens that
+    page in the browser.
+
+Fixes
+  - Damaged files are handled more safely: a damaged WAV file could make
+    the program hang, and damaged WAV and DFF files are now refused
+    cleanly in every case.
+  - The Signal Path could move partly off the screen when it stayed open
+    while the next track brought more lines.
+
+General
+  - Selected text in input fields is now clearly visible, with every accent
+    colour and in both themes.
+  - The folder dialog is easier to use: an arrow at the end of each row
+    opens that folder with one click, the path above the list leads back to
+    any folder on the way, and a line beside the buttons names the folder
+    that Select folder will take.
+  - "Open folder" in more places. As a button and in the right-click menu:
+    Tag consistency, Properties, the Virtual Folder editor and the library
+    folders in Preferences. In the right-click menu: the ReplayGain scanner,
+    the Booklet Viewer and the Now Playing banner.
+  - In the About window the Data folder is a link that opens it.
+  - Some layout improvements in the help.
+
+
 Version 1.1.0.19 (24 November 2026)
 -------------------------------------------------------------------------------
 

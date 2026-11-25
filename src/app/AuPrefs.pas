@@ -61,6 +61,9 @@ uses
 type
   { Scan / Repair: apply these folders and scan (FullRebuild = Repair) }
   TPrefsScanEvent = procedure(AFolders: TStrings; FullRebuild: Boolean) of object;
+  { Apply: the dialog's settings are in AppSettings.Data and AFolders holds
+    the library folders; the owner puts them to work while the dialog stays open }
+  TPrefsApplyEvent = procedure(AFolders: TStrings) of object;
 
 const
   PREFS_LIBRARY = 0;
@@ -87,7 +90,13 @@ const
   into AppSettings.Data and AFolders holds the new library folders. APage < 0
   opens the page shown last time in this run of the program (AppSettings.Data.PrefsPage). }
 function ShowPreferences(AOwner: TComponent; AFolders: TStrings; ALibrary: TLibraryManager;
-  AOnScan: TPrefsScanEvent; APage: Integer = -1): Boolean;
+  AOnScan: TPrefsScanEvent; AOnApply: TPrefsApplyEvent; APage: Integer = -1): Boolean;
+{ Puts the settings of one page (PREFS_*) in D back to those of ADef. Left as
+  they are: the output interface and device, the volume lock (a reset must
+  not make the music louder) and the Last.fm key. }
+procedure CopyPageDefaults(APage: Integer; const ADef: TAppSettingsData; var D: TAppSettingsData);
+{ a page with settings that can be reset (not the list of shortcuts) }
+function PageHasSettings(APage: Integer): Boolean;
 { the open dialog shows the scan's progress; '' = the scan has ended }
 procedure PrefsScanStatus(const AText: string);
 function PrefsOpen: Boolean;
@@ -111,7 +120,7 @@ implementation
 
 uses
   Dialogs, uAppStrings, uLibraryWatcher, uAudioUtils, uSettingsLog, AuDialogs,
-  ALAudioEngine, uPlaylistFormat, AuFormatBoxes;
+  ALAudioEngine, uPlaylistFormat, AuFormatBoxes, AuMenus, AuTagLoader;
 
 function PlaybackRestartNeeded(const A, B: TManagerConfig): Boolean;
 begin
@@ -206,6 +215,8 @@ type
     FData: TAppSettingsData;
     FLibrary: TLibraryManager;
     FOnScan: TPrefsScanEvent;
+    FOnApply: TPrefsApplyEvent;
+    FBtnReset, FBtnApply: TAuButton;
     FOrigTheme, FOrigAccent: Integer;
     FNav: TAuListView;
     FPages: array of TAuScrollBox;
@@ -227,6 +238,8 @@ type
     FFolders: TStringList;
     FFolderList: TAuListView;
     FBtnAdd, FBtnRemove, FBtnScan, FBtnRepair: TAuButton;
+    FBtnOpenFolder: TAuIconButton;    // Explorer at the selected library folder
+    FFolderMenu: TAuMenu;             // the menu of a right-clicked folder (kept until its entry ran)
     FWatch, FRescan, FAccordion, FCursorFollows, FStickyHeaders, FCompactRows: TAuSwitch;
     FDblClick: TAuCombo;
     FScanning: Boolean;
@@ -323,6 +336,10 @@ type
     procedure ShortcutCell(Sender: TObject; Row, Col: Integer; var AText: string);
     procedure AddFolderClick(Sender: TObject);
     procedure RemoveFolderClick(Sender: TObject);
+    procedure ResetPageClick(Sender: TObject);
+    procedure ApplyClick(Sender: TObject);
+    procedure OpenFolderClick(Sender: TObject);
+    procedure FolderContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
     procedure ScanClick(Sender: TObject);
     procedure RepairClick(Sender: TObject);
     procedure UpdateLibraryButtons;
@@ -344,6 +361,7 @@ const
   X0 = 32;                   // left edge of the rows on a page
   RW = 616;                  // row width (the page is DLG_W - SIDE_W wide)
   CTRL_W = 270;              // the control on the right of a row
+  RESET_BTN_W = 170;         // Reset this page, at the left of the bottom row
   CARD_PAD = 14;             // a card reaches this far left and right of the rows
   CARD_H = 58;               // the head of a card
   CARD_GAP = 8;              // between two cards
@@ -351,7 +369,7 @@ const
   TEXT_SIZES: array[0..3] of Integer = (90, 100, 110, 120);
 
   { the keyboard shortcuts of the Shortcuts page }
-  SHORTCUTS: array[0..33, 0..1] of string = (
+  SHORTCUTS: array[0..34, 0..1] of string = (
     ('Space', 'Play / pause'),
     ('Ctrl+Left / Ctrl+Right', 'Back / forward 10 seconds'),
     ('Ctrl+Up / Ctrl+Down', 'Volume up / down'),
@@ -359,6 +377,7 @@ const
     ('Ctrl+S', 'Shuffle off / tracks / albums'),
     ('Ctrl+R', 'Repeat off / all / one'),
     ('Ctrl+J', 'Jump to Now Playing'),
+    ('Ctrl+E', 'Stop after current track'),
     ('Ctrl+T', 'Tone Control'),
     ('Media keys', 'Play / pause, stop, next, previous'),
     ('Ctrl+O', 'Add files to the playlist'),
@@ -457,8 +476,90 @@ begin
   end;
 end;
 
+function PageHasSettings(APage: Integer): Boolean;
+begin
+  Result := (APage >= 0) and (APage < PREFS_SHORTCUTS);
+end;
+
+procedure CopyPageDefaults(APage: Integer; const ADef: TAppSettingsData; var D: TAppSettingsData);
+begin
+  case APage of
+    PREFS_LIBRARY:
+      begin
+        D.WatchFolders := ADef.WatchFolders;
+        D.AutoRescanLibrary := ADef.AutoRescanLibrary;
+      end;
+    PREFS_APPEARANCE:
+      begin
+        D.ThemeMode := ADef.ThemeMode;
+        D.Accent := ADef.Accent;
+        D.UIFontSize := ADef.UIFontSize;
+        D.CompactRows := ADef.CompactRows;
+        D.DoubleClickAction := ADef.DoubleClickAction;
+        D.AccordionEnabled := ADef.AccordionEnabled;
+        D.ShowLibArtist := ADef.ShowLibArtist;
+        D.ShowLibComposer := ADef.ShowLibComposer;
+        D.ShowLibAlbum := ADef.ShowLibAlbum;
+        D.ShowLibGenre := ADef.ShowLibGenre;
+        D.ShowPeakmeter := ADef.ShowPeakmeter;
+        D.LibraryFontSize := ADef.LibraryFontSize;
+        D.PlaylistFontSize := ADef.PlaylistFontSize;
+        D.LibraryTileSize := ADef.LibraryTileSize;
+      end;
+    PREFS_PLAYLISTS:
+      begin
+        D.DefaultGroupingMode := ADef.DefaultGroupingMode;
+        D.DefaultHeaderFormat := ADef.DefaultHeaderFormat;
+        D.DefaultTrackFormat := ADef.DefaultTrackFormat;
+        D.CursorFollowsPlayback := ADef.CursorFollowsPlayback;
+        D.StickyHeaders := ADef.StickyHeaders;
+      end;
+    PREFS_OUTPUT:
+      D.Audio.PCMBufferMs := ADef.Audio.PCMBufferMs;
+    PREFS_DSD:
+      begin
+        D.Audio.UseDoP := ADef.Audio.UseDoP;
+        D.Audio.DsdLowPassFilter := ADef.Audio.DsdLowPassFilter;
+        D.Audio.DsdToPcmGain := ADef.Audio.DsdToPcmGain;
+        D.Audio.DSDBufferMs := ADef.Audio.DSDBufferMs;
+      end;
+    PREFS_RESAMPLER:
+      begin
+        D.Audio.ResamplePCM := ADef.Audio.ResamplePCM;
+        D.Audio.TargetSampleRate44 := ADef.Audio.TargetSampleRate44;
+        D.Audio.TargetSampleRate48 := ADef.Audio.TargetSampleRate48;
+        D.Audio.BypassThreshold := ADef.Audio.BypassThreshold;
+        D.Audio.DisableResampleForDSD := ADef.Audio.DisableResampleForDSD;
+        D.Audio.ResampleQuality := ADef.Audio.ResampleQuality;
+        D.Audio.UpsamplePhase := ADef.Audio.UpsamplePhase;
+        D.Audio.DownsamplePhase := ADef.Audio.DownsamplePhase;
+        D.Audio.ResampleBandWidthIndex := ADef.Audio.ResampleBandWidthIndex;
+        D.Audio.ResampleAntiAliasIndex := ADef.Audio.ResampleAntiAliasIndex;
+      end;
+    PREFS_VOLUME:
+      begin
+        D.Audio.ReplayGainMode := ADef.Audio.ReplayGainMode;
+        D.Audio.AutoHeadroom := ADef.Audio.AutoHeadroom;
+        D.Audio.PreampDB := ADef.Audio.PreampDB;
+        D.Audio.EnableSoftClipping := ADef.Audio.EnableSoftClipping;
+        D.RGScanThreads := ADef.RGScanThreads;
+      end;
+    PREFS_SYSTEM:
+      begin
+        D.Audio.KeepDrivesAwake := ADef.Audio.KeepDrivesAwake;
+        D.Animations := ADef.Animations;
+        D.GpuPaint := ADef.GpuPaint;
+        D.Audio.OptimizeAffinity := ADef.Audio.OptimizeAffinity;
+        D.Audio.EnableMMCSS := ADef.Audio.EnableMMCSS;
+        D.Audio.UseHighResTimer := ADef.Audio.UseHighResTimer;
+        D.AlwaysSaveLog := ADef.AlwaysSaveLog;
+        D.CheckUpdatesAtStart := ADef.CheckUpdatesAtStart;
+      end;
+  end;
+end;
+
 function ShowPreferences(AOwner: TComponent; AFolders: TStrings; ALibrary: TLibraryManager;
-  AOnScan: TPrefsScanEvent; APage: Integer): Boolean;
+  AOnScan: TPrefsScanEvent; AOnApply: TPrefsApplyEvent; APage: Integer): Boolean;
 var
   F: TPrefsForm;
 begin
@@ -471,6 +572,7 @@ begin
   try
     F.FLibrary := ALibrary;
     F.FOnScan := AOnScan;
+    F.FOnApply := AOnApply;
     if (ALibrary <> nil) and ALibrary.IsScanning then F.ScanStatus(STATUS_SCANNING_FULL);
     Result := F.ShowModal = mrOK;
     AppSettings.Data.PrefsPage := F.CurrentPage;
@@ -564,8 +666,15 @@ begin
     SetCardOpen(I, Pos(',' + FCards[I].Id + ',', ',' + AppSettings.Data.PrefsCards + ',') > 0, False);
   FNav.RowCount := Length(FPages);
 
-  FStatus := AddLabel(Bottom, '', 24, 16, DLG_W - 24 - 2 * 110 - 40);
+  { the bottom: Reset this page and the scan's progress left; Apply, Cancel, OK right }
+  FBtnReset := AddButton(Bottom, 'Reset this page', 24, 16, RESET_BTN_W, bkNormal, @ResetPageClick);
+  FBtnReset.Hint := 'Set the settings of this page back to their defaults. Nothing changes until OK or Apply.';
+  FBtnReset.ShowHint := True;
+  FStatus := AddLabel(Bottom, '', 24 + RESET_BTN_W + 14, 16, DLG_W - 24 - 3 * 110 - 50 - RESET_BTN_W - 14);
   FStatus.Height := S(32);
+  FBtnApply := AddButton(Bottom, 'Apply', DLG_W - 24 - 3 * 110 - 20, 16, 110, bkNormal, @ApplyClick);
+  FBtnApply.Hint := 'Use the settings now and keep this window open.';
+  FBtnApply.ShowHint := True;
   B := AddButton(Bottom, 'Cancel', DLG_W - 24 - 2 * 110 - 10, 16, 110);
   B.ModalResult := mrCancel;
   B := AddButton(Bottom, 'OK', DLG_W - 24 - 110, 16, 110, bkPrimary);
@@ -576,12 +685,14 @@ begin
   if (APage < 0) or (APage > High(FPages)) then APage := 0;
   FNav.SelectOnly(APage);
   for I := 0 to High(FPages) do FPages[I].Visible := I = APage;
+  FBtnReset.Enabled := PageHasSettings(APage);
   ActiveControl := FNav;
 end;
 
 destructor TPrefsForm.Destroy;
 begin
   if GPrefs = Self then GPrefs := nil;
+  FFolderMenu.Free;
   FFolders.Free;
   FDevIds.Free;
   inherited Destroy;
@@ -1270,6 +1381,7 @@ begin
   FFolderList.OnDrawCell := @FolderCell;
   FFolderList.OnSelChange := @FolderSel;
   FFolderList.OnKeyDown := @FolderKey;
+  FFolderList.OnRowContext := @FolderContext;
   Inc(FY, 176 + 12);
   FBtnAdd := AddButton(FCur, 'Add folder...', X0, FY, 140, bkNormal, @AddFolderClick);
   FBtnAdd.Icon := icFolderPlus;
@@ -1279,6 +1391,14 @@ begin
   FBtnRemove.Icon := icTrash;
   FBtnRemove.Hint := 'Remove the selected folder from the library (Del). The files stay on disk.';
   FBtnRemove.ShowHint := True;
+  { the row is full: an icon button between Remove and Scan now }
+  FBtnOpenFolder := TAuIconButton.Create(Self);
+  FBtnOpenFolder.Parent := FCur;
+  FBtnOpenFolder.Icon := icFolder;
+  FBtnOpenFolder.Hint := 'Open folder';
+  FBtnOpenFolder.ShowHint := True;
+  FBtnOpenFolder.OnClick := @OpenFolderClick;
+  FBtnOpenFolder.SetBounds(S(X0 + 280), S(FY), S(36), S(32));
   FBtnRepair := AddButton(FCur, 'Repair...', X0 + RW - 120, FY, 120, bkNormal, @RepairClick);
   FBtnRepair.Icon := icRefresh;
   FBtnRepair.Hint := 'Rebuild the library from scratch, thumbnails included. ' +
@@ -1519,8 +1639,8 @@ begin
   FLastFmKey := AddEdit(FCur, 0, 0, 300);
   FLastFmKey.OnChange := @AnyChange;
   SideRow('Last.fm API key',
-    'Artist Info gets its biographies from Last.fm, which asks every program for a key. A key is ' +
-    'free: create an API account at last.fm/api and paste the "API key" here.', FLastFmKey, 300, 32);
+    'Optional: with a key Artist Info takes its biographies from Last.fm instead of Wikipedia. ' +
+    'A key is free: create an API account at last.fm/api and paste the "API key" here.', FLastFmKey, 300, 32);
   EndCard;
   EndPage;
 end;
@@ -1809,6 +1929,7 @@ begin
   if (P < 0) or (P > High(FPages)) or not FNav.Selected[P] then Exit;
   if FPages[P].Visible then Exit;
   for I := 0 to High(FPages) do FPages[I].Visible := I = P;
+  FBtnReset.Enabled := PageHasSettings(P);
   { the new page fades in, moving up a little }
   EntranceFade(FPages[P], S(12));
 end;
@@ -1817,6 +1938,44 @@ end;
 procedure TPrefsForm.NavActivate(Sender: TObject; Row: Integer);
 begin
   ModalResult := mrOK;
+end;
+
+{ The settings of the page in view back to their defaults, in the dialog
+  only: OK or Apply puts them to work, Cancel drops them. }
+procedure TPrefsForm.ResetPageClick(Sender: TObject);
+var
+  P: Integer;
+  Def: TAppSettingsData;
+begin
+  P := CurrentPage;
+  if not PageHasSettings(P) then Exit;
+  if AuMessage(Format('Set the settings of the page "%s" back to their defaults?', [FNavCaptions[P]]) +
+       LineEnding + LineEnding +
+       'The output device, the library folders and the Last.fm key are kept. ' +
+       'Nothing changes until OK or Apply is clicked.', amQuestion, abYesNo, TITLE_PREFERENCES) <> mrYes then Exit;
+  StoreValues(FData);
+  Def := AppSettings.DefaultData;
+  CopyPageDefaults(P, Def, FData);
+  LoadValues;
+  { the theme and the accent are shown at once, as when they are picked }
+  if P = PREFS_APPEARANCE then
+  begin
+    FTheme.ItemIndex := EnsureRange(Def.ThemeMode, 0, 2);
+    FAccent.ItemIndex := EnsureRange(Def.Accent, 0, AccentCount - 1);
+    ThemePreview(nil);
+  end;
+  AnyChange(nil);
+end;
+
+{ The settings are put to work while the dialog stays open. What was applied
+  stays when the dialog is then cancelled. }
+procedure TPrefsForm.ApplyClick(Sender: TObject);
+begin
+  StoreValues(AppSettings.Data);
+  FData := AppSettings.Data;
+  FOrigTheme := Ord(ThemeMode);
+  FOrigAccent := AccentIndex;
+  if Assigned(FOnApply) then FOnApply(FFolders);
 end;
 
 procedure TPrefsForm.AnyChange(Sender: TObject);
@@ -1883,6 +2042,25 @@ begin
   UpdateLibraryButtons;
 end;
 
+{ Explorer at the first selected library folder }
+procedure TPrefsForm.OpenFolderClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+begin
+  Sel := FFolderList.SelectedRows;
+  if (Length(Sel) = 0) or (Sel[0] < 0) or (Sel[0] >= FFolders.Count) then Exit;
+  OpenFolderWithWindow(Self, IncludeTrailingPathDelimiter(FFolders[Sel[0]]));
+end;
+
+procedure TPrefsForm.FolderContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+begin
+  if FFolderList.SelCount = 0 then Exit;
+  FFolderMenu.Free;
+  FFolderMenu := TAuMenu.Create;
+  FFolderMenu.Add('Open folder...', @OpenFolderClick, icFolder);
+  FFolderMenu.Popup(ScreenPt.X, ScreenPt.Y);
+end;
+
 procedure TPrefsForm.FolderKey(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
   if FScanning then Exit;
@@ -1907,6 +2085,7 @@ begin
   FFolderList.Enabled := not FScanning;
   FBtnAdd.Enabled := not FScanning;
   FBtnRemove.Enabled := (not FScanning) and (FFolderList.SelCount > 0);
+  if FBtnOpenFolder <> nil then FBtnOpenFolder.Enabled := FFolderList.SelCount > 0;
   FBtnScan.Enabled := (not FScanning) and (FFolders.Count > 0);
   FBtnRepair.Enabled := (not FScanning) and (FFolders.Count > 0);
   FFolderList.Invalidate;

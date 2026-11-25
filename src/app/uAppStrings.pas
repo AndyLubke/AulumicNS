@@ -223,7 +223,7 @@ const
   ERR_AUDIO_BUFFUNALIGNED     = 'The buffer duration is not aligned with the period.';
   ERR_AUDIO_ACCESSDENIED      = 'Access Denied. Check device permissions.';
   ERR_AUDIO_FAIL              = 'Unspecified Error (E_FAIL). The device may be unstable.';
-  ERR_AUDIO_MULTI_CHANNEL     = 'Audio with more than 2 channels is not supported. Playback is limited to mono and stereo files.';
+  ERR_AUDIO_MULTI_CHANNEL     = 'This file has too many channels to be played. Files with up to 8 channels are mixed to stereo.';
 
   // 7C. Decoder Specific Errors
   ERR_DECODE_NOTDSD           = 'Not a DSF File.';
@@ -232,6 +232,12 @@ const
   ERR_DECODE_FLACFAIL         = 'FLAC Init Failed.';
   ERR_DECODE_NOTWAV           = 'Not a valid WAV file.';
   ERR_DECODE_WAVINVALID       = 'Could not find audio data in WAV file.';
+  ERR_DECODE_NOTAIFF          = 'Not a valid AIFF file.';
+  ERR_DECODE_AIFFINVALID      = 'Could not find audio data in AIFF file.';
+  ERR_DECODE_M4A_INVALID      = 'Could not find audio data in M4A file.';
+  ERR_DECODE_M4A_AAC          = 'This M4A file holds AAC audio, which is not played. Only Apple Lossless (ALAC) is played from M4A files.';
+  ERR_DECODE_M4A_OTHER        = 'This M4A file does not hold Apple Lossless (ALAC) audio.';
+  ERR_DECODE_AIFF_COMPRESSED  = 'This AIFF file is compressed. Only uncompressed AIFF files are played.';
 
   // 7D. Editor & Validation Errors
   ERR_EDIT_EMPTYNAME          = 'The name cannot be empty.';
@@ -282,7 +288,7 @@ const
   // ===========================================================================
   // 7E. LAST.FM SCRAPER STATUS & ERROR STRINGS (uLastFmScraper)
   // ===========================================================================
-  ERR_LASTFM_MISSING_API_KEY = 'Biographies come from Last.fm, and that needs a personal Last.fm API key (free). Enter it in Preferences > System > Internet.';
+  ERR_LASTFM_MISSING_API_KEY = 'Wikipedia has no biography for this artist. Last.fm knows more artists; it needs a personal API key (free), entered in Preferences > System > Internet.';
   ERR_LASTFM_NETWORK_PREFIX  = 'Last.fm network error: ';
   ERR_LASTFM_API_PREFIX      = 'Last.fm: ';
   ERR_LASTFM_GENERIC         = 'Last.fm returned an error.';
@@ -296,7 +302,7 @@ const
   // General open / save dialog filters
   // ===========================================================================
   DIALOG_FILTER_PLAYLISTS     = 'Playlists (*.m3u;*.m3u8)|*.m3u;*.m3u8';
-  DIALOG_FILTER_AUDIO_FILES   = 'Audio Files (*.flac;*.wav;*.dsf;*.dff)|*.flac;*.wav;*.dsf;*.dff';
+  DIALOG_FILTER_AUDIO_FILES   = 'Audio Files (*.flac;*.wav;*.aiff;*.aif;*.aifc;*.m4a;*.dsf;*.dff)|*.flac;*.wav;*.aiff;*.aif;*.aifc;*.m4a;*.dsf;*.dff';
 
   // ===========================================================================
   // ARTIST INFO & COVER ART POPUP HINTS (AuArtistInfo / AuCoverViewer)
@@ -329,6 +335,9 @@ const
   // ===========================================================================
   LBL_FETCHING_INFO             = 'Fetching information...';
   LBL_BIO_UNAVAILABLE           = 'Biography not available.';
+  LBL_BIO_SOURCE_WIKIPEDIA      = 'Source: Wikipedia (CC BY-SA 4.0)';
+  LBL_BIO_SOURCE_LASTFM         = 'Source: Last.fm';
+  HINT_BIO_SOURCE               = 'Open the page this text comes from in the browser.';
   FMT_ARTIST_LIB_STATS          = 'Library: %d albums, %d tracks';
 
   DLG_SELECT_ARTIST_PIC_TITLE   = 'Select artist picture';

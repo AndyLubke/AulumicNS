@@ -21,7 +21,7 @@ uses
   Interfaces, Forms,
   { the GUI library }
   AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuTileGrid, AuExtra, AuTitleBar,
-  AuFolderPicker, AuAppIcon,
+  AuCrumbBar, AuFolderPicker, AuAppIcon,
   { the program }
   AuSingle, AuSettings, AuLog, AuDialogs, uAppConsts, uAppStrings, uSettingsManager, uTonePresets, uLibraryCheck, AuLibraryCheck, uPlaylistFormat, AuFormatBoxes, uAppLifetime,
   uPlaybackManager, AuBanner, AuTransport, AuLibraryPane, AuLibraryTiles, AuPlaylistPane, AuToneForm, AuVolumePopup,
@@ -29,7 +29,7 @@ uses
   uOSUtils, uPlaybackIOWorker, {$IFDEF DEBUG}AuTouchProbe,{$ENDIF}
   { the engine (with the built-in decoders and resampler) }
   ALAudioTypes, ALAudioOutput, ALWasapiApi, ALOutputWasapi, ALOutputAsio, ALOutputRing, ALMetadata, ALReaders,
-  ALReaderFLAC, ALReaderWAV, ALReaderDSF, ALReaderDFF, ALSourceFactory, ALHeadroom, ALAudioThread, ALAudioEngine,
+  ALReaderFLAC, ALReaderWAV, ALReaderAIFF, ALMp4, ALDecAlac, ALReaderALAC, ALReaderDSF, ALReaderDFF, ALSourceFactory, ALHeadroom, ALAudioThread, ALAudioEngine,
   AuAudioTypes, AuDecoder, AuDecFlac, AuDecWav, AuDecDsd, AuResample, uToneControl, uAudioUtils,
   { the library (stored by uDbStore) }
   uDbStore, uLibraryTypes, uLibraryQuery, uTagParser, uUserStatsManager,
@@ -37,7 +37,7 @@ uses
   uPlaylistFile, uPlaylistRows, uAutoPlaylist, uPlaylistImport, uPlaylistStore,
   { tags (the AulumicTag units) }
   audiotag, basetag, commonfunctions, id3v1genres, song, registerallreader, file_dsf, file_dff, file_dummy,
-  file_flac, file_wave,
+  file_flac, file_wave, file_aiff, file_m4a,
   tag_dummy, tag_id3v2, tag_vorbis,
   AuMainForm;
 

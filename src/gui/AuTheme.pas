@@ -49,6 +49,7 @@ var
   clOnAccent: TARGB;    // text drawn on an accent fill
   clSelection: TARGB;
   clSelectionDim: TARGB; // selection of an unfocused list
+  clTextSelection: TARGB; // behind selected text in an input field
   clGood: TARGB;
   clBad: TARGB;
   clWarn: TARGB;
@@ -109,6 +110,14 @@ function RoleColor(R: TAuRole): TARGB;
 function AccentSample(I: Integer): TARGB;
 function SystemPrefersDark: Boolean;
 procedure SetTheme(AMode: TAuThemeMode; AAccent: Integer);
+{ the WCAG contrast of two colours, 1 (the same) .. 21 }
+function ContrastOf(A, B: TARGB): Double;
+{ The colour behind selected text in an input field: the field's background
+  with as much of the accent mixed in as leaves the text on it readable. A
+  row of a list is marked with clSelection, a much weaker tint: behind a few
+  letters, and on a field that is lighter than the window, that tint is
+  hardly seen. }
+function TextSelectionFor(ABack, AAccent, AText: TARGB): TARGB;
 procedure ApplyTitleBar(H: HWND);
 
 const
@@ -180,6 +189,35 @@ begin
   L := RelLuminance(A);
   if 1.05 / (L + 0.05) >= (L + 0.05) / (RelLuminance($FF111317) + 0.05) then Result := $FFFFFFFF
   else Result := $FF111317;
+end;
+
+function ContrastOf(A, B: TARGB): Double;
+var
+  LA, LB: Double;
+begin
+  LA := RelLuminance(A);
+  LB := RelLuminance(B);
+  if LA >= LB then Result := (LA + 0.05) / (LB + 0.05)
+  else Result := (LB + 0.05) / (LA + 0.05);
+end;
+
+function TextSelectionFor(ABack, AAccent, AText: TARGB): TARGB;
+const
+  MIX_MOST = 0.55;            // the strongest tint
+  MIX_LEAST = 0.30;
+  MIX_STEP = 0.01;
+  TEXT_CONTRAST = 4.5;        // the text on the tint (WCAG AA)
+var
+  M: Double;
+begin
+  { a pastel accent of the dark theme is bright: less of it, until the light
+    text stands out enough }
+  M := MIX_MOST;
+  repeat
+    Result := Blend(ABack, AAccent, M);
+    if ContrastOf(AText, Result) >= TEXT_CONTRAST then Exit;
+    M := M - MIX_STEP;
+  until M < MIX_LEAST;
 end;
 
 function UIScale: Single;
@@ -423,6 +461,7 @@ begin
     clAccentText := A;              // pastel: readable as it is
     clSelection := Blend(clBg, A, 0.26);
     clSelectionDim := Blend(clBg, clText, 0.10);
+    clTextSelection := TextSelectionFor(clInput, A, clText);
   end
   else
   begin
@@ -434,6 +473,7 @@ begin
     clAccentText := A;
     clSelection := Blend(clBg, A, 0.16);
     clSelectionDim := Blend(clBg, clText, 0.08);
+    clTextSelection := TextSelectionFor(clInput, A, clText);
   end;
   clOnAccent := OnAccentFor(clAccent);
   RefreshAllForms;
@@ -550,5 +590,6 @@ initialization
   clOnAccent := OnAccentFor(clAccent);
   clSelection := Blend(clBg, clAccent, 0.26);
   clSelectionDim := Blend(clBg, clText, 0.10);
+  clTextSelection := TextSelectionFor(clInput, clAccent, clText);
 
 end.

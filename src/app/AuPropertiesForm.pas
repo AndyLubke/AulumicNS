@@ -53,7 +53,7 @@ implementation
 uses
   AuAudioTypes, Graphics, LCLIntf, DateUtils, ALMetadata, uMetaUtils, uAppConsts, uAppStrings, uOSUtils,
   uMetadataPayloads, uEngineStateManager, uUserStatsManager, uLibraryTypes, AuLog,
-  uSettingsManager, AuDialogs, AudioTag, baseTag, tag_id3v2, uMetadataCustodian;
+  uSettingsManager, AuDialogs, AudioTag, baseTag, tag_id3v2, uMetadataCustodian, AuMenus, uAudioUtils;
 
 type
   TTagField = (tfTitle, tfArtist, tfAlbumArtist, tfAlbum, tfGenre, tfYear, tfTrack, tfDisc,
@@ -77,7 +77,8 @@ type
     FMemo: TAuMemo;
     FCover: TAuCover;
     FCoverInfo, FCoverLbl, FCoverNote, FTagsNote: TAuLabel;
-    FBtnLoad, FBtnWeb, FBtnClear, FBtnSave, FBtnCancel: TAuButton;
+    FBtnLoad, FBtnWeb, FBtnClear, FBtnSave, FBtnCancel, FBtnFolder: TAuButton;
+    FRowMenu: TAuMenu;                // the menu of a right-clicked file (kept until its entry ran)
     // shown while a selected file has a damaged tag that is not yet marked
     // for repair
     FBtnRepair: TAuButton;
@@ -92,6 +93,8 @@ type
     FShownCoverLen: SizeInt;
     FShownCoverHash: QWord;
     function Item(I: Integer): PTagEditNodeData;
+    procedure FolderClick(Sender: TObject);
+    procedure ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
     function FieldEdit(F: TTagField): TAuEdit;
     function FieldText(F: TTagField): string;
     procedure SetFieldText(F: TTagField; const AText: string);
@@ -139,6 +142,7 @@ const
   MIN_H = 440;
   COMMENT_H = 80;                  // the comment memo at its smallest
   LIST_W = 260;
+  FOLDER_BTN_W = 150;              // Open folder, at the left of the bottom row
   PX = LIST_W + 44;                // the right part
   COVER_W = 204;                   // the cover column (at the right of the Tags page)
   { the Tags page at its smallest: five rows of fields, the Comment with its
@@ -387,6 +391,7 @@ begin
   FList.BackRole := crCard;
   FList.OnDrawCell := @ListDraw;
   FList.OnSelChange := @ListSel;
+  FList.OnRowContext := @ListContext;
   FList.TabOrder := 0;
 
   { the pages }
@@ -471,6 +476,11 @@ begin
   { the buttons }
   FStatus := AddLabel(Self, '', 24, 0, 500);
   FStatus.Height := S(34);
+  FBtnFolder := AddButton(Self, 'Open folder', 0, 0, FOLDER_BTN_W, bkNormal, @FolderClick);
+  FBtnFolder.Icon := icFolder;
+  FBtnFolder.Hint := 'Show the selected file in Explorer.';
+  FBtnFolder.ShowHint := True;
+  FBtnFolder.TabOrder := 27;
   FBtnCancel := AddButton(Self, 'Cancel', 0, 0, 110);
   FBtnCancel.ModalResult := mrCancel;
   FBtnSave := AddButton(Self, 'Save', 0, 0, 110, bkPrimary, @SaveClick);
@@ -509,6 +519,7 @@ destructor TPropertiesForm.Destroy;
 var
   I: Integer;
 begin
+  FRowMenu.Free;
   for I := 0 to FItems.Count - 1 do Dispose(PTagEditNodeData(FItems[I]));
   FItems.Free;
   inherited Destroy;
@@ -596,15 +607,18 @@ begin
   FBtnClear.SetBounds(S(CX), S(BY + 80), S(COVER_W), FBtnClear.Height);
   FCoverNote.SetBounds(S(CX), S(BY + 124), S(COVER_W), S(40));
 
-  { the bottom: the status left, Cancel and Save right }
+  { the bottom: Open folder and the status left, Cancel and Save right }
+  FBtnFolder.SetBounds(S(24), S(Ht - 24 - 34), S(FOLDER_BTN_W), FBtnFolder.Height);
   if FBtnRepair.Visible or FBtnUndo.Visible then
   begin
-    FStatus.SetBounds(S(24), S(Ht - 24 - 34), S(Math.Max(100, Wd - 2 * 110 - 140 - 20 - 72)), FStatus.Height);
+    FStatus.SetBounds(S(24 + FOLDER_BTN_W + 12), S(Ht - 24 - 34),
+      S(Math.Max(100, Wd - 2 * 110 - 140 - 20 - 72 - FOLDER_BTN_W - 12)), FStatus.Height);
     FBtnRepair.SetBounds(S(Wd - 24 - 2 * 110 - 140 - 20), S(Ht - 24 - 34), S(140), FBtnRepair.Height);
     FBtnUndo.SetBounds(FBtnRepair.Left, FBtnRepair.Top, FBtnRepair.Width, FBtnUndo.Height);
   end
   else
-    FStatus.SetBounds(S(24), S(Ht - 24 - 34), S(Math.Max(100, Wd - 2 * 110 - 10 - 72)), FStatus.Height);
+    FStatus.SetBounds(S(24 + FOLDER_BTN_W + 12), S(Ht - 24 - 34),
+      S(Math.Max(100, Wd - 2 * 110 - 10 - 72 - FOLDER_BTN_W - 12)), FStatus.Height);
   FBtnCancel.SetBounds(S(Wd - 24 - 2 * 110 - 10), S(Ht - 24 - 34), S(110), FBtnCancel.Height);
   FBtnSave.SetBounds(S(Wd - 24 - 110), S(Ht - 24 - 34), S(110), FBtnSave.Height);
 end;
@@ -616,6 +630,27 @@ begin
   { the size for the next time (not a maximized one) }
   if Showing and (WindowState = wsNormal) then
     SizeToRemember(AppSettings.Data.PropsWinW, AppSettings.Data.PropsWinH);
+end;
+
+{ Explorer at the first selected file }
+procedure TPropertiesForm.FolderClick(Sender: TObject);
+var
+  Sel: TIntegerArray;
+  D: PTagEditNodeData;
+begin
+  Sel := FList.SelectedRows;
+  if Length(Sel) = 0 then Exit;
+  D := Item(Sel[0]);
+  if D <> nil then OpenFolderWithWindow(Self, D^.FilePath);
+end;
+
+procedure TPropertiesForm.ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+begin
+  if FList.SelCount = 0 then Exit;
+  FRowMenu.Free;
+  FRowMenu := TAuMenu.Create;
+  FRowMenu.Add('Open folder...', @FolderClick, icFolder);
+  FRowMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 
 function TPropertiesForm.Item(I: Integer): PTagEditNodeData;
@@ -1288,7 +1323,7 @@ begin
     Meta.CoverData := nil;
   end;
   S := INS_HDR_AUDIO_CHAR + sLineBreak;
-  S := S + INS_LBL_FORMAT + UpperCase(StringReplace(ExtractFileExt(D^.FilePath), '.', '', [rfReplaceAll])) + sLineBreak;
+  S := S + INS_LBL_FORMAT + FormatNameOf(D^.FilePath) + sLineBreak;
   if Meta.SampleRate > 0 then S := S + INS_LBL_SAMPLE_RATE + SafeFormat(FMT_INS_SAMPLE_RATE, [Meta.SampleRate]) + sLineBreak;
   if Meta.BitDepth > 0 then S := S + INS_LBL_BIT_DEPTH + SafeFormat(FMT_INS_BIT_DEPTH, [Meta.BitDepth]) + sLineBreak;
   S := S + INS_LBL_DURATION + Meta.DurationStr + sLineBreak + sLineBreak;

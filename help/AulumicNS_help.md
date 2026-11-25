@@ -20,6 +20,8 @@ Aulumic is a free music player for Windows. It sends the music straight to the D
 
 With the volume at 100 % and nothing else switched on, the DAC gets the audio exactly as it's stored in the file (bit-perfect). The **Bit-perfect** badge in the top banner shows whether that's the case right now; click it to see the whole signal path. See *Configuring bit-perfect playback*.
 
+When something does change the audio, such as the volume, ReplayGain, the tone control or the resampler, it is calculated in 64-bit floating point and rounded once, at the very end. The figures are in Audio concepts.
+
 ![The main window while an album plays](02-dark-playing)
 
 The parts of the window are explained one by one in The main interface.
@@ -54,9 +56,10 @@ Both skip the Windows mixer, so neither changes the audio.
 
 **Supported file formats:**
 
-- **Lossless only:** FLAC, WAV, DSF and DFF. MP3, AAC and other lossy formats won't play.
-- **Mono and stereo:** Files with more than two channels won't play.
-- **High resolution:** High-resolution PCM (including DXD) in FLAC or WAV, and DSD in DSF and DFF files.
+- **Lossless only:** FLAC, WAV, AIFF, Apple Lossless (ALAC, in M4A files), DSF and DFF. MP3, AAC and other lossy formats won't play. AIFF files must be uncompressed (the usual kind).
+- **M4A files:** Only those with Apple Lossless inside play; an M4A file with AAC is listed but refused with a message.
+- **More than two channels:** FLAC, WAV, AIFF and Apple Lossless files with more channels (5.1, for example) are mixed to stereo; the badge then shows **Processed**. A DSD file with more than two channels is converted to PCM for this, also when Play DSD natively is on.
+- **High resolution:** High-resolution PCM (including DXD) in FLAC, WAV, AIFF or Apple Lossless, and DSD in DSF and DFF files.
 - **Local files:** A music collection on local or network drives. There's no internet radio or streaming.
 
 **Gapless playback:** No pauses or clicks between tracks that run into each other, as on live albums, concept albums or classical works.
@@ -88,16 +91,16 @@ From top to bottom; the numbers are those in the picture:
 {1} **Main menu:** The button with the three lines at the left of the title bar opens all main functions and tools:
 
 - **File:** Add files or a folder to the playlist.
-- **Playback:** Play, stop, previous and next, the shuffle and repeat modes, the Tone Control and Jump to Now Playing.
+- **Playback:** Play, stop, previous and next, the shuffle and repeat modes, the Tone Control and Jump to Now Playing. Stop after current track lets the playing track be the last one: the Stop button is marked until then, and Play later goes on with the next track.
 - **Library:** Search, refresh, rescan and the library folders.
 - **Playlist:** New playlist, the Playlist Manager, import and export, expand or collapse all albums, remove dead items and clear the playlist.
 - **View:** The switches that are changed now and then, without opening Preferences: dark or light mode and the accent colour under Theme, Compact rows, Peak meter, Keep album headers in view, Cursor follows playback and Library as tiles. A tick shows what is on.
 - **Tools:** Properties, Calculate ReplayGain for the library and Check tag consistency of the library (both for everything in the library; the same two for a selection are in the right-click menus), the log and the Debug Queue.
-- **Below these:** Preferences, Help, About and Quit. The About window has a Check for updates button: a click asks GitHub for the latest version. When a newer one is there, a box offers to open its download page.
+- **Below these:** Preferences, Help, About and Quit. The About window has a Check for updates button: a click asks GitHub for the latest version. When a newer one is there, a box offers to open its download page. The Data folder and Website rows are links.
 
 {2} **Preferences:** The gear at the right of the title bar opens Preferences (also with Ctrl+P), where all settings are.
 
-{3} **Now Playing banner:** Shows the cover, title, album, genre, the credited artists, performers and composers, and the audio format of the playing track.
+{3} **Now Playing banner:** Shows the cover, title, album, genre, the credited artists, performers and composers, and the audio format of the playing track. Right-click it for Open folder.
 
 - **Cover & album title:** Click the cover or the album title to open the Cover Art Viewer.
 - **Artists, performers & composers:** Everyone is listed once, with what they do behind the name in smaller text (*piano, composer*). Click a name to open Artist Info. If the line gets too long, the roles are left out to make room for more names; if there are still more names than fit, click +n more at the end of the line for the others.
@@ -199,7 +202,7 @@ Click the **Bit-perfect** or **Processed** badge in the banner to see every stag
 - **Amber:** The stage changes the signal (for example ReplayGain, the tone control, the resampler or a volume below 100 %).
 - **Grey:** The source file and the output device.
 
-The stages are the source file, the decoder or the DSD transport (DoP, native DSD or DSD to PCM), ReplayGain, the tone control, the resampler, the volume, dither or the bit depth, warnings such as clipping, and the output format the device accepted. When the summary at the top says **Bit-perfect**, the DAC gets the file's samples unchanged.
+The stages are the source file, the decoder or the DSD transport (DoP, native DSD or DSD to PCM), the downmix of a file with more than two channels, ReplayGain, the tone control, the resampler, the volume, dither or the bit depth, warnings such as clipping or dropouts, and the output format the device accepted. When the summary at the top says **Bit-perfect**, the DAC gets the file's samples unchanged.
 
 # Keyboard shortcuts
 
@@ -211,6 +214,7 @@ All shortcuts are also listed in Preferences > Shortcuts.
 
 - **Play / pause:** `Space` or `Media Play/Pause`
 - **Stop:** `Media Stop`
+- **Stop after current track:** `Ctrl + E`
 - **Next / previous track:** `Media Next` / `Media Previous`
 - **Seek forward / backward:** `Ctrl + Arrow Right` / `Ctrl + Arrow Left`
 - **Volume up / down:** `Ctrl + Arrow Up` / `Ctrl + Arrow Down`
@@ -282,7 +286,8 @@ Open Preferences from the main menu, with the gear in the title bar, or with Ctr
 
 ![Preferences: Library](24-prefs-0)
 
-- **Library folders:** The folders that make up the music library. The Add folder button adds one; Remove takes one out of the library (the files stay on disk).
+- **Library folders:** The folders that make up the music library. The Add folder button adds one; Remove takes one out of the library (the files stay on disk). The folder button beside Remove opens the selected folder in Explorer.
+- **Choosing a folder:** In the folder dialog, the arrow at the end of a row opens that folder, and the path above the list leads back. Select folder takes the folder named beside the button.
 - **Scan now:** Checks the library folders for new, changed or removed files. A cover that was changed in another program also updates the album thumbnail. Folders on a drive that is disconnected or asleep keep their tracks. The progress is shown on the page.
 - **Repair:** Rebuilds the library from scratch, including all album thumbnails. Try it when tracks are missing or the library looks wrong.
 - **Watch the library folders:** New and changed files show up in the library by themselves a few seconds later. Network folders aren't watched; press Refresh (F5) or Rescan (Ctrl+F5) for those.
@@ -290,7 +295,7 @@ Open Preferences from the main menu, with the gear in the title bar, or with Ctr
 
 ## 2. Appearance page
 
-![Preferences: Appearance](24-prefs-1){1=19.5,14.5 2=76,22 3=80,66 4=91,87.5}
+![Preferences: Appearance](24-prefs-1){1=19.5,14.5 2=76,22 3=80,66 4=91,87.5 5=64.5,87.5 6=12,87.5}
 
 Every page of Preferences is built the same way; the numbers are those in the picture:
 
@@ -298,6 +303,8 @@ Every page of Preferences is built the same way; the numbers are those in the pi
 - {2} **Settings:** Every setting has a short description under its name.
 - {3} **Cards:** Settings that are set once are in cards: click a card to open it, and again to close it.
 - {4} **OK:** Keeps the changes; Cancel (or Esc) drops them.
+- {5} **Apply:** Uses the changes at once and keeps Preferences open. What was applied stays, also after Cancel.
+- {6} **Reset this page:** Sets the settings of the page in view back to their defaults; nothing changes until OK or Apply. The output device, the library folders, the volume lock and the Last.fm key are kept.
 
 The settings of this page:
 
@@ -342,7 +349,7 @@ The settings of this page:
 
 ![Preferences: DSD](24-prefs-4)
 
-- **Play DSD natively:** Sends DSD to the DAC as DSD: over WASAPI packed as DoP, over ASIO as native DSD when the driver supports it (otherwise as DoP). When it is off, DSD is converted to PCM.
+- **Play DSD natively:** Sends DSD to the DAC as DSD: over WASAPI packed as DoP, over ASIO as native DSD when the driver supports it (otherwise as DoP). When it is off, DSD is converted to PCM. A DSD file with more than two channels is always converted, since it is mixed to stereo.
 - **DSD low-pass:** Applies a low-pass filter when DSD is converted to PCM.
 - **DSD gain:** The level of DSD converted to PCM. `+0.0 dB` keeps the original level; `+6.0 dB` brings DSD closer to the level of FLAC and WAV files. Loud passages can then exceed full scale; Headroom on *Automatic* (Volume page) lowers the album just as far as needed.
 - **DSD buffer size:** How much DSD audio is buffered ahead when DSD goes to the DAC as DSD (DoP, or native over ASIO). A dropout there is a pop, so it needs more than PCM.
@@ -386,7 +393,7 @@ These settings are used while PCM resampling is on. When it is off, the rows are
 
 ### How automatic headroom works
 
-- **What it does:** Some albums come out above full scale after upsampling or after DSD is converted to PCM, and would clip. The peaks are measured during playback, and the album is lowered just as far as its highest peak needs. Nothing is clipped or limited.
+- **What it does:** Some albums come out above full scale after upsampling, after DSD is converted to PCM, or when more than two channels are mixed to stereo, and would clip. The peaks are measured during playback, and the album is lowered just as far as its highest peak needs. Nothing is clipped or limited.
 - **Per album:** All tracks of an album get the same level. The peak is remembered, so the next time the album starts at the right level.
 - **Never touched:** Quiet albums and bit-perfect playback.
 - **Where it is shown:** The signal path shows what is taken off, for example `Headroom -0.8 dB`.
@@ -416,9 +423,8 @@ These settings help Windows give audio playback priority over other tasks. Leave
 ### Card: Internet
 
 - **Check for updates at start:** Asks GitHub once at every start whether a newer version is available. When there is one, a box offers to open its download page; Skip this version keeps the box away until a later version is released. Off by default.
-- **Last.fm API key:** Artist Info gets its biographies from Last.fm, and Last.fm asks every program for a key. Aulumic has none built in, so a personal key is needed.
+- **Last.fm API key:** Optional. Without a key Artist Info takes its biographies from Wikipedia; with a personal key from Last.fm, which knows more artists. Aulumic has no key built in.
   - **Getting one:** It's free. Create an API account at last.fm/api and paste its "API key" into this field.
-  - **Without a key:** Biographies already downloaded are still shown.
   - **From a file:** A file `LastFmKey.txt` with a key in it can be put next to `AulumicNS.exe`. While no key is entered here, Aulumic takes the key from that file at start and keeps it, so the file is only needed once.
 
 ## 9. Shortcuts page
@@ -486,7 +492,7 @@ An auto-playlist has the general settings of every playlist ({1}, {2}, {3} and {
 ### Text tags
 
 - **Title, Artist, Album artist, Album, Genre, Composer, Performer, Comment:** The tags of the track.
-- **Codec:** The file format: FLAC, WAV, DSF or DFF.
+- **Codec:** The file format: FLAC, WAV, AIFF, M4A, DSF or DFF.
 - **Resolution:** The audio quality as shown in the program, for example "24-bit / 96 kHz".
 - **Date:** The release date as stored in the file, usually YYYY or YYYY-MM-DD.
 - **File name / File path:** The name of the file and the folder where it is stored. Useful to include or exclude certain drives or folders, for example File path `HAS` "\High-Res Audio\".
@@ -528,6 +534,7 @@ The tabs {2} switch between the tags and the Inspector.
 - **Several tracks:** Fields that differ between the selected tracks show *Multiple values*; Title and Track stay unique per track. A value typed in a shared field is applied to all selected tracks. Only the changed fields are written.
 - {4} **Cover:** The Load button chooses an image file, Search the web looks for the cover online, and Remove takes the cover out of the selected files. An image file can also be dropped on the window or pasted with Ctrl+V.
 - {5} **Save:** Writes the changes. They're written in the background, so listening can go on. Cancel (or Esc) drops them. DFF files can be tagged too.
+- **Open folder:** Shows the selected file in Explorer; also in the right-click menu of the file list.
 - **Damaged tag:** A WAV, DSF or DFF file whose tag is damaged isn't saved, because whatever lies behind the damage would be lost. A Repair tag button next to Cancel shows what can be recovered and asks first; Save then writes the repaired tag. A copy of the old tag is kept in the folder `TagBackups` of the data folder.
 - **Undo repair:** For a single file whose tag was repaired, an Undo repair button stands in the same place. Save then puts the old tag back exactly as it was; tag changes made since the repair are lost.
 
@@ -553,6 +560,7 @@ Open it for a selection with Tools > Check tag consistency in the right-click me
 - **Filter:** The box at the top right shows the findings of one kind, with the number of each.
 - **Order:** Click a column heading to sort by it, and again to reverse. Sorted by Finding, all lines of one album stand together.
 - **Open in Properties:** Double-click a line (or press Enter) to open its files in Properties, where they are changed and saved as usual. Several lines can be selected with Ctrl or Shift and opened together.
+- **Open folder:** Shows the folder of the selected line in Explorer; also in the right-click menu.
 - **Check again:** Reads the same part of the library anew.
 
 # Tone Control
@@ -599,7 +607,7 @@ What counts as an album:
 
 ![The results of a scan](38-replaygain-results)
 
-Each file is listed with its track gain and peak, its album gain and peak (empty for a track without an album tag), or the reason it could not be measured (for example a disconnected drive, a moved file or a damaged file). Nothing is written to the files until Save all is clicked; the tags are then written in the background. Cancel drops the results.
+Each file is listed with its track gain and peak, its album gain and peak (empty for a track without an album tag), or the reason it could not be measured (for example a disconnected drive, a moved file or a damaged file). Nothing is written to the files until Save all is clicked; the tags are then written in the background. Cancel drops the results. Right-click a row for Open folder.
 
 # Virtual Folders
 
@@ -620,6 +628,7 @@ Right-click a folder in the library and choose Create Virtual Folder, or right-c
 - **Search in:** Artist / performer, Composer, Album / title, Comment / genre and Folder name.
 - **Auto-find:** Searches the library for folders whose tracks match every word; accents are ignored. Tracks in disc sub folders (such as `CD1`) are added as their album folder. New folders are added to the list and selected, so they are easy to check.
 - **Add folder...:** Choose a folder by hand, or drag folders from Windows Explorer into the list.
+- **Open folder:** Shows the selected folder in Explorer.
 - **Remove:** Removes the selected folders from the list (Del). The folders themselves are not changed.
 
 ## Common use cases
@@ -643,7 +652,7 @@ Artist Info shows a biography and a picture of an artist. To open it, click an a
 
 ![Artist Info](41-artist-info)
 
-Next to the biography and the picture, it says how many albums and tracks of the artist are in the library. The information comes from Last.fm, Wikipedia and TheAudioDB (the artist's name is sent to these services) and is kept in the Data folder, so it's there right away next time. The biographies need a free Last.fm API key: enter it in Preferences > System > Internet.
+Next to the biography and the picture, it says how many albums and tracks of the artist are in the library. The information comes from Last.fm, Wikipedia and TheAudioDB (the artist's name is sent to these services) and is kept in the Data folder, so it's there right away next time. The biography is the introduction of the artist's English Wikipedia article, or Last.fm's text when a free Last.fm API key is entered in Preferences > System > Internet. The line under the text names the source; a click on it opens that page.
 
 - **Edit (F2):** Edit the biography; it is saved automatically.
 - **Picture (Ctrl+O):** Choose a picture, drop an image file on the window, or paste one with Ctrl+V. Remove (Del) deletes it.
@@ -662,6 +671,7 @@ When the playing album has a PDF booklet (in its folder, in a sub folder such as
 - **Zoom:** The minus, fit and plus buttons, the `+` and `-` keys, Ctrl with the mouse wheel, or a double-click. Drag the page or use the mouse wheel to move around when zoomed in.
 - **Other booklets:** When the album has more than one PDF, the button on the left switches between them.
 - **Open with the PDF program of Windows:** The folder button on the right.
+- **Open folder:** Right-click the page.
 
 # Audio concepts
 
@@ -671,7 +681,7 @@ When the playing album has a PDF booklet (in its folder, in a sub folder such as
 
 - **Bit-perfect:** The audio reaches the DAC exactly as it is stored in the file, without any change.
 - **PCM (pulse code modulation):** The basis of almost all digital audio, including CD, WAV and FLAC. PCM stores the sound wave as a series of measurements (samples). The sample rate is how many samples are taken per second (for example 44.1 kHz); the bit depth is how precise each sample is (for example 16 or 24 bits).
-- **FLAC (Free Lossless Audio Codec):** FLAC makes files smaller without losing any quality; when played, the audio is identical to the original. Lossy formats such as MP3 or AAC permanently remove audio information.
+- **FLAC and Apple Lossless (ALAC):** Both make files smaller without losing any quality; when played, the audio is identical to the original. WAV and AIFF store the same audio uncompressed. Lossy formats such as MP3 or AAC permanently remove audio information.
 - **DSD (Direct Stream Digital):** A 1-bit format, used for SACD (DSF and DFF files). DSD can be sent unchanged to a DAC that supports it; volume control and processing such as ReplayGain are then not applied. If the DAC doesn't support DSD, turn off *Play DSD natively*; DSD is then converted to PCM during playback.
 - **DoP (DSD over PCM):** DoP packs the unchanged DSD data into 24-bit PCM frames, so connections that only handle PCM can carry it. The DAC unpacks it and plays it as native DSD, without any loss.
 - **Native DSD (ASIO):** Over ASIO, a driver that supports DSD receives the DSD data directly, without DoP packing.
@@ -683,6 +693,7 @@ When the playing album has a PDF booklet (in its folder, in a sub folder such as
   - **Linear phase:** All frequencies stay exactly in time, but a very short "pre-ringing" can occur just before a sharp sound.
   - **Minimum phase:** No pre-ringing; the ringing moves to just after the sound, where it is usually considered less audible.
   - **Intermediate phase:** Halfway between the two.
+- **Downmix:** A file with more than two channels is mixed to stereo: the front channels at full level, the centre and the surround channels 3 dB lower into their side, and the subwoofer channel left out.
 
 ## III. Volume & dynamics
 
@@ -695,6 +706,15 @@ When the playing album has a PDF booklet (in its folder, in a sub folder such as
 - **MMCSS (Multimedia Class Scheduler Service):** A Windows service that gives registered audio threads priority. The audio thread is registered as a "Pro Audio" task (Preferences > System), also while the window is minimized.
 - **Power throttling:** Windows slows down programs whose window is minimized or hidden. With the *High-resolution kernel timer* option on, the player asks to be left out of that.
 
+## V. What the processing adds
+
+- **Decoding:** FLAC, Apple Lossless, WAV and AIFF give exactly the samples that were stored.
+- **Rounding:** Once, at the end, with dither, and only when a stage changed the samples.
+- **Resampler:** Measured with test tones, images and aliasing stay below -150 dB at 24-bit precision, and below -200 dB at 32-bit precision. The level in the pass band is right to within 0.001 dB.
+- **DSD to PCM:** What the conversion folds back into the audible range lies below -165 dBFS, measured on recordings.
+- **Tone control:** The error of its filters lies below -230 dBFS. For comparison, the last bit of a 32-bit DAC is at -186 dBFS.
+- **Automatic headroom:** Lowers the level; never clips and never limits.
+
 # Configuring bit-perfect playback
 
 ![Preferences: Output](24-prefs-3)
@@ -706,6 +726,7 @@ Out of the box the output is bit-perfect as long as the volume is at 100 %. To m
 - **Resampling off:** Keep PCM resampling turned off.
 - **Tone control off:** Keep the tone control disabled (Ctrl+T).
 - **DSD natively:** Keep *Play DSD natively* turned on, so DSF and DFF files reach the DAC as DSD.
+- **Two channels:** A file with more than two channels is mixed to stereo, so it is never bit-perfect.
 
 > The badge in the banner shows **Bit-perfect** when the DAC receives the samples unchanged. Click it to see which stage changes the signal when it shows **Processed**.
 
@@ -717,7 +738,8 @@ Aulumic keeps a log of each session: library scans, playback errors, files that 
 
 - **Show log:** Main menu > Tools > Show log... (or Ctrl+L). Warnings and errors are marked. The buttons Copy, Save to file and Clear work on the whole log.
 - **Saved log:** If errors were logged, the log is saved as `AulumicNSLog_<date>.txt` in the Data folder at exit. If there were no errors, nothing is saved, unless *Always save the log* is on (Preferences > System > Log): then `AulumicNSLog.txt` is written at every exit.
-- **Dropouts:** If the music cuts out for a moment, check the log for a line "Dropout at about m:ss in the track". A larger buffer size (Preferences > Output for PCM, Preferences > DSD for DSD sent as DSD) helps. If the log shows no dropout, the cause lies outside Aulumic: the driver, USB or the DAC.
+- **Dropouts:** If the music cuts out for a moment, the Signal Path shows a Dropouts line with their number, and the log has a line "Dropout at about m:ss in the track". A larger buffer size (Preferences > Output for PCM, Preferences > DSD for DSD sent as DSD) helps. If the log shows no dropout, the cause lies outside Aulumic: the driver, USB or the DAC.
+- **A file that won't play:** The message says why. The usual cases: an M4A file with AAC inside, a compressed AIFF file, a DFF file with DST compression, or a damaged file.
 - **Black or flickering areas in a window:** Turn off *Use the graphics card* (Preferences > System), and please report the graphics card and its driver version.
 - **Debug Queue (Ctrl+D):** Shows what the player is doing: the play queue, the next track and the engine's state. Useful when reporting a problem.
 - **ShutdownTraceLog.txt:** Only written next to the program when an error occurs while it closes. Please include it and the log when reporting a problem.
@@ -760,7 +782,7 @@ The library and the playlists are saved at once after every change, so a crash o
 
 Aulumic is free software: it may be used, shared and changed under the terms of the GNU General Public License, version 3. It comes without any warranty. The source code is on GitHub.
 
-Developed with Lazarus and Free Pascal (FPC). The FLAC decoder, the resampler, the EBU R128 loudness meter and the user interface are own code; the interface is drawn with Direct2D and DirectWrite, and PDF booklets are shown with the PDF engine of Windows.
+Developed with Lazarus and Free Pascal (FPC). The FLAC and Apple Lossless decoders, the resampler, the EBU R128 loudness meter and the user interface are own code; the interface is drawn with Direct2D and DirectWrite, and PDF booklets are shown with the PDF engine of Windows.
 
 ## Third-party acknowledgements
 

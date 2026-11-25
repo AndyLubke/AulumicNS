@@ -64,6 +64,11 @@ type
 { the popup at X, Y (screen; above AboveY when it does not fit below) }
 procedure ShowSignalPath(X, Y, AboveY: Integer; AFill: TSignalPathFill);
 procedure CloseSignalPath;
+{ Where the popup's top goes when its height becomes ANewHeight (a stage more
+  or less): it keeps its place - its lower edge when it was opened above the
+  badge (AAboveY >= 0 and above it), else its top - and never leaves the work
+  area AWorkTop .. AWorkBottom; the top wins when it is higher than that. }
+function SignalPathTop(ATop, ANewHeight, AAboveY, AWorkTop, AWorkBottom: Integer): Integer;
 function SignalPathOpen: Boolean;
 
 { the stages of the playing stream. AInfo.Valid = False: idle / stopped }
@@ -81,7 +86,7 @@ const
 implementation
 
 uses
-  uAppConsts, uAppStrings, uSettingsManager;
+  uAppConsts, uAppStrings, uSettingsManager, ALReaders;
 
 type
   { TSignalPathPopup }
@@ -206,6 +211,15 @@ end;
 
 { ---- the popup ---- }
 
+function SignalPathTop(ATop, ANewHeight, AAboveY, AWorkTop, AWorkBottom: Integer): Integer;
+begin
+  { opened above the badge: its lower edge stays there and it grows upwards }
+  if (AAboveY >= 0) and (ATop < AAboveY) then Result := AAboveY - ANewHeight
+  else Result := ATop;
+  if Result + ANewHeight > AWorkBottom then Result := AWorkBottom - ANewHeight;
+  if Result < AWorkTop then Result := AWorkTop;
+end;
+
 constructor TSignalPathPopup.CreatePath(AFill: TSignalPathFill);
 begin
   CreatePopup(nil);
@@ -231,19 +245,18 @@ end;
 
 procedure TSignalPathPopup.Refill;
 var
-  H: Integer;
+  H, T: Integer;
   WA: TRect;
 begin
   if Assigned(FFill) then FFill(FPath);
-  WA := Screen.MonitorFromPoint(Point(Left, Top)).WorkareaRect;
+  { the screen the popup is on, by its middle: a corner can lie outside }
+  WA := Screen.MonitorFromPoint(Point(Left + Width div 2, Top + Height div 2)).WorkareaRect;
   FPath.MaxHeight := WA.Bottom - WA.Top - S(16);
   H := FPath.PreferredHeight;
   if H <> ClientHeight then
   begin
-    { a stage more or less: the height follows, inside the screen }
-    if (FAboveY >= 0) and (Top < FAboveY) then SetBounds(Left, FAboveY - H, Width, H)
-    else if Top + H > WA.Bottom then SetBounds(Left, Math.Max(WA.Top, WA.Bottom - H), Width, H)
-    else Height := H;
+    T := SignalPathTop(Top, H, FAboveY, WA.Top, WA.Bottom);
+    SetBounds(Left, T, Width, H);
   end;
 end;
 
@@ -314,6 +327,8 @@ begin
   E := LowerCase(ExtractFileExt(APath));
   if E = '.flac' then Result := 'FLAC'
   else if E = '.wav' then Result := 'WAV'
+  else if (E = '.aiff') or (E = '.aif') or (E = '.aifc') then Result := 'AIFF'
+  else if E = '.m4a' then Result := 'ALAC'
   else if E = '.dsf' then Result := 'DSF'
   else if E = '.dff' then Result := 'DFF'
   else Result := UpperCase(Copy(E, 2, 8));
@@ -323,7 +338,16 @@ function ChannelText(N: Integer): string;
 begin
   if N = 1 then Result := 'mono'
   else if N = 2 then Result := 'stereo'
+  else if N <= DOWNMIX_MAX_CHANNELS then
+    Result := ChannelLayoutName(N) + ' (' + IntToStr(N) + ' channels)'
   else Result := IntToStr(N) + ' channels';
+end;
+
+{ the layout that is mixed down, as the first word of its stage }
+function DownmixName(N: Integer): string;
+begin
+  if N = 4 then Result := 'Quadraphonic'
+  else Result := ChannelLayoutName(N);
 end;
 
 { ATenths: the tone gain in tenths of a dB (as the settings keep it) }
@@ -384,9 +408,12 @@ begin
   if AInfo.IsDsd then
     Src := Format('%s  ·  %s  ·  1 bit  ·  %s MHz', [CodecOf(AFilePath), DsdName(AMeta.SampleRate),
       FormatFloat('0.0###', AMeta.SampleRate / 1000000, DefaultFormatSettings)])
+  else if AInfo.DownmixFrom > 0 then
+    Src := Format('%s  ·  %d bit  ·  %s kHz', [CodecOf(AFilePath), AInfo.DownmixBits, RateText(AInfo.InRate)])
   else
     Src := Format('%s  ·  %d bit  ·  %s kHz', [CodecOf(AFilePath), AInfo.SourceBits, RateText(AInfo.InRate)]);
-  Src := Src + '  ·  ' + ChannelText(AInfo.Channels);
+  if AInfo.DownmixFrom > 0 then Src := Src + '  ·  ' + ChannelText(AInfo.DownmixFrom)
+  else Src := Src + '  ·  ' + ChannelText(AInfo.Channels);
   P.AddStage(icDocument, 'Source file', Src, stNeutral);
   { decoder / DSD transport }
   if AInfo.DoP then
@@ -403,12 +430,22 @@ begin
     if AppSettings.Data.Audio.DsdToPcmGain = 6 then S2 := S2 + ' (SACD reference, with the volume)'
     else if AppSettings.Data.Audio.DsdToPcmGain <> 0 then S2 := S2 + ' (with the volume)';
     if AppSettings.Data.Audio.DsdLowPassFilter then S2 := S2 + '  ·  low-pass';
+    if AInfo.DownmixFrom > 0 then S2 := S2 + '  ·  needed for the downmix';
     P.AddStage(icDisc, 'DSD to PCM', S2, stModified);
   end
   else if CodecOf(AFilePath) = 'FLAC' then
     P.AddStage(icBolt, 'Decoder', 'Built-in FLAC decoder  ·  lossless', stTransparent)
+  else if CodecOf(AFilePath) = 'ALAC' then
+    P.AddStage(icBolt, 'Decoder', 'Built-in Apple Lossless decoder  ·  lossless', stTransparent)
   else
     P.AddStage(icBolt, 'Decoder', 'PCM, read as stored', stTransparent);
+  { more than two channels: mixed to stereo right behind the decoder }
+  if AInfo.DownmixFrom > 0 then
+  begin
+    S2 := Format('%s to stereo  ·  centre and surround at -3 dB', [DownmixName(AInfo.DownmixFrom)]);
+    if AInfo.DownmixDB <= -0.005 then S2 := S2 + '  ·  ' + GainText(AInfo.DownmixDB) + ' so it cannot clip';
+    P.AddStage(icSliders, 'Downmix', S2, stModified);
+  end;
   { ReplayGain (RGFactor also holds the preamp: shown as a
     stage of its own, the ReplayGain stage shows the rest) }
   RgDb := 0;
@@ -483,7 +520,7 @@ begin
   end;
   { bit depth: dither when the signal is processed, padding is lossless }
   PcmWork := (not DsdOut) and not AInfo.BitPerfect;
-  if PcmWork and (AInfo.Resampled or AInfo.ToneActive or AInfo.DsdToPcm or
+  if PcmWork and (AInfo.Resampled or AInfo.ToneActive or AInfo.DsdToPcm or (AInfo.DownmixFrom > 0) or
     ((not AInfo.VolumeDisabled) and ((AInfo.Volume < 1000) or (Abs(RgDb + AInfo.PreampDB) >= 0.005)))) then
     P.AddStage(icSliders, 'Dither', Format('TPDF to %d bit', [AInfo.OutValidBits]), stModified)
   else if (not DsdOut) and (AInfo.OutValidBits < AInfo.SourceBits) then
@@ -494,6 +531,12 @@ begin
       [AInfo.SourceBits, AInfo.OutBits]), stTransparent);
   if AInfo.Clipped then
     P.AddStage(icWarning, 'Clipping', 'Samples were limited at full scale (lower the volume or the preamp)', stModified);
+  { the device ran out of audio: each time is a gap that was heard }
+  if AInfo.Dropouts = 1 then
+    P.AddStage(icWarning, 'Dropouts', '1 since the device was opened  ·  a larger buffer can help', stModified)
+  else if AInfo.Dropouts > 1 then
+    P.AddStage(icWarning, 'Dropouts', Format('%d since the device was opened  ·  a larger buffer can help',
+      [AInfo.Dropouts]), stModified);
   { output }
   if AInfo.OutputApi = 1 then Api := 'ASIO' else Api := 'WASAPI exclusive';
   if AInfo.NativeDsd then Fmt := DsdName(AMeta.SampleRate) + ' (native)'

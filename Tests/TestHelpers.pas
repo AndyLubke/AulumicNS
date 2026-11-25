@@ -71,6 +71,13 @@ procedure WritePatternWav(const APath: string; AFrames: Integer;
 procedure WritePatternFlac(const APath: string; AFrames: Integer;
   ASampleRate: Integer = 44100; AFirstFrame: Integer = 0; ABits: Integer = 16;
   ABlockSize: Integer = 4096);
+// A FLAC file of AChannels independent channels (1 .. 8), written the same
+// way; the sample of frame AFrame, AChannel comes from ASample
+type
+  TChannelSampleFunc = function(AFrame, AChannel, ABits: Integer): Integer;
+procedure WriteChannelFlac(const APath: string; AFrames, AChannels: Integer;
+  ASample: TChannelSampleFunc; ASampleRate: Integer = 44100; ABits: Integer = 16;
+  ABlockSize: Integer = 4096);
 
 type
   // The DSD bytes of a test DSF file
@@ -560,6 +567,90 @@ begin
         W.Put(0, 1);                   // no wasted bits
         for I := 0 to Count - 1 do
           W.Put(QWord(Int64(PatternSample(AFirstFrame + First + I, Ch, ABits))) and Mask, ABits);
+      end;
+
+      // Byte aligned already (8-bit subframe headers, 16 / 24-bit samples)
+      Frame := W.Bytes;
+      W.Put(FlacCrc16(Frame, Length(Frame)), 16);
+      Frame := W.Bytes;
+      FS.WriteBuffer(Frame[0], Length(Frame));
+
+      Inc(FrameNo);
+      Inc(First, Count);
+    end;
+  finally
+    W.Free;
+    FS.Free;
+  end;
+end;
+
+procedure WriteChannelFlac(const APath: string; AFrames, AChannels: Integer;
+  ASample: TChannelSampleFunc; ASampleRate: Integer; ABits: Integer; ABlockSize: Integer);
+var
+  FS: TFileStream;
+  W: TBitWriter;
+  Frame: TBytes;
+  FrameNo, First, Count, I, Ch: Integer;
+  Mask: QWord;
+begin
+  ForceDirectories(ExtractFileDir(APath));
+  Mask := (QWord(1) shl ABits) - 1;
+
+  FS := TFileStream.Create(APath, fmCreate);
+  W  := TBitWriter.Create;
+  try
+    // "fLaC" and the STREAMINFO block (the last metadata block)
+    W.Put(Ord('f'), 8); W.Put(Ord('L'), 8); W.Put(Ord('a'), 8); W.Put(Ord('C'), 8);
+    W.Put(1, 1);                       // last metadata block
+    W.Put(0, 7);                       // STREAMINFO
+    W.Put(34, 24);                     // its length
+    W.Put(ABlockSize, 16);             // min block size
+    W.Put(ABlockSize, 16);             // max block size
+    W.Put(0, 24);                      // min frame size: unknown
+    W.Put(0, 24);                      // max frame size: unknown
+    W.Put(ASampleRate, 20);
+    W.Put(AChannels - 1, 3);           // channels - 1
+    W.Put(ABits - 1, 5);               // bits per sample - 1
+    W.Put(AFrames, 36);                // total samples (per channel)
+    for I := 1 to 16 do
+      W.Put(0, 8);                     // MD5: zero = not known
+    Frame := W.Bytes;
+    FS.WriteBuffer(Frame[0], Length(Frame));
+
+    FrameNo := 0;
+    First   := 0;
+    while First < AFrames do
+    begin
+      Count := ABlockSize;
+      if First + Count > AFrames then
+        Count := AFrames - First;
+
+      W.Clear;
+      // Frame header
+      W.Put($3FFE, 14);                // sync
+      W.Put(0, 1);                     // reserved
+      W.Put(0, 1);                     // fixed block size
+      W.Put(7, 4);                     // block size: 16 bits (size - 1) at the end
+      W.Put(0, 4);                     // sample rate: from STREAMINFO
+      W.Put(AChannels - 1, 4);         // independent channels
+      if ABits = 24 then
+        W.Put(6, 3)                    // 24 bits per sample
+      else
+        W.Put(4, 3);                   // 16 bits per sample
+      W.Put(0, 1);                     // reserved
+      PutFlacNumber(W, FrameNo);
+      W.Put(Count - 1, 16);
+      Frame := W.Bytes;
+      W.Put(FlacCrc8(Frame, Length(Frame)), 8);
+
+      // One VERBATIM subframe per channel
+      for Ch := 0 to AChannels - 1 do
+      begin
+        W.Put(0, 1);                   // zero bit
+        W.Put(1, 6);                   // VERBATIM
+        W.Put(0, 1);                   // no wasted bits
+        for I := 0 to Count - 1 do
+          W.Put(QWord(Int64(ASample(First + I, Ch, ABits))) and Mask, ABits);
       end;
 
       // Byte aligned already (8-bit subframe headers, 16 / 24-bit samples)

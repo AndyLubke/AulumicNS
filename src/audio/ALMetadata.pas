@@ -408,7 +408,7 @@ var
 begin
   Result := ClearMetaData;
 
-  if ACheckExists and (not FileExists(LongPath(FileName))) then
+  if ACheckExists and (not AuFileExists(FileName)) then
     Exit;
 
   try

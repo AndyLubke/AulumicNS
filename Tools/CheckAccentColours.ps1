@@ -116,6 +116,25 @@ if ($Mode -eq 'eval') {
     }
     Report "  closest" $hexes
   }
+  # selected text in an input field (AuTheme.TextSelectionFor): the field's
+  # background with as much accent as leaves the text on it at 4.5 or more
+  $inputs = [regex]::Matches($src, 'clInput := \$FF([0-9A-Fa-f]{6})') | ForEach-Object { ,(HexRgb $_.Groups[1].Value) }
+  $texts = [regex]::Matches($src, 'clText := \$FF([0-9A-Fa-f]{6})') | ForEach-Object { ,(HexRgb $_.Groups[1].Value) }
+  $n = 0
+  foreach ($t in @(@('AccentDark', 'dark'), @('AccentLight', 'light'))) {
+    $arr = [regex]::Match($src, "$($t[0]):[^=]*=\s*\(([^)]*)\)").Groups[1].Value
+    $hexes = [regex]::Matches($arr, '\$FF([0-9A-Fa-f]{6})') | ForEach-Object { '#' + $_.Groups[1].Value.ToUpper() }
+    $bg = $inputs[$n]; $tx = $texts[$n]; $n++
+    "--- $($t[1]) theme: selected text in an input field"
+    for ($i = 0; $i -lt $hexes.Count; $i++) {
+      $acc = HexRgb $hexes[$i]
+      for ($m = 0.55; $m -ge 0.2999; $m -= 0.01) {
+        $sel = @(0,1,2) | ForEach-Object { [math]::Round($bg[$_] + ($acc[$_] - $bg[$_]) * $m) }
+        if ((Contrast $tx $sel) -ge 4.5) { break }
+      }
+      "  {0,-8} {1}  {2:P0} accent  on the field {3:N2}  text on it {4:N1}" -f $names[$i], (Hex $sel), $m, (Contrast $sel $bg), (Contrast $tx $sel)
+    }
+  }
 }
 
 if ($Mode -eq 'opt') {
