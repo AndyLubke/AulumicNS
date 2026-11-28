@@ -193,7 +193,9 @@ begin
   { summary pill }
   C := StateColor(FSummaryState);
   G.FillRound(S(16), S(14), Width - S(32), S(30), S(15), Blend(clCard, C, 0.14));
-  G.FillCircle(S(32), S(29), SF(4), C);
+  { a tick, a dot or nothing: the state does not rest on the colour alone }
+  if FSummaryState = stTransparent then DrawIcon(G, icCheck, S(32), S(29), S(13), C)
+  else G.FillCircle(S(32), S(29), SF(4), C);
   G.Text(FSummary, S(44), S(14), Width - S(72), S(30), UIFont(12.5, True), C, 0, 1);
   CX := S(36);
   Y := S(56);
@@ -203,6 +205,12 @@ begin
     C := StateColor(FStages[I].State);
     G.FillCircle(CX, Y + S(18), S(16), Blend(clCard, C, 0.16));
     DrawIcon(G, FStages[I].Icon, CX, Y + S(18), S(15), C);
+    { a stage that changes the samples carries a dot at its upper right }
+    if FStages[I].State = stModified then
+    begin
+      G.FillCircle(CX + S(12), Y + S(7), SF(5.5), clCard);
+      G.FillCircle(CX + S(12), Y + S(7), SF(3.5), C);
+    end;
     G.Text(FStages[I].Title, CX + S(28), Y + S(2), Width - CX - S(44), S(18), UIFont(13, True), clText, 0, 1);
     G.Text(FStages[I].Detail, CX + S(28), Y + S(20), Width - CX - S(44), S(18), UIFont(12), clTextDim, 0, 1);
     Y := Y + P;

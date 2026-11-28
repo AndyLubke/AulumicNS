@@ -32,7 +32,7 @@ Aulumic is one program file, `AulumicNS.exe` (NS stands for Native Sound). It ne
 
 ## Sound quality
 
-Bit-perfect playback is the default, and the program shows when it isn't: the badge says Bit-perfect or Processed, and the Signal Path lists every stage that touches the audio.
+Bit-perfect playback is the default, and the program shows when it isn't: the Signal path badge is green with a tick when the output is bit-perfect and amber with a dot when it is processed, and the Signal Path lists every stage that touches the audio.
 
 - **Lossless means identical:** The built-in decoders are tested to give exactly the samples that were stored. Apple Lossless and AIFF files are checked against the same audio as FLAC and WAV, bit for bit.
 - **One calculation, one rounding:** Whatever changes the audio (volume, ReplayGain, tone control, resampler) is calculated in 64-bit floating point and rounded once, at the very end, with dither. A 16-bit file is never rounded back to 16 bits on the way.

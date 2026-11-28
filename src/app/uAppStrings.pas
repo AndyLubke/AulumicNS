@@ -74,8 +74,9 @@ const
   LBL_DEFAULT_PLAYLIST        = 'Default PlayList';
   LBL_USE_GLOBAL_PREFS        = '[ Use global preferences ]';
   LBL_CUSTOM_PREFS            = '[Custom]';
-  LBL_UNIQUE_PER_TRACK        = '(Unique per track)';
-  LBL_MULTIPLE_VALUES         = '<< Multiple Values >>';
+  // Short enough for the narrowest field (Track, Disc)
+  LBL_UNIQUE_PER_TRACK        = 'Unique';
+  LBL_MULTIPLE_VALUES         = 'Varies';
   LBL_NOT_AVAILABLE           = ' (not available)';  // Suffix for an unreachable library folder
 
   // Standard Button Labels (uMetadataCustodian)
@@ -292,6 +293,8 @@ const
   ERR_LASTFM_NETWORK_PREFIX  = 'Last.fm network error: ';
   ERR_LASTFM_API_PREFIX      = 'Last.fm: ';
   ERR_LASTFM_GENERIC         = 'Last.fm returned an error.';
+  // Last.fm does not know the artist (or has no text) and Wikipedia has no article
+  ERR_BIO_NOT_FOUND          = 'No biography found on Last.fm or Wikipedia.';
   // Last.fm error 10 (invalid key) / 26 (suspended key)
   ERR_LASTFM_KEY_REJECTED    = 'Artist information is not available: Last.fm did not accept the API key. Check it in Preferences > System > Internet. Saved biographies and pictures still work.';
   LOG_LASTFM_KEY_REJECTED    = '[Artist Info] Last.fm did not accept the API key (invalid or blocked). Biographies of new artists cannot be fetched until the key is replaced.';
@@ -375,18 +378,43 @@ const
   INS_HDR_RAW_META              = '--- RAW METADATA ---';
 
   INS_LBL_FORMAT                = 'Format: ';
-  INS_LBL_SAMPLE_RATE           = 'Sample Rate: ';
-  INS_LBL_BIT_DEPTH             = 'Bit Depth: ';
+  INS_LBL_SAMPLE_RATE           = 'Sample rate: ';
+  INS_LBL_BIT_DEPTH             = 'Bit depth: ';
   INS_LBL_DURATION              = 'Duration: ';
-  INS_LBL_FILE_SIZE             = 'File Size: ';
-  INS_LBL_FOLDER_PATH           = 'Folder Path: ';
-  INS_LBL_FILE_NAME             = 'File Name: ';
-  INS_LBL_DATE_ADDED            = 'Date Added: ';
-  INS_LBL_PLAY_COUNT            = 'Play Count: ';
-  INS_LBL_LAST_PLAYED           = 'Last Played: ';
+  INS_LBL_FILE_SIZE             = 'File size: ';
+  INS_LBL_FOLDER_PATH           = 'Folder path: ';
+  INS_LBL_FILE_NAME             = 'File name: ';
+  INS_LBL_DATE_ADDED            = 'Date added: ';
+  INS_LBL_PLAY_COUNT            = 'Play count: ';
+  INS_LBL_LAST_PLAYED           = 'Last played: ';
   INS_LBL_RATING                = 'Rating: ';
-  INS_LBL_TRACKS_SELECTED       = 'Tracks Selected: ';
-  INS_LBL_TOTAL_FILE_SIZE       = 'Total File Size: ';
+  INS_LBL_TRACKS_SELECTED       = 'Tracks selected: ';
+  INS_LBL_TOTAL_FILE_SIZE       = 'Total file size: ';
+  { the Inspector's summary of several tracks }
+  INS_HDR_SELECTION             = '--- SELECTION ---';
+  INS_HDR_TAGS                  = '--- TAGS ---';
+  INS_LBL_NOT_IN_LIBRARY        = 'Not in the library: ';
+  INS_LBL_TOTAL_TIME            = 'Total time: ';
+  INS_LBL_FOLDERS               = 'Folders: ';
+  INS_LBL_ALBUM_ARTIST          = 'Album artist: ';
+  INS_LBL_ALBUM                 = 'Album: ';
+  INS_LBL_YEAR                  = 'Year: ';
+  INS_LBL_GENRE                 = 'Genre: ';
+  INS_LBL_REPLAYGAIN            = 'ReplayGain: ';
+  INS_LBL_FAVOURITES            = 'Favourites: ';
+  INS_VAL_EMPTY                 = '(empty)';
+  INS_VAL_ALL_TRACKS            = 'All tracks';
+  INS_VAL_NO_TRACK              = 'No track';
+  INS_VAL_NOT_RATED             = 'No track rated';
+  FMT_INS_COUNTED               = '%s (%d)';
+  FMT_INS_MORE                  = ', and %d more';
+  FMT_INS_MORE_LINE             = '  and %d more';
+  FMT_INS_OF_TRACKS             = '%d of %d tracks';
+  FMT_INS_PLAYS                 = '%d in all';
+  FMT_INS_NEVER_PLAYED          = ', %d tracks never played';
+  FMT_INS_RATED                 = '%d of %d tracks rated, average %.1f / 5';
+  FMT_INS_DATE_RANGE            = '%s to %s';
+  FMT_SIZE_GB                   = '%.2f GB';
 
   // ===========================================================================
   // VIRTUAL FOLDER / ALIAS EDITOR STRINGS (AuVirtualFolderForm)

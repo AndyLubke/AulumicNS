@@ -19,11 +19,13 @@ unit AuLists;
 interface
 
 uses
-  Windows, Classes, SysUtils, Math, Controls, Forms, ExtCtrls, LCLType, 
+  Windows, Classes, SysUtils, Math, Controls, Forms, ExtCtrls, LCLType, LazUTF8,
   AuGfx, AuAnim, AuTheme, AuIcons, AuControls;
 
 type
   TAuGetCellEvent = procedure(Sender: TObject; Row, Col: Integer; var AText: string) of object;
+  { the text of a row that typing its first letters is matched against }
+  TAuRowTextEvent = function(Sender: TObject; Row: Integer): string of object;
   TAuDrawCellEvent = procedure(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single;
     var Handled: Boolean) of object;
   TAuRowStyleEvent = procedure(Sender: TObject; Row: Integer; var Bold: Boolean; var Color: TARGB) of object;
@@ -57,6 +59,12 @@ type
     FVScroll, FHScroll: TAuScrollBar;
     FSortCol: Integer;
     FSortDesc: Boolean;
+    { typing the first letters of a row's text goes to that row (letters
+      typed within 0.9 s belong together; the text is that of TypeColumn) }
+    FTypeText: string;
+    FTypeTick: QWord;
+    FTypeColumn: Integer;
+    FOnTypeText: TAuRowTextEvent;
     FEmptyText: string;
     FResizeCol, FResizeStartX, FResizeStartW, FHoverHeader, FDownRow: Integer;
     { the edge was only taken because a finger reaches further than the
@@ -97,6 +105,7 @@ type
     function GetSelected(I: Integer): Boolean;
     procedure SetSelected(I: Integer; V: Boolean);
     procedure MoveFocus(N: Integer; Shift: TShiftState);
+    procedure TypeAhead(const Ch: string);
   protected
     procedure DoPaint(G: TGfx); override;
     procedure Resize; override;
@@ -106,6 +115,7 @@ type
     procedure MouseLeave; override;
     procedure DblClick; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure UTF8KeyPress(var UTF8Key: TUTF8Char); override;
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     function PanBy(DX, DY: Integer): Boolean; override;   // touch
   public
@@ -127,6 +137,10 @@ type
     procedure ClearSelection;
     procedure SelectAll;
     procedure SelectOnly(Row: Integer);
+    { these rows selected and no others, the focus on AFocus; ATopRow is the
+      first row shown, or below 0: the focused row is brought into view (a
+      list filled again takes back the selection it had) }
+    procedure RestoreSelection(const ARows: TIntegerArray; AFocus, ATopRow: Integer);
     function ColumnLeft(C: Integer): Integer;
     function SelectedRows: TIntegerArray;
     property RowCount: Integer read FRowCount write SetRowCount;
@@ -141,6 +155,12 @@ type
     property MultiSelect: Boolean read FMultiSelect write FMultiSelect;
     property SortColumn: Integer read FSortCol write FSortCol;
     property SortDescending: Boolean read FSortDesc write FSortDesc;
+    { the column whose text typing the first letters is matched against
+      (OnGetCell gives it; a list that only draws its cells has none) }
+    property TypeColumn: Integer read FTypeColumn write FTypeColumn;
+    { a list that draws its rows itself (OnDrawCell) says here what a row is
+      called; without it OnGetCell's text of TypeColumn is taken }
+    property OnTypeText: TAuRowTextEvent read FOnTypeText write FOnTypeText;
     property EmptyText: string read FEmptyText write FEmptyText;
     property OnGetCell: TAuGetCellEvent read FOnGetCell write FOnGetCell;
     property OnDrawCell: TAuDrawCellEvent read FOnDrawCell write FOnDrawCell;
@@ -553,6 +573,7 @@ end;
 
 procedure TAuListView.SelectOnly(Row: Integer);
 begin
+  FTypeText := '';              // a row chosen another way ends the text being typed
   ClearSelection;
   if (Row >= 0) and (Row < FRowCount) then
   begin
@@ -562,6 +583,38 @@ begin
     FAnchorRow := Row;
     EnsureVisible(Row);
   end;
+  DoSelChange;
+end;
+
+procedure TAuListView.RestoreSelection(const ARows: TIntegerArray; AFocus, ATopRow: Integer);
+var
+  I: Integer;
+begin
+  ClearSelection;
+  for I := 0 to High(ARows) do
+    if (ARows[I] >= 0) and (ARows[I] < FRowCount) and not FSel[ARows[I]] then
+    begin
+      FSel[ARows[I]] := True;
+      Inc(FSelCount);
+    end;
+  if (AFocus >= 0) and (AFocus < FRowCount) then
+  begin
+    FFocusRow := AFocus;
+    FAnchorRow := AFocus;
+  end
+  else
+  begin
+    FFocusRow := -1;
+    FAnchorRow := -1;
+  end;
+  if ATopRow >= 0 then
+  begin
+    FVScroll.Position := ATopRow;
+    FTop := FVScroll.Position;
+  end
+  else if FFocusRow >= 0 then
+    EnsureVisible(FFocusRow);
+  Invalidate;
   DoSelChange;
 end;
 
@@ -838,6 +891,7 @@ var
   P: TPoint;
 begin
   inherited MouseDown(Button, Shift, X, Y);
+  FTypeText := '';
   { the menu buttons }
   if (Button = mbLeft) and InMenuButton(X) then
   begin
@@ -1072,6 +1126,7 @@ var
 begin
   inherited KeyDown(Key, Shift);
   if Key = 0 then Exit;
+  if Key in [VK_UP, VK_DOWN, VK_PRIOR, VK_NEXT, VK_HOME, VK_END, VK_RETURN, VK_ESCAPE] then FTypeText := '';
   case Key of
     VK_UP: MoveFocus(FFocusRow - 1, Shift);
     VK_DOWN: MoveFocus(FFocusRow + 1, Shift);
@@ -1105,6 +1160,44 @@ begin
     else Exit;
   end;
   Key := 0;
+end;
+
+procedure TAuListView.TypeAhead(const Ch: string);
+var
+  U, T: string;
+  I, R, Start: Integer;
+begin
+  if not (Assigned(FOnTypeText) or Assigned(FOnGetCell)) or (FRowCount = 0) then Exit;
+  if GetTickCount64 - FTypeTick > 900 then FTypeText := '';
+  FTypeTick := GetTickCount64;
+  FTypeText := FTypeText + Ch;
+  U := UTF8LowerCase(FTypeText);
+  Start := Math.Max(FFocusRow, 0);
+  if Length(FTypeText) = Length(Ch) then Start := Start + 1;   // a new search starts after the focus
+  for I := 0 to FRowCount - 1 do
+  begin
+    R := (Start + I) mod FRowCount;
+    T := '';
+    if Assigned(FOnTypeText) then T := FOnTypeText(Self, R)
+    else FOnGetCell(Self, R, FTypeColumn, T);
+    if Pos(U, UTF8LowerCase(TrimLeft(T))) = 1 then
+    begin
+      MoveFocus(R, []);
+      Exit;
+    end;
+  end;
+end;
+
+procedure TAuListView.UTF8KeyPress(var UTF8Key: TUTF8Char);
+begin
+  inherited UTF8KeyPress(UTF8Key);
+  { a space only inside a text being typed }
+  if (Assigned(FOnTypeText) or Assigned(FOnGetCell)) and (UTF8Key <> '') and (UTF8Key[1] >= ' ') and
+     not ((UTF8Key = ' ') and ((FTypeText = '') or (GetTickCount64 - FTypeTick > 900))) then
+  begin
+    TypeAhead(UTF8Key);
+    UTF8Key := '';
+  end;
 end;
 
 function TAuListView.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean;

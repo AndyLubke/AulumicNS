@@ -149,6 +149,7 @@ begin
     end;
     if WindowState <> wsMinimized then
     begin
+      if FPlStatusDirty then UpdatePlaylistStatus;
       UpdatePosition;
       UpdateMeter;
       if (GetTickCount64 - FLastStatusTick > 1000) or
@@ -156,6 +157,9 @@ begin
       begin
         FLastStatusTick := GetTickCount64;
         UpdateEngineStatus;
+        { a change of the list that came without a notice }
+        if (FPl.EntryCount <> FPlStatusCount) or (FPl.List.SelCount <> FPlStatusSel) then
+          FPlStatusDirty := True;
         { also when what the stream does has changed }
         if (FPlayback.State = psPlaying) and
            ((not FRateShown) or (SignalKey(FPlayback.GetSignalInfo) <> FRateKey)) then
@@ -337,55 +341,78 @@ begin
   end;
 end;
 
-{ the status line during playback:
-  [resampling phase | ][gain | ]Buffer: n ms | CPU: x % }
+{ the right end of the status line during playback: the processor load, and
+  for a while a note when the sound was interrupted. What the stream is and
+  what is done to it stands in the banner and the Signal Path. }
 procedure TMainForm.UpdateEngineStatus;
+const
+  DROPOUT_NOTE_MS = 10000;
 var
-  St: TAudioStats;
-  A: TManagerConfig;
-  T, Part: string;
-  Phase: Integer;
+  Drops: Integer;
 begin
   if FPlayback.State <> psPlaying then
   begin
-    if FPlayback.State = psStopped then FStatus.EngineText := '';
+    { paused as stopped: a load that no longer moves would only mislead }
+    FStatus.EngineText := '';
+    FStatus.WarnText := '';
     Exit;
-  end;
-  St := FPlayback.GetEngineStats;
-  A := AppSettings.Data.Audio;
-  T := '';
-  if (St.InputRate > 0) and (St.OutputRate > 0) and A.ResamplePCM and (not FIsCurrentDoP) and
-     (not (FIsCurrentDsd and A.DisableResampleForDSD)) and (St.InputRate <> St.OutputRate) then
-  begin
-    if St.OutputRate > St.InputRate then
-    begin
-      Phase := A.UpsamplePhase;
-      Part := 'Upsampling: ';
-    end
-    else
-    begin
-      Phase := A.DownsamplePhase;
-      Part := 'Downsampling: ';
-    end;
-    T := Part + PHASE_OPTIONS[EnsureRange(Phase, 0, High(PHASE_OPTIONS))].DisplayName + '  |  ';
-  end;
-  if (not FIsCurrentDoP) and (not A.VolumeLocked) then
-  begin
-    if (Abs(St.AppliedReplayGain) > 0.001) and (A.PreampDB < 0) then
-      T := T + Format('Gain: %.2f dB (RG) + %.1f dB (Preamp)', [St.AppliedReplayGain, A.PreampDB]) + '  |  '
-    else if Abs(St.AppliedReplayGain) > 0.001 then
-      T := T + Format('Gain: %.2f dB (RG)', [St.AppliedReplayGain]) + '  |  '
-    else if A.PreampDB < 0 then
-      T := T + Format('Gain: %.1f dB (Preamp)', [A.PreampDB]) + '  |  ';
   end;
   if (FCpuTick = 0) or (GetTickCount64 - FCpuTick >= 1000) then
   begin
     FCpuTick := GetTickCount64;
     FCpuText := Format('%.1f%%', [GetAppCPUUsage]);
   end;
-  T := T + 'Buffer: ' + IntToStr(St.BufferSizeMs) + ' ms  |  CPU: ' + FCpuText;
-  if A.OutputApi = 1 then T := T + '  |  ASIO';
-  FStatus.EngineText := T;
+  FStatus.EngineText := 'CPU: ' + FCpuText;
+  { the sound was interrupted: said here for a while, as it happens (the
+    count starts again with every stream) }
+  Drops := FPlayback.GetSignalInfo.Dropouts;
+  if Drops > FDropsSeen then FDropTick := GetTickCount64;
+  FDropsSeen := Drops;
+  if (Drops > 0) and (FDropTick <> 0) and (GetTickCount64 - FDropTick < DROPOUT_NOTE_MS) then
+  begin
+    if Drops = 1 then FStatus.WarnText := 'Sound interrupted'
+    else FStatus.WarnText := Format('Sound interrupted (%d times)', [Drops]);
+  end
+  else
+    FStatus.WarnText := '';
+end;
+
+{ the left end of the status line while nothing else is said there: what
+  the playlist holds, or what is selected in it }
+procedure TMainForm.UpdatePlaylistStatus;
+const
+  STATUS_DOT = '•';
+var
+  Sel: TIntArray;
+  I, N: Integer;
+  Sec: Int64;
+  T: string;
+begin
+  FPlStatusDirty := False;
+  if (FPl = nil) or (FStatus = nil) then Exit;
+  FPlStatusCount := FPl.EntryCount;
+  FPlStatusSel := FPl.List.SelCount;
+  T := '';
+  Sel := FPl.SelectedEntries;
+  Sec := 0;
+  if Length(Sel) >= 2 then
+  begin
+    for I := 0 to High(Sel) do Inc(Sec, FPl.Entry(Sel[I]).Seconds);
+    T := Format('%s selected  %s  %s', [FormatCount(Length(Sel)), STATUS_DOT, FormatLongDuration(Sec)]);
+  end
+  else
+  begin
+    N := FPl.EntryCount;
+    for I := 0 to N - 1 do Inc(Sec, FPl.Entry(I).Seconds);
+    if N = 1 then T := Format('1 track  %s  %s', [STATUS_DOT, FormatLongDuration(Sec)])
+    else if N > 1 then T := Format('%s tracks  %s  %s', [FormatCount(N), STATUS_DOT, FormatLongDuration(Sec)]);
+  end;
+  FStatus.IdleText := T;
+end;
+
+procedure TMainForm.PlSelChange(Sender: TObject);
+begin
+  FPlStatusDirty := True;
 end;
 
 { ---- "Opening..." and "Waiting for drive..." ---- }
@@ -638,16 +665,7 @@ begin
   else T := 'Native Rate: ' + OutText;
   FRateKey := SignalKey(Si);
   FBanner.RateText := T;
-  if Si.BitPerfect then
-  begin
-    FBanner.Badge := bbBitPerfect;
-    FBanner.BadgeText := 'Bit-perfect';
-  end
-  else
-  begin
-    FBanner.Badge := bbProcessed;
-    FBanner.BadgeText := 'Processed';
-  end;
+  if Si.BitPerfect then FBanner.Badge := bbBitPerfect else FBanner.Badge := bbProcessed;
   FRateShown := True;
   FBanner.Changed;
 end;

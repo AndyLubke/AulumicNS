@@ -53,10 +53,19 @@ const
   LNF_OFFLINE = 2;     // a library folder that could not be reached
 
 type
+  { how the tree looks: its nodes by their paths }
+  TLibTreeState = record
+    Valid: Boolean;
+    Expanded, Selected: array of string;
+    Focus, Top: string;      // the focused node and the one in the first row
+    TopRow: Integer;         // the first row, where the node of Top is gone
+  end;
+
   { TLibraryPane }
 
   TLibraryPane = class(TAuPanel)
   private
+    FBeforeSearch: TLibTreeState;   // the tree as it was when the search began
     FTop: TAuPanel;
     FLib: TLibraryManager;
     FSearchTimer: TTimer;
@@ -69,6 +78,8 @@ type
     FOnTileModeChange: TNotifyEvent;
     FWantTopRow, FWantTileScroll: Integer;   // the scroll positions of the last run, put back once the window is laid out
     procedure ScrollLater(Data: PtrInt);
+    procedure SearchTree(const AQuery: string);
+    procedure LeaveSearch;
     procedure TreeBtnClick(Sender: TObject);
     procedure TilesBtnClick(Sender: TObject);
     procedure TileSizeWheel(Sender: TObject; Index: Integer);
@@ -108,8 +119,13 @@ type
     procedure SaveView;
     { the four categories, all closed }
     procedure Populate;
+    { the opened nodes, the selection and the scroll position of the tree,
+      and putting them back into a tree built again (a node that is gone:
+      its parent has the focus) }
+    function TakeTreeState: TLibTreeState;
+    procedure PutTreeState(const AState: TLibTreeState);
     { rebuilds the tree from the library, keeping the opened nodes, the
-      selection and the scroll position; ends a search }
+      selection and the scroll position; a search shown is made again }
     procedure RefreshLibrary;
     { F5: a folder node is filled again from the library, else RefreshLibrary }
     procedure RefreshCurrentFolder;
@@ -166,8 +182,6 @@ const
   NODE_TRACKS  = 'Tracks';
   { below this width (unscaled) the pane has one button for tree / tiles }
   NARROW_PANE_WIDTH = 290;
-  { from this width (unscaled) the tiles' sort buttons are next to the search box }
-  SORT_IN_TOP_WIDTH = 400;
   LIB_EMPTY_TEXT = 'The library is empty.' + LineEnding +
     'Add the music folders: Main menu > Library > Library folders...';
 
@@ -263,7 +277,7 @@ end;
 
 procedure TLibraryPane.TopResize(Sender: TObject);
 var
-  Right, VW: Integer;
+  Right: Integer;
 begin
   if (Search = nil) or (BtnRescan = nil) or (BtnTree = nil) or (BtnTiles = nil) then Exit;
   BtnRescan.SetBounds(FTop.Width - S(10) - S(36), S(9), S(36), S(34));
@@ -273,30 +287,6 @@ begin
     switches to and fro (TilesBtnClick) }
   BtnTree.Visible := FTop.Width >= S(NARROW_PANE_WIDTH);
   if BtnTree.Visible then Right := BtnTree.Left else Right := BtnTiles.Left;
-  { with the tiles shown: their two sort buttons, placed as the playlist's
-    are above the playlist. A pane too narrow for them keeps them in the
-    line above the tiles. }
-  if Tiles <> nil then
-  begin
-    if FTileMode and (FTop.Width >= S(SORT_IN_TOP_WIDTH)) then
-    begin
-      Tiles.HostSort(FTop);
-      { the Tab key goes from left to right: the buttons that came in last
-        stand between the search box and the tree button }
-      Search.TabOrder := 0;
-      Tiles.BtnDir.TabOrder := 1;
-      Tiles.BtnSort.TabOrder := 2;
-      BtnTree.TabOrder := 3;
-      BtnTiles.TabOrder := 4;
-      BtnRescan.TabOrder := 5;
-      VW := Tiles.BtnSort.PreferredWidth;
-      Tiles.BtnSort.SetBounds(Right - S(4) - VW, S(10), VW, S(32));
-      Tiles.BtnDir.SetBounds(Tiles.BtnSort.Left - S(34), S(9), S(34), S(34));
-      Right := Tiles.BtnDir.Left + S(2);
-    end
-    else
-      Tiles.HostSort(nil);
-  end;
   Search.SetBounds(S(10), S(10), Math.Max(S(40), Right - S(16)), S(32));
 end;
 
@@ -371,9 +361,25 @@ var
   Parts: TStringList;
   I: Integer;
   N: TAuTreeNode;
-  Sel, All: string;
+  Sel, All, Steps: string;
+  T0, T1: QWord;
+
+  { one more step of the restore and what it took, into the log line }
+  procedure Took(const AName: string);
+  var
+    Now_: QWord;
+  begin
+    Now_ := GetTickCount64;
+    if Steps <> '' then Steps := Steps + ', ';
+    Steps := Steps + AName + ' ' + IntToStr(Now_ - T1);
+    T1 := Now_;
+  end;
+
 begin
   FLib := ALib;
+  T0 := GetTickCount64;
+  T1 := T0;
+  Steps := '';
   Populate;
   if ARestoreView and (Tree.RootCount > 0) then
   begin
@@ -395,11 +401,13 @@ begin
         KeepWindowAlive;
         N := Tree.FindPath(Parts[I], True);
         if N <> nil then N.Expanded := True;
+        if N <> nil then Took(N.Caption) else Took('(gone)');
       end;
     finally
       Tree.EndUpdate;
       Parts.Free;
     end;
+    Took('rows');
     Sel := TextToPath(AppSettings.Data.LibrarySelection);
     N := Tree.FindPath(Sel, True);
     while (N = nil) and (Pos(#1, Sel) > 0) do
@@ -408,6 +416,9 @@ begin
       N := Tree.FindPath(Sel, True);
     end;
     if N <> nil then Tree.SelectNode(N);
+    Took('selection');
+    { how long the tree of the last run took to come back, node by node }
+    AddLog(SafeFormat('[Library] Tree restored in %d ms (%s).', [GetTickCount64 - T0, Steps]));
     FWantTopRow := AppSettings.Data.LibraryTopRow;
     FWantTileScroll := AppSettings.Data.LibraryTilesScroll;
     Application.QueueAsyncCall(@ScrollLater, 0);
@@ -421,6 +432,7 @@ begin
     { SetTileMode starts at the selected node: all albums, if it was so }
     if ARestoreView and AppSettings.Data.LibraryTilesAll then
     begin
+      Tiles.LeavePlace;
       FTileAll := True;
       RebuildTiles;
     end;
@@ -747,52 +759,97 @@ begin
   end;
 end;
 
-procedure TLibraryPane.RefreshLibrary;
+function TLibraryPane.TakeTreeState: TLibTreeState;
 var
-  Expanded: TStringList;
-  SelPath: string;
+  L: TStringList;
+  A: TAuTreeNodeArray;
+  I: Integer;
+begin
+  Result := Default(TLibTreeState);
+  Result.Valid := True;
+  L := TStringList.Create;
+  try
+    for I := 0 to Tree.RootCount - 1 do CollectExpanded(Tree.Roots(I), L);
+    SetLength(Result.Expanded, L.Count);
+    for I := 0 to L.Count - 1 do Result.Expanded[I] := L[I];
+  finally
+    L.Free;
+  end;
+  A := Tree.SelectedNodes;
+  SetLength(Result.Selected, Length(A));
+  for I := 0 to High(A) do Result.Selected[I] := Tree.NodePath(A[I]);
+  if Tree.FocusedNode <> nil then Result.Focus := Tree.NodePath(Tree.FocusedNode);
+  if Tree.TopNode <> nil then Result.Top := Tree.NodePath(Tree.TopNode);
+  Result.TopRow := Tree.TopRow;
+end;
+
+procedure TLibraryPane.PutTreeState(const AState: TLibTreeState);
+var
   I: Integer;
   N: TAuTreeNode;
+  P: string;
 begin
-  if Search.Text <> '' then
-  begin
-    FSearchTimer.Enabled := False;
-    Search.Text := '';
-  end;
-  Expanded := TStringList.Create;
+  if not AState.Valid then Exit;
+  Tree.BeginUpdate;
   try
-    for I := 0 to Tree.RootCount - 1 do CollectExpanded(Tree.Roots(I), Expanded);
-    SelPath := '';
-    if Tree.FocusedNode <> nil then SelPath := Tree.NodePath(Tree.FocusedNode);
-    Tree.BeginUpdate;
-    try
-      Populate;
-      { parents come before their children in the list }
-      for I := 0 to Expanded.Count - 1 do
-      begin
-        N := Tree.FindPath(Expanded[I], True);
-        if N <> nil then N.Expanded := True;
-      end;
-    finally
-      Tree.EndUpdate;
-    end;
-    if SelPath <> '' then
+    { parents come before their children in the list }
+    for I := 0 to High(AState.Expanded) do
     begin
-      N := Tree.FindPath(SelPath, True);
-      { gone (deleted / renamed): its parent }
-      while (N = nil) and (Pos(#1, SelPath) > 0) do
-      begin
-        SelPath := Copy(SelPath, 1, RPos(#1, SelPath) - 1);
-        N := Tree.FindPath(SelPath, True);
-      end;
-      if N <> nil then
-      begin
-        Tree.SelectNode(N);
-        Tree.MakeVisible(N);
-      end;
+      KeepWindowAlive;
+      N := Tree.FindPath(AState.Expanded[I], True);
+      if N <> nil then N.Expanded := True;
     end;
   finally
-    Expanded.Free;
+    Tree.EndUpdate;
+  end;
+  P := AState.Focus;
+  N := Tree.FindPath(P, True);
+  { gone (deleted / renamed): its parent }
+  while (N = nil) and (Pos(#1, P) > 0) do
+  begin
+    P := Copy(P, 1, RPos(#1, P) - 1);
+    N := Tree.FindPath(P, True);
+  end;
+  if N <> nil then Tree.SelectNode(N);
+  { the other selected nodes; the focused one stands for a selection that
+    is gone }
+  if Length(AState.Selected) > 1 then
+    for I := 0 to High(AState.Selected) do
+    begin
+      { FindPath gives the last part it finds: only the node itself counts }
+      N := Tree.FindPath(AState.Selected[I], False);
+      if (N <> nil) and (Tree.NodePath(N) = AState.Selected[I]) then N.Selected := True;
+    end;
+  { the scroll position last: SelectNode brought the focused node into
+    view, which is not where the tree was }
+  N := Tree.FindPath(AState.Top, False);
+  { FindPath gives the last part it finds: only the node itself counts }
+  if (N <> nil) and (Tree.NodePath(N) <> AState.Top) then N := nil;
+  if (N = nil) or not Tree.ScrollNodeToTop(N) then Tree.TopRow := AState.TopRow;
+  Tree.Invalidate;
+end;
+
+procedure TLibraryPane.RefreshLibrary;
+var
+  State: TLibTreeState;
+  Q: string;
+begin
+  State := TakeTreeState;
+  if FSearchActive then
+  begin
+    { what was found, searched again and shown where it was }
+    Q := Trim(Search.Text);
+    if Length(Q) < 2 then LeaveSearch
+    else
+    begin
+      SearchTree(Q);
+      PutTreeState(State);
+    end;
+  end
+  else
+  begin
+    Populate;
+    PutTreeState(State);
   end;
   if FTileMode then
   begin
@@ -804,10 +861,13 @@ end;
 procedure TLibraryPane.RefreshCurrentFolder;
 var
   N: TAuTreeNode;
+  State: TLibTreeState;
 begin
   N := Tree.FocusedNode;
   if (N <> nil) and (NodeType(N) = lntFolder) and not FSearchActive then
   begin
+    { the folders opened inside it open again }
+    State := TakeTreeState;
     Tree.BeginUpdate;
     try
       N.Expanded := False;
@@ -818,6 +878,7 @@ begin
     finally
       Tree.EndUpdate;
     end;
+    PutTreeState(State);
     Exit;
   end;
   RefreshLibrary;
@@ -843,20 +904,22 @@ begin
   FSearchTimer.Enabled := False;
   Search.Text := '';
   FSearchTimer.Enabled := False;
-  if FSearchActive then Populate;
+  if FSearchActive then LeaveSearch;
   if FTileMode then RebuildTiles;
+end;
+
+{ the tree again in place of what a search found, as it was when the search
+  began }
+procedure TLibraryPane.LeaveSearch;
+begin
+  Populate;
+  PutTreeState(FBeforeSearch);
+  FBeforeSearch.Valid := False;
 end;
 
 procedure TLibraryPane.PerformSearch;
 var
   Q: string;
-  MArt, MAlb, MGen, MFld, MCmp: TStringList;
-  MTrk: TTrackList;
-  I: Integer;
-  Cat: TAuTreeNode;
-  T: PTrackInfo;
-  Cap: string;
-  OldCursor: TCursor;
 begin
   if FLib = nil then Exit;
   { with the tiles shown the search fills them; the tree follows when it
@@ -869,9 +932,27 @@ begin
   Q := Trim(Search.Text);
   if Length(Q) < 2 then
   begin
-    if FSearchActive then Populate;
+    if FSearchActive then LeaveSearch;
     Exit;
   end;
+  SearchTree(Q);
+end;
+
+{ the tree shows what the library finds for AQuery }
+procedure TLibraryPane.SearchTree(const AQuery: string);
+var
+  Q: string;
+  MArt, MAlb, MGen, MFld, MCmp: TStringList;
+  MTrk: TTrackList;
+  I: Integer;
+  Cat: TAuTreeNode;
+  T: PTrackInfo;
+  Cap: string;
+  OldCursor: TCursor;
+begin
+  Q := AQuery;
+  { the first search: this is the tree to come back to }
+  if not FSearchActive then FBeforeSearch := TakeTreeState;
   FSearchActive := True;
   MArt := TStringList.Create;
   MAlb := TStringList.Create;
@@ -1099,7 +1180,6 @@ procedure TLibraryPane.TileSortChange(Sender: TObject);
 begin
   AppSettings.Data.LibraryTileSort := Ord(Tiles.Sort);
   AppSettings.Data.LibraryTileSortRev := Tiles.Reverse;
-  TopResize(nil);                 // the order's name may have another width
 end;
 
 procedure TLibraryPane.TileClearScope(Sender: TObject);
@@ -1221,8 +1301,6 @@ begin
       else if W = BtnTree then What := 'tree'
       else if W = BtnTiles then What := 'tiles'
       else if W = BtnRescan then What := 'rescan'
-      else if W = Tiles.BtnDir then What := 'arrow'
-      else if W = Tiles.BtnSort then What := 'order'
       else What := '?';
       Result := Result + Format('%s@%d ', [What, W.Left]);
     end;
@@ -1268,14 +1346,13 @@ end;
 
 procedure TLibraryPane.RebuildTiles(AKeep: Boolean);
 var
-  Q, Crumb, Key, EmptyText: string;
-  L, Part, MTrk: TTrackList;
-  Found, Whole, Done, MArt, MAlb, MGen, MFld: TStringList;
+  Q, Crumb, EmptyText, Place: string;
+  L, MTrk: TTrackList;
+  Found, MArt, MAlb, MGen, MFld: TStringList;
   N: TAuTreeNode;
   A: TAuTreeNodeArray;
-  T, P: PTrackInfo;
-  I, J, At: Integer;
-  CanClear, NoAlbum: Boolean;
+  I: Integer;
+  CanClear: Boolean;
   OldCursor: TCursor;
   StartTick: QWord;
 
@@ -1299,11 +1376,8 @@ begin
   end;
   StartTick := GetTickCount64;
   L := TTrackList.Create;
-  Part := TTrackList.Create;
   MTrk := TTrackList.Create;
   Found := PathSet;
-  Whole := PathSet;
-  Done := PathSet;
   MArt := TStringList.Create;
   MAlb := TStringList.Create;
   MGen := TStringList.Create;
@@ -1313,78 +1387,31 @@ begin
   try
     if Q <> '' then
     begin
+      { the albums of the tracks found, each whole and marked with how many
+        of its tracks were found. An artist, genre or folder that matches by
+        name needs nothing more: all its tracks are found. (The other lists
+        of SearchLibrary are the artists, albums ... of the tracks found,
+        not names that match - taking all their tracks would show most of
+        the library.) }
       FLib.SearchLibrary(Q, MArt, MAlb, MGen, MFld, MTrk);
-      { what was found as an artist, album, genre or folder: all its albums }
-      for I := 0 to MArt.Count - 1 do
-      begin
-        KeepWindowAlive;
-        Part.Clear;
-        FLib.GetTracksByArtist(MArt[I], Part);
-        L.AddList(Part);
-      end;
-      for I := 0 to MAlb.Count - 1 do
-      begin
-        KeepWindowAlive;
-        Part.Clear;
-        FLib.GetTracksByAlbum(MAlb[I], Part);
-        L.AddList(Part);
-      end;
-      for I := 0 to MGen.Count - 1 do
-      begin
-        KeepWindowAlive;
-        Part.Clear;
-        FLib.GetTracksByGenre(MGen[I], Part);
-        L.AddList(Part);
-      end;
-      for I := 0 to MFld.Count - 1 do
-      begin
-        KeepWindowAlive;
-        Part.Clear;
-        FLib.GetTracksInFolderRecursive(ExcludeTrailingPathDelimiter(MFld[I]), Part);
-        L.AddList(Part);
-      end;
-      for I := 0 to L.Count - 1 do Whole.Add(L[I]^.FilePath);
-      { a track that was found: its whole album, marked with how many of its
-        tracks were found }
-      for I := 0 to MTrk.Count - 1 do
-      begin
-        T := MTrk[I];
-        Found.Add(T^.FilePath);
-        if Whole.Find(T^.FilePath, At) then Continue;
-        NoAlbum := (Trim(T^.Album) = '') or SameText(Trim(T^.Album), LBL_UNKNOWN_ALBUM);
-        if NoAlbum or (Trim(T^.AlbumArtist) = '') then
-          Key := #1 + T^.FolderDir + #1 + T^.Album
-        else
-          Key := T^.AlbumArtist + #1 + T^.Album;
-        if Done.Find(Key, At) then Continue;
-        Done.Add(Key);
-        KeepWindowAlive;
-        Part.Clear;
-        if NoAlbum then
-          FLib.GetTracksInFolder(ExcludeTrailingPathDelimiter(T^.FolderDir), Part)
-        else
-          FLib.GetTracksByAlbum(T^.Album, Part);
-        for J := 0 to Part.Count - 1 do
-        begin
-          P := Part[J];
-          if P^.Album <> T^.Album then Continue;
-          if P^.AlbumArtist <> T^.AlbumArtist then Continue;
-          if (NoAlbum or (Trim(T^.AlbumArtist) = '')) and (P^.FolderDir <> T^.FolderDir) then Continue;
-          L.Add(P^);
-        end;
-      end;
+      for I := 0 to MTrk.Count - 1 do Found.Add(MTrk[I]^.FilePath);
+      KeepWindowAlive;
+      FLib.GetAlbumsOfTracks(MTrk, L);
+      { a search is no place to come back to: the tiles return to the part
+        of the library shown before it }
       Tiles.SetTracks(L, Found, Q, 'Search: ' + Q, 'Nothing found for "' + Q + '".', False, AKeep);
     end
     else
     begin
       { the tree may still show what an earlier search found }
-      if FSearchActive then Populate;
+      if FSearchActive then LeaveSearch;
       N := Tree.FocusedNode;
       if (N <> nil) and (NodeType(N) = lntTrack) then N := N.Parent;
       if FTileAll or (N = nil) or (NodeType(N) = lntCategory) then
       begin
         FLib.GetAllTracks(L);
         Crumb := LBL_ALL_ALBUMS;
+        Place := TILE_PLACE_ALL;
         CanClear := False;
       end
       else
@@ -1393,11 +1420,12 @@ begin
         A[0] := N;
         CollectTracks(A, L);
         Crumb := Tree.NodePath(N);
+        Place := Crumb;
         CanClear := True;
       end;
       if FLib.GetTrackCount = 0 then EmptyText := LIB_EMPTY_TEXT
       else EmptyText := 'No albums here.';
-      Tiles.SetTracks(L, nil, '', Crumb, EmptyText, CanClear, AKeep);
+      Tiles.SetTracks(L, nil, '', Crumb, EmptyText, CanClear, AKeep, Place);
     end;
     AddLog(SafeFormat('[Library] Tiles: %d albums of %d tracks.', [Tiles.TileCount, L.Count]), StartTick);
   finally
@@ -1405,11 +1433,8 @@ begin
     MGen.Free;
     MAlb.Free;
     MArt.Free;
-    Done.Free;
-    Whole.Free;
     Found.Free;
     MTrk.Free;
-    Part.Free;
     L.Free;
     Screen.Cursor := OldCursor;
   end;

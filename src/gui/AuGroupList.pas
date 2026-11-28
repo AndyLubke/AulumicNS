@@ -163,6 +163,10 @@ type
     { puts row R where TopRow finds it }
     procedure ScrollRowToTop(R: Integer);
     procedure SelectOnly(R: Integer);
+    { these rows selected and no others, the focus on AFocus (-1: none);
+      nothing scrolls and no group is opened (a list built again takes back
+      the selection it had) }
+    procedure RestoreSelection(const ARows: TAuRowArray; AFocus: Integer);
     procedure SelectAll;
     procedure ClearSelection;
     function SelectedRows: TAuRowArray;
@@ -732,6 +736,36 @@ begin
     FFocus := R;
     FAnchor := R;
     EnsureVisible(R);
+  end;
+  Invalidate;
+  DoSelChange;
+end;
+
+procedure TAuGroupList.RestoreSelection(const ARows: TAuRowArray; AFocus: Integer);
+var
+  I: Integer;
+
+  { an item of a collapsed group cannot be seen }
+  function Hidden(ARow: Integer): Boolean;
+  begin
+    Result := (FRows[ARow].Kind = rkItem) and (FRows[ARow].Group >= 0) and FRows[FRows[ARow].Group].Collapsed;
+  end;
+
+begin
+  ClearSelQuiet;
+  { hidden items are never selected, and the focus is on their header }
+  for I := 0 to High(ARows) do
+    if (ARows[I] >= 0) and (ARows[I] < FCount) and not Hidden(ARows[I]) then FRows[ARows[I]].Selected := True;
+  if (AFocus >= 0) and (AFocus < FCount) then
+  begin
+    if Hidden(AFocus) then AFocus := FRows[AFocus].Group;
+    FFocus := AFocus;
+    FAnchor := AFocus;
+  end
+  else
+  begin
+    FFocus := -1;
+    FAnchor := -1;
   end;
   Invalidate;
   DoSelChange;

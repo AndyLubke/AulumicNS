@@ -34,7 +34,7 @@ uses
 
 type
   { (stored by its number: new orders are added at the end) }
-  TTileSort = (tsArtist, tsAlbum, tsYear, tsAdded, tsComposer);
+  TTileSort = (tsArtist, tsAlbum, tsYear, tsAdded, tsComposer, tsFolder);
 
   TLibTile = record
     Key: string;                      // what makes it one album (see the unit's head)
@@ -62,6 +62,14 @@ type
   end;
   TTileIdxCompare = function(A, B: Integer): Integer of object;
 
+  { how a part of the library was left: the albums by their keys }
+  TTilePlace = record
+    Place: string;
+    Sel: array of string;
+    Focus, Top: string;
+    TopOffset, CellH: Integer;   // pixels of the top row scrolled out, at this row height
+  end;
+
   { TLibraryTiles }
 
   TLibraryTiles = class(TAuPanel)
@@ -78,9 +86,9 @@ type
     FThumbPx: Integer;                // the size the kept thumbnails were read at
     FSort: TTileSort;
     FReverse: Boolean;
-    FSortHost: TWinControl;           // where the two sort buttons are (nil: in the line above the tiles)
-    FPlainAll: Boolean;               // all albums, no search: the line has nothing to say
     FQuery: string;                   // the search the tiles are for, in lower case
+    FPlace: string;                   // the part of the library shown ('': none that is remembered)
+    FPlaces: array of TTilePlace;     // how the parts shown before were left, the oldest first
     FSortMenu: TAuMenu;
     FOnOffline: TTileOfflineEvent;
     FOnSortChange, FOnClearScope: TNotifyEvent;
@@ -102,6 +110,9 @@ type
     procedure SetSort(V: TTileSort);
     procedure TakeState(ASel: TStringList; out AFocus: string; out AScroll: Integer);
     procedure PutState(ASel: TStringList; const AFocus: string; AScroll: Integer);
+    function IndexOfKey(const AKey: string): Integer;
+    procedure RememberPlace;
+    function ReturnToPlace(const APlace: string): Boolean;
     procedure GridInfo(Sender: TObject; Index: Integer; out Info: TAuTileInfo);
     function GridArt(Sender: TObject; Index: Integer; var ABudget: Integer;
       out APending: Boolean): TGfxBitmap;
@@ -117,18 +128,22 @@ type
       ACrumb: the line above the tiles (a path: its parts joined by #1); ACanClear: with the button that
       widens it to all albums; AKeep: the albums that were selected are
       selected again and the tiles stay where they were scrolled to (the
-      same part of the library, read again) }
+      same part of the library, read again). APlace names the part of the
+      library ('': not remembered, a search): a part shown before comes
+      back as it was left; coming up from a part inside it (APlace is the
+      beginning of its name, the parts joined by #1, or TILE_PLACE_ALL) the
+      album that had the focus there is at the top }
     procedure SetTracks(AList: TTrackList; AFound: TStringList; const AQuery, ACrumb, AEmptyText: string;
-      ACanClear: Boolean; AKeep: Boolean = False);
+      ACanClear: Boolean; AKeep: Boolean = False; const APlace: string = '');
+    { the next SetTracks is a fresh start: it does not count as coming up
+      from the part shown now }
+    procedure LeavePlace;
     function TileCount: Integer;
     procedure ClearThumbCache;
     { the two sort buttons move into AHost (the caller places them there) or,
       with nil, back into the line above the tiles. With the buttons
       elsewhere that line is slim, and hidden while it would only say
       "All albums". }
-    procedure HostSort(AHost: TWinControl);
-    function BtnSort: TAuButton;
-    function BtnDir: TAuIconButton;
     { a tile by its place in the grid }
     function Tile(Index: Integer): PLibTile;
     property Sort: TTileSort read FSort write SetSort;
@@ -142,15 +157,23 @@ type
   end;
 
 const
-  TILE_SORT_NAMES: array[TTileSort] of string = ('Artist', 'Album', 'Year', 'Added to library', 'Composer');
+  TILE_SORT_NAMES: array[TTileSort] of string = ('Artist', 'Album', 'Year', 'Added to library', 'Composer', 'Folder');
   { the orders as the menu lists them }
-  TILE_SORT_MENU: array[0..4] of TTileSort = (tsArtist, tsComposer, tsAlbum, tsYear, tsAdded);
+  TILE_SORT_MENU: array[0..5] of TTileSort = (tsArtist, tsComposer, tsAlbum, tsYear, tsAdded, tsFolder);
   LBL_ALL_ALBUMS = 'All albums';
+  { the place name of all albums (no path begins with it) }
+  TILE_PLACE_ALL = #2;
+  { more places than this are not remembered: the oldest goes }
+  MAX_TILE_PLACES = 64;
+
+{ two folders as the library tree lists them: part by part of their paths,
+  and a folder's sub folders before what lies in the folder itself }
+function CompareFolderOrder(const A, B: string): Integer;
 
 implementation
 
 uses
-  AuAudioTypes, uAppConsts, uAppStrings, uMetaUtils;
+  AuAudioTypes, uAppConsts, uAppStrings, uMetaUtils, uLibraryManager;
 
 const
   LBL_VARIOUS_ARTISTS = 'Various artists';
@@ -208,9 +231,15 @@ begin
   FBtnDir := TAuIconButton.Create(Self);
   FBtnDir.Parent := FHead;
   FBtnDir.IconSize := 16;
+  FBtnDir.Style := ibRect;
   FBtnDir.Hint := 'Reverse the order';
   FBtnDir.ShowHint := True;
   FBtnDir.OnClick := @DirClick;
+  { the Tab key goes through the line from left to right }
+  FCrumb.TabOrder := 0;
+  FBtnClear.TabOrder := 1;
+  FBtnDir.TabOrder := 2;
+  FBtnSort.TabOrder := 3;
   ShowSort;
   Grid := TAuTileGrid.Create(Self);
   Grid.Parent := Self;
@@ -242,19 +271,16 @@ var
 begin
   if (FCrumb = nil) or (FBtnSort = nil) or (FBtnDir = nil) or (FBtnClear = nil) then Exit;
   R := FHead.Width - S(6);
-  if FSortHost = nil then
+  { at the right: the arrow and the name of the order, as above the
+    playlist; a narrow pane has no room for the arrow }
+  W := Math.Min(FBtnSort.PreferredWidth - S(16), Math.Max(S(40), FHead.Width div 2));
+  FBtnSort.SetBounds(R - W, S(3), W, S(28));
+  R := FBtnSort.Left;
+  FBtnDir.Visible := FHead.Width >= S(NARROW_HEAD_WIDTH);
+  if FBtnDir.Visible then
   begin
-    { at the right: the arrow and the name of the order, as above the
-      playlist; a narrow pane has no room for the arrow }
-    W := Math.Min(FBtnSort.PreferredWidth, Math.Max(S(40), FHead.Width div 2));
-    FBtnSort.SetBounds(R - W, S(3), W, S(28));
-    R := FBtnSort.Left;
-    FBtnDir.Visible := FHead.Width >= S(NARROW_HEAD_WIDTH);
-    if FBtnDir.Visible then
-    begin
-      FBtnDir.SetBounds(R - S(30), S(3), S(30), S(28));
-      R := FBtnDir.Left;
-    end;
+    FBtnDir.SetBounds(R - S(20), S(3), S(20), S(28));
+    R := FBtnDir.Left;
   end;
   R := R - S(4);
   X := S(14);
@@ -267,49 +293,14 @@ begin
     FBtnClear.SetBounds(FCrumb.Left + FCrumb.Width + S(2), (FHead.Height - S(22)) div 2, S(26), S(22));
 end;
 
-function TLibraryTiles.BtnSort: TAuButton;
-begin
-  Result := FBtnSort;
-end;
-
-function TLibraryTiles.BtnDir: TAuIconButton;
-begin
-  Result := FBtnDir;
-end;
-
-procedure TLibraryTiles.HostSort(AHost: TWinControl);
-begin
-  if AHost = FSortHost then Exit;
-  FSortHost := AHost;
-  if AHost = nil then AHost := FHead;
-  FBtnSort.Parent := AHost;
-  FBtnDir.Parent := AHost;
-  FBtnDir.Visible := True;
-  { in the line above the tiles the Tab key goes from left to right: the
-    cross, the arrow, the order's name (a host sets its own order) }
-  if FSortHost = nil then
-  begin
-    FBtnClear.TabOrder := 0;
-    FBtnDir.TabOrder := 1;
-    FBtnSort.TabOrder := 2;
-  end;
-  UpdateHead;
-end;
-
-{ the line above the tiles: tall with the sort buttons in it, slim without
-  them, and not there while it would only say "All albums" }
+{ the line above the tiles: always there, with the path at its left and the
+  two sort buttons at its right, so nothing above the tiles moves when the
+  view or the part of the library changes }
 procedure TLibraryTiles.UpdateHead;
-var
-  H: Integer;
-  NeedLine: Boolean;
 begin
-  if FSortHost = nil then H := S(34) else H := S(26);
-  NeedLine := (FSortHost = nil) or not FPlainAll;
-  if FHead.Height <> H then FHead.Height := H;
-  if FHead.Visible <> NeedLine then FHead.Visible := NeedLine;
-  { without the line the first tiles stand where the first album header of
-    the playlist stands }
-  if NeedLine then Grid.TopPad := 8 else Grid.TopPad := 5;
+  if FHead.Height <> S(34) then FHead.Height := S(34);
+  if not FHead.Visible then FHead.Visible := True;
+  Grid.TopPad := 8;
   HeadResize(nil);
 end;
 
@@ -432,6 +423,93 @@ begin
   Grid.RestoreState(Sel, Focus, AScroll);
 end;
 
+function TLibraryTiles.IndexOfKey(const AKey: string): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if AKey = '' then Exit;
+  for I := 0 to FTileN - 1 do
+    if Tile(I)^.Key = AKey then Exit(I);
+end;
+
+{ how the part shown now is left: selection, focus and the album at the top }
+procedure TLibraryTiles.RememberPlace;
+var
+  P: TTilePlace;
+  I, N, At: Integer;
+begin
+  if (FPlace = '') or (FTileN = 0) then Exit;
+  P := Default(TTilePlace);
+  P.Place := FPlace;
+  SetLength(P.Sel, FTileN);
+  N := 0;
+  for I := 0 to FTileN - 1 do
+    if Grid.Selected[I] then
+    begin
+      P.Sel[N] := Tile(I)^.Key;
+      Inc(N);
+    end;
+  SetLength(P.Sel, N);
+  if Tile(Grid.FocusIndex) <> nil then P.Focus := Tile(Grid.FocusIndex)^.Key;
+  I := Grid.TopTile(P.TopOffset);
+  if Tile(I) <> nil then P.Top := Tile(I)^.Key;
+  P.CellH := Grid.RowHeight;
+  { the place again: at the end, as the newest }
+  At := -1;
+  for I := 0 to High(FPlaces) do
+    if FPlaces[I].Place = FPlace then At := I;
+  if At < 0 then
+  begin
+    if Length(FPlaces) >= MAX_TILE_PLACES then At := 0
+    else
+    begin
+      SetLength(FPlaces, Length(FPlaces) + 1);
+      At := High(FPlaces);
+    end;
+  end;
+  for I := At to High(FPlaces) - 1 do FPlaces[I] := FPlaces[I + 1];
+  FPlaces[High(FPlaces)] := P;
+end;
+
+{ the tiles as APlace was left; False: it was not shown before }
+function TLibraryTiles.ReturnToPlace(const APlace: string): Boolean;
+var
+  I, At, TopIdx, Off: Integer;
+  Sel: TStringList;
+begin
+  At := -1;
+  for I := 0 to High(FPlaces) do
+    if FPlaces[I].Place = APlace then At := I;
+  if At < 0 then Exit(False);
+  Result := True;
+  Sel := TStringList.Create;
+  try
+    Sel.UseLocale := False;
+    Sel.CaseSensitive := True;
+    Sel.Sorted := True;
+    Sel.Duplicates := dupIgnore;
+    for I := 0 to High(FPlaces[At].Sel) do Sel.Add(FPlaces[At].Sel[I]);
+    PutState(Sel, FPlaces[At].Focus, -1);
+  finally
+    Sel.Free;
+  end;
+  { an album at the top that is gone: the tiles stay where the focus is }
+  TopIdx := IndexOfKey(FPlaces[At].Top);
+  if TopIdx < 0 then Exit;
+  Off := FPlaces[At].TopOffset;
+  if (FPlaces[At].CellH > 0) and (Grid.RowHeight <> FPlaces[At].CellH) then
+    Off := Int64(Off) * Grid.RowHeight div FPlaces[At].CellH;
+  Grid.ScrollToTile(TopIdx, Off);
+end;
+
+{ whether the part of the library AInner lies inside AOuter }
+function TilePlaceInside(const AInner, AOuter: string): Boolean;
+begin
+  if (AInner = '') or (AOuter = '') or (AInner = AOuter) then Exit(False);
+  Result := (AOuter = TILE_PLACE_ALL) or (Copy(AInner, 1, Length(AOuter) + 1) = AOuter + #1);
+end;
+
 function TLibraryTiles.Tile(Index: Integer): PLibTile;
 begin
   if (Index < 0) or (Index >= FTileN) then Exit(nil);
@@ -486,6 +564,30 @@ begin
   if Result <> 0 then Exit;
   Result := CompareStr(FBuild[A].T^.FilePath, FBuild[B].T^.FilePath);
   if Result = 0 then Result := A - B;
+end;
+
+function CompareFolderOrder(const A, B: string): Integer;
+var
+  PA, PB, EA, EB: Integer;
+begin
+  PA := 1;
+  PB := 1;
+  while True do
+  begin
+    if (PA > Length(A)) or (PB > Length(B)) then
+    begin
+      if (PA > Length(A)) and (PB > Length(B)) then Exit(0);
+      if PA > Length(A) then Exit(1) else Exit(-1);
+    end;
+    EA := PA;
+    while (EA <= Length(A)) and not (A[EA] in ['\', '/']) do Inc(EA);
+    EB := PB;
+    while (EB <= Length(B)) and not (B[EB] in ['\', '/']) do Inc(EB);
+    Result := AnsiCompareText(Copy(A, PA, EA - PA), Copy(B, PB, EB - PB));
+    if Result <> 0 then Exit;
+    PA := EA + 1;
+    PB := EB + 1;
+  end;
 end;
 
 function TLibraryTiles.CompareTiles(A, B: Integer): Integer;
@@ -554,6 +656,12 @@ begin
         if Result = 0 then Result := ByTitle;     // (recordings of one work side by side)
         if Result = 0 then Result := ByArtist;
       end;
+    tsFolder:
+      begin
+        Result := CompareFolderOrder(FTiles[A].FolderDir, FTiles[B].FolderDir);
+        if Result = 0 then Result := ByTitle;      // (several albums in one folder)
+        if Result = 0 then Result := ByArtist;
+      end;
     tsAdded:
       begin
         Result := CompareValue(FTiles[B].Added, FTiles[A].Added);     // the newest first
@@ -574,18 +682,23 @@ begin
   if FTileN > 1 then SortIdx(FOrder, 0, FTileN - 1, @CompareTiles);
 end;
 
+procedure TLibraryTiles.LeavePlace;
+begin
+  FPlace := '';
+end;
+
 function TLibraryTiles.TileCount: Integer;
 begin
   Result := FTileN;
 end;
 
 procedure TLibraryTiles.SetTracks(AList: TTrackList; AFound: TStringList; const AQuery, ACrumb,
-  AEmptyText: string; ACanClear, AKeep: Boolean);
+  AEmptyText: string; ACanClear, AKeep: Boolean; const APlace: string);
 var
   Idx: array of Integer;
   I, N, FoundAt: Integer;
   T: PTrackInfo;
-  Alb, Art, LastKey, Comp: string;
+  Alb, LastKey, Comp, OldPlace: string;
   Cur: PLibTile;
   ArtistFixed: Boolean;
   KeepSel: TStringList;
@@ -595,6 +708,9 @@ begin
   KeepSel := TStringList.Create;
   try
   TakeState(KeepSel, KeepFocus, KeepScroll);
+  RememberPlace;
+  OldPlace := FPlace;
+  FPlace := APlace;
   FTileN := 0;
   FTiles := nil;
   FQuery := UTF8LowerCase(Trim(AQuery));
@@ -606,14 +722,7 @@ begin
     for I := 0 to N - 1 do
     begin
       T := AList[I];
-      Alb := Trim(T^.Album);
-      Art := Trim(T^.AlbumArtist);
-      if (Alb = '') or SameText(Alb, LBL_UNKNOWN_ALBUM) then
-        FBuild[I].Key := #2 + UTF8LowerCase(ExcludeTrailingPathDelimiter(T^.FolderDir))
-      else if Art = '' then
-        FBuild[I].Key := #1 + UTF8LowerCase(Alb) + #1 + UTF8LowerCase(ExcludeTrailingPathDelimiter(T^.FolderDir))
-      else
-        FBuild[I].Key := UTF8LowerCase(Art) + #1 + UTF8LowerCase(Alb);
+      FBuild[I].Key := AlbumKeyOf(T^);
       FBuild[I].Disc := T^.DiscNumber;
       FBuild[I].Track := T^.TrackNumber;
       FBuild[I].T := T;
@@ -682,11 +791,17 @@ begin
   SortTiles;
   FCrumb.SetPath(ACrumb);
   FBtnClear.Visible := ACanClear;
-  FPlainAll := (not ACanClear) and (FQuery = '');
   UpdateHead;
   Grid.EmptyText := AEmptyText;
   Grid.SetCount(FTileN);
-  if AKeep then PutState(KeepSel, KeepFocus, KeepScroll);
+  if AKeep then PutState(KeepSel, KeepFocus, KeepScroll)
+  else if TilePlaceInside(OldPlace, APlace) and (IndexOfKey(KeepFocus) >= 0) then
+  begin
+    { up from a part inside this one: where that part's album is }
+    PutState(KeepSel, KeepFocus, -1);
+    Grid.ScrollToTile(Grid.FocusIndex);
+  end
+  else if APlace <> '' then ReturnToPlace(APlace);
   finally
     KeepSel.Free;
   end;

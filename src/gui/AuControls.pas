@@ -57,6 +57,7 @@ type
     FGpuPaint: Boolean;
     FWinTarget: TGfxWindowTarget;
     FWantKeys: Boolean;
+    FocusEdge: Boolean;                  // the focus is shown as a line down the left edge (PaintFocusEdge)
     procedure CreateWnd; override;
     procedure EraseBackground(DC: HDC); override;
     procedure Paint; override;
@@ -70,6 +71,10 @@ type
     procedure EnabledChanged; override;
     function ShowFocus: Boolean;
     procedure DrawFocusRing(G: TGfx; X, Y, W, H, R: Single);
+    { a line down the left edge while the control has the keyboard focus:
+      the mark of a large view (a text, a page) that has no row or frame to
+      show it with. Drawn after DoPaint when FocusEdge is set. }
+    procedure PaintFocusEdge(G: TGfx);
     { how far the hover highlight has faded in (0 .. 1), and
       a colour between the plain and the hovered one }
     function HoverT: Single;
@@ -157,14 +162,20 @@ type
     FBold, FWrap, FMono, FItalic, FAutoWidth: Boolean;
     FRole: TAuRole;
     FHAlign, FVAlign: Integer;
+    FLink: Boolean;
     procedure SetCaption(const V: string);
     procedure SetRole(V: TAuRole);
+    procedure SetLink(V: Boolean);
   protected
     procedure DoPaint(G: TGfx); override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     constructor Create(AOwner: TComponent); override;
     function Font: TGfxFont;
     procedure FitWidth;
+    { a text that is clicked (OnClick): the Tab key reaches it, Enter and
+      Space click it, and it is underlined while it has the focus }
+    property Link: Boolean read FLink write SetLink;
     property Caption: string read FCaption write SetCaption;
     property FontSize: Single read FSize write FSize;
     property Bold: Boolean read FBold write FBold;
@@ -207,7 +218,9 @@ type
     property ModalResult: TModalResult read FModalResult write FModalResult;
   end;
 
-  TAuIconButtonStyle = (ibFlat, ibFilled, ibCircle);
+  { ibRect: as ibFlat, with a rounded rectangle over the whole button as its
+    highlight - for a button that is narrower than it is high }
+  TAuIconButtonStyle = (ibFlat, ibFilled, ibCircle, ibRect);
 
   { TAuIconButton - round icon-only button (transport, toolbars) }
 
@@ -480,6 +493,16 @@ type
     FWantX: Single;             // the x the caret keeps on Up / Down (-1 none)
     FTextSize: Single;
     FPlain: Boolean;
+    { the scroll bar, shown while the text is taller than the box. FScrollY
+      is the offset the text is drawn at; the two are kept in step by
+      UpdateBar / SetScrollY and BarScrolled. }
+    FBar: TAuScrollBar;
+    FBarQueued: Boolean;
+    FBarContentH: Integer;   // the text's height the bar was set for
+    procedure UpdateBar;
+    procedure UpdateBarAsync(Data: PtrInt);
+    procedure BarScrolled(Sender: TObject);
+    procedure SetScrollY(V: Integer);
     function GetMemoText: string;
     procedure SetMemoText(const V: string);
     procedure SetTextSize(V: Single);
@@ -514,9 +537,15 @@ type
     procedure ScaleCached(K: Double); override;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     property Text: string read GetMemoText write SetMemoText;
+    property ScrollBar: TAuScrollBar read FBar;
     { the font size (unscaled, default 13) }
     property TextSize: Single read FTextSize write SetTextSize;
+    { for tests: the width a line may have, and the lines the text was broken into }
+    function LineRoom: Integer;
+    function LineCount: Integer;
+    function LineStartOf(ALine: Integer): Integer;
     { no box: the text on the parent's background (a text to read) }
     property Plain: Boolean read FPlain write SetPlain;
   end;
@@ -692,6 +721,7 @@ type
     FContent: TAuPanel;
     FScroll: TAuScrollBar;
     FContentHeight: Integer;
+    FPendingPos: Integer;             // where ScrollTo wanted to go before the box had its size (0: nowhere)
     procedure ScrollChanged(Sender: TObject);
     procedure SetContentHeight(V: Integer);
   protected
@@ -707,6 +737,8 @@ type
     procedure Relayout;
     { scrolls as little as needed to show C with AMargin (unscaled) around it }
     procedure ScrollIntoView(C: TControl; AMargin: Integer = 8);
+    { scrolls to this offset in pixels, as far as the content goes }
+    procedure ScrollTo(APos: Integer);
     property Content: TAuPanel read FContent;
     property ContentHeight: Integer read FContentHeight write SetContentHeight;
   end;
@@ -873,6 +905,12 @@ procedure CrossFadeFrom(AParent: TWinControl; ABefore: TGfxBitmap; ASlidePx: Int
   fades in over its plain background and moves up ASlidePx into its place.
   The fade lies on its parent, over it. Nothing happens without animations. }
 procedure EntranceFade(AShown: TWinControl; ASlidePx: Integer);
+
+{ the letter or digit of a key pressed alone or with Shift ('A' .. 'Z', '0' ..
+  '9'), else #0; and the entry after AAfter (going round) that begins with it,
+  -1 without one: typing a letter jumps to the next entry it begins }
+function LetterOfKey(Key: Word; Shift: TShiftState): Char;
+function IndexStartingWith(AItems: TStrings; AAfter: Integer; ACh: Char): Integer;
 
 implementation
 
@@ -1455,6 +1493,7 @@ begin
     try
       G.Clear(EffBack);
       DoPaint(G);
+      PaintFocusEdge(G);
       TallyStep(' step: DoPaint', QS);
     finally
       G.Free;
@@ -1486,6 +1525,7 @@ begin
     TallyStep(' step: d2d begin', QS);
     try
       DoPaint(G);
+      PaintFocusEdge(G);
       TallyStep(' step: DoPaint', QS);
     finally
       G.Free;
@@ -1608,6 +1648,35 @@ begin
   Result := Focused and KeyboardCues;
 end;
 
+function LetterOfKey(Key: Word; Shift: TShiftState): Char;
+begin
+  Result := #0;
+  if (Shift <> []) and (Shift <> [ssShift]) then Exit;
+  if ((Key >= Ord('A')) and (Key <= Ord('Z'))) or ((Key >= Ord('0')) and (Key <= Ord('9'))) then Result := Chr(Key);
+end;
+
+function IndexStartingWith(AItems: TStrings; AAfter: Integer; ACh: Char): Integer;
+var
+  K, I, N: Integer;
+  S1: string;
+begin
+  Result := -1;
+  if (ACh = #0) or (AItems = nil) then Exit;
+  N := AItems.Count;
+  if AAfter < -1 then AAfter := -1;
+  for K := 1 to N do
+  begin
+    I := (AAfter + K) mod N;
+    S1 := TrimLeft(AItems[I]);
+    if (S1 <> '') and (UpCase(S1[1]) = ACh) then Exit(I);
+  end;
+end;
+
+procedure TAuControl.PaintFocusEdge(G: TGfx);
+begin
+  if FocusEdge and ShowFocus then G.FillRect(0, 0, Math.Max(2, S(2)), Height, clAccent);
+end;
+
 procedure TAuControl.DrawFocusRing(G: TGfx; X, Y, W, H, R: Single);
 begin
   if ShowFocus then G.StrokeRound(X, Y, W, H, R, SF(2), clAccent);
@@ -1700,10 +1769,30 @@ begin
   Invalidate;
 end;
 
+procedure TAuLabel.SetLink(V: Boolean);
+begin
+  if V = FLink then Exit;
+  FLink := V;
+  TabStop := V;
+  if V then Cursor := crHandPoint else Cursor := crDefault;
+  Invalidate;
+end;
+
+procedure TAuLabel.KeyDown(var Key: Word; Shift: TShiftState);
+begin
+  inherited KeyDown(Key, Shift);
+  if FLink and Enabled and (Shift = []) and ((Key = VK_RETURN) or (Key = VK_SPACE)) then
+  begin
+    Key := 0;
+    Click;
+  end;
+end;
+
 procedure TAuLabel.DoPaint(G: TGfx);
 var
   C: TARGB;
   Fl: Integer;
+  TW: Single;
 begin
   G.FillRect(0, 0, Width, Height, EffBack);
   C := RoleColor(FRole);
@@ -1712,6 +1801,12 @@ begin
   Fl := 0;
   if FWrap then Fl := tfWrap;
   G.Text(FCaption, 0, 0, Width, Height, Font, C, FHAlign, FVAlign, Fl);
+  { a link with the focus: a line under its text }
+  if FLink and ShowFocus and not FWrap then
+  begin
+    TW := Math.Min(TextWidth(FCaption, Font), Width);
+    G.FillRect(0, Height / 2 + SF(FSize * 0.75), TW, Math.Max(1, SF(1.5)), C);
+  end;
 end;
 
 { ---- TAuButton ---- }
@@ -1794,7 +1889,15 @@ begin
   end;
   if Bg <> 0 then G.FillRound(0, 0, Width, Height, R, Bg);
   if Bd <> 0 then G.StrokeRound(0, 0, Width, Height, R, 1, Bd);
-  DrawFocusRing(G, 0, 0, Width, Height, R);
+  { the focus: a ring in the accent colour - which a primary button is
+    filled with, so there the ring lies inside it, in the colour of its text }
+  if (FKind = bkPrimary) and Enabled and not FDown then
+  begin
+    if ShowFocus then
+      G.StrokeRound(S(3), S(3), Width - 2 * S(3), Height - 2 * S(3), Math.Max(1, R - S(3)), SF(1.6), Fg);
+  end
+  else
+    DrawFocusRing(G, 0, 0, Width, Height, R);
   F := UIFont(13, FKind = bkPrimary);
   IconSz := S(16);
   if FIcon <> icNone then
@@ -1919,8 +2022,16 @@ begin
     if FStyle = ibFilled then begin Bg := clBorderHi; Fg := EffBack; end
     else Bg := 0;
   end;
-  if Bg <> 0 then G.FillCircle(CX, CY, R - 0.5, Bg);
-  if ShowFocus then G.StrokeCircle(CX, CY, R - SF(1.5), SF(2), clAccent);
+  if FStyle = ibRect then
+  begin
+    if Bg <> 0 then G.FillRound(0, 0, Width, Height, S(7), Bg);
+    DrawFocusRing(G, 0, 0, Width, Height, S(7));
+  end
+  else
+  begin
+    if Bg <> 0 then G.FillCircle(CX, CY, R - 0.5, Bg);
+    if ShowFocus then G.StrokeCircle(CX, CY, R - SF(1.5), SF(2), clAccent);
+  end;
   DrawIcon(G, FIcon, CX, CY, S(FIconSize), Fg);
   if FActive and FShowDot then G.FillCircle(CX, CY + S(FIconSize) / 2 + S(4), SF(1.8), clAccentText);
 end;
@@ -3006,6 +3117,18 @@ begin
   Height := S(96);
   FWantX := -1;
   FTextSize := 13;
+  FBar := TAuScrollBar.Create(Self);
+  FBar.Parent := Self;
+  FBar.Visible := False;
+  FBar.BackRole := crInput;
+  FBar.Cursor := crDefault;
+  FBar.OnScroll := @BarScrolled;
+end;
+
+destructor TAuMemo.Destroy;
+begin
+  if FBarQueued then Application.RemoveAsyncCalls(Self);
+  inherited Destroy;
 end;
 
 procedure TAuMemo.SetTextSize(V: Single);
@@ -3014,6 +3137,7 @@ begin
   if V = FTextSize then Exit;
   FTextSize := V;
   FLayoutValid := False;
+  UpdateBar;
   Invalidate;
 end;
 
@@ -3021,6 +3145,56 @@ procedure TAuMemo.SetPlain(V: Boolean);
 begin
   if V = FPlain then Exit;
   FPlain := V;
+  if FPlain then FBar.BackRole := crInherit else FBar.BackRole := crInput;
+  { a box shows the focus with its border; without a box: the left edge }
+  FocusEdge := FPlain;
+  FLayoutValid := False;
+  UpdateBar;
+  Invalidate;
+end;
+
+{ Place, range and position of the scroll bar for the text as it is laid out
+  now. A box with rounded corners keeps the bar inside its border. }
+procedure TAuMemo.UpdateBar;
+var
+  CH: Integer;
+begin
+  if FBar = nil then Exit;
+  { not laid out yet: breaking a long text into a box a few pixels wide
+    would make a line of every letter }
+  if (Width < S(40)) or (Height < S(20)) then
+  begin
+    FBar.Visible := False;
+    Exit;
+  end;
+  CH := ContentH;
+  FBarContentH := CH;
+  if FPlain then FBar.SetBounds(Width - S(12), 0, S(12), Height)
+  else FBar.SetBounds(Width - S(14), S(5), S(12), Height - S(10));
+  FBar.SetParams(CH, Height);
+  FBar.Visible := CH > Height;
+  FScrollY := Math.Max(0, Math.Min(FScrollY, CH - Height));
+  if FBar.Position <> FScrollY then FBar.Position := FScrollY;
+end;
+
+procedure TAuMemo.UpdateBarAsync(Data: PtrInt);
+begin
+  FBarQueued := False;
+  UpdateBar;
+  Invalidate;
+end;
+
+procedure TAuMemo.BarScrolled(Sender: TObject);
+begin
+  if FBar.Position = FScrollY then Exit;
+  FScrollY := FBar.Position;
+  Invalidate;
+end;
+
+procedure TAuMemo.SetScrollY(V: Integer);
+begin
+  FScrollY := Math.Max(0, Math.Min(V, ContentH - Height));
+  if (FBar <> nil) and (FBar.Position <> FScrollY) then FBar.Position := FScrollY;
   Invalidate;
 end;
 
@@ -3039,11 +3213,15 @@ var
   U: UnicodeString;
 begin
   U := UTF8Decode(StringReplace(StringReplace(V, #13#10, #10, [rfReplaceAll]), #13, #10, [rfReplaceAll]));
+  { the text it has already: where it is scrolled to and the caret stay (a
+    view that is filled again with what it shows) }
+  if U = FText then Exit;
   FText := U;
   FCaret := 0;
   FAnchor := 0;
   FScrollY := 0;
   FLayoutValid := False;
+  UpdateBar;
   Invalidate;
 end;
 
@@ -3062,11 +3240,30 @@ begin
   if FPlain then Result := S(2) else Result := S(7);
 end;
 
+function TAuMemo.LineRoom: Integer;
+begin
+  { the room at the right is the scroll bar's, shown or not: the text does
+    not break anew when the bar comes or goes }
+  if FPlain then Result := Width - PadX - S(16) else Result := Width - PadX - S(18);
+end;
+
+function TAuMemo.LineCount: Integer;
+begin
+  Layout;
+  Result := Length(FLines);
+end;
+
+function TAuMemo.LineStartOf(ALine: Integer): Integer;
+begin
+  Layout;
+  Result := FLines[ALine].Start;
+end;
+
 { the visual lines: each paragraph broken at the last space that fits (a word
   longer than the line is broken where it must) }
 procedure TAuMemo.Layout;
 var
-  W, P, ParEnd, LineStart, LastSpace, I, N: Integer;
+  W, P, ParEnd, LineStart, I, N, Rest, Fit, Guess: Integer;
   F: TGfxFont;
 
   procedure AddLine(AStart, ALen: Integer);
@@ -3077,13 +3274,45 @@ var
     Inc(N);
   end;
 
+  function Fits(AStart, ALen: Integer): Boolean;
+  begin
+    Result := TextWidthW(Copy(FText, AStart + 1, ALen), F) <= W;
+  end;
+
+  { how many characters from AStart fit the line: at least 1, AMax when all
+    of them do. A longer piece is never narrower than a shorter one, so the
+    place is found by doubling from the length of the line before and then
+    halving - a few measurements a line, where one per character would take
+    seconds for a text of some pages. }
+  function CountThatFit(AStart, AMax: Integer): Integer;
+  var
+    Lo, Hi, Mid: Integer;
+  begin
+    if AMax <= 1 then Exit(1);
+    Lo := 1;
+    Hi := Math.Min(AMax, Math.Max(2, Guess + 8));
+    while Fits(AStart, Hi) do
+    begin
+      if Hi = AMax then Exit(AMax);
+      Lo := Hi;
+      Hi := Math.Min(AMax, Hi * 2);
+    end;
+    while Hi - Lo > 1 do
+    begin
+      Mid := (Lo + Hi) div 2;
+      if Fits(AStart, Mid) then Lo := Mid else Hi := Mid;
+    end;
+    Result := Lo;
+  end;
+
 begin
-  W := Width - 2 * PadX - S(8);
+  W := LineRoom;
   if FLayoutValid and (W = FLayoutW) then Exit;
   FLayoutW := W;
   FLayoutValid := True;
   F := MemoFont;
   N := 0;
+  Guess := 64;
   SetLength(FLines, 8);
   P := 0;
   repeat
@@ -3094,22 +3323,19 @@ begin
     else
       while LineStart < ParEnd do
       begin
-        if TextWidthW(Copy(FText, LineStart + 1, ParEnd - LineStart), F) <= W then
+        Rest := ParEnd - LineStart;
+        Fit := CountThatFit(LineStart, Rest);
+        if Fit >= Rest then
         begin
-          AddLine(LineStart, ParEnd - LineStart);
-          LineStart := ParEnd;
+          AddLine(LineStart, Rest);
           Break;
         end;
-        { the longest part that fits, ending after a space if there is one }
-        LastSpace := -1;
-        I := LineStart + 1;
-        while (I < ParEnd) and (TextWidthW(Copy(FText, LineStart + 1, I - LineStart + 1), F) <= W) do
-        begin
-          if FText[I + 1] = ' ' then LastSpace := I + 1;
-          Inc(I);
-        end;
-        if LastSpace > LineStart then I := LastSpace;
-        if I <= LineStart then I := LineStart + 1;
+        Guess := Fit;
+        { the longest part that fits, ending after a space if there is one
+          (not a space that is its first character) }
+        I := LineStart + Fit;
+        while (I > LineStart + 1) and (FText[I] <> ' ') do Dec(I);
+        if I <= LineStart + 1 then I := LineStart + Fit;
         AddLine(LineStart, I - LineStart);
         LineStart := I;
       end;
@@ -3185,6 +3411,7 @@ begin
   if LTop < FScrollY then FScrollY := LTop
   else if LTop + LineH > FScrollY + H then FScrollY := LTop + LineH - H;
   FScrollY := Math.Max(0, Math.Min(FScrollY, ContentH - Height));
+  UpdateBar;
 end;
 
 procedure TAuMemo.MemoChanged;
@@ -3218,12 +3445,14 @@ procedure TAuMemo.Resize;
 begin
   inherited Resize;
   FLayoutValid := False;
+  UpdateBar;
 end;
 
 procedure TAuMemo.ScaleCached(K: Double);
 begin
   inherited ScaleCached(K);
   FLayoutValid := False;
+  UpdateBar;
 end;
 
 procedure TAuMemo.DoEnter;
@@ -3289,12 +3518,12 @@ begin
     G.FillRect(CX, Y + S(2), SF(1.2), LineH - S(4), clText);
   end;
   G.Restore(St);
-  { a slim scroll indicator when the text is taller than the box }
-  if ContentH > Height then
+  { the text's height changed without a resize or an edit (the text size of
+    the program): the bar follows once this paint is done }
+  if ((FBar.Visible <> (ContentH > Height)) or (FBar.Visible and (ContentH <> FBarContentH))) and not FBarQueued and (Width >= S(40)) and (Height >= S(20)) then
   begin
-    X1 := Height * Height / ContentH;
-    X2 := (Height - X1) * FScrollY / Math.Max(1, ContentH - Height);
-    G.FillRound(Width - S(6), X2 + S(3), S(3), X1 - S(6), SF(1.5), clThumb);
+    FBarQueued := True;
+    Application.QueueAsyncCall(@UpdateBarAsync, 0);
   end;
 end;
 
@@ -3317,6 +3546,7 @@ begin
     end;
     FScrollY := Math.Max(0, Math.Min(FScrollY, ContentH - Height));
     Key := 0;
+    UpdateBar;
     Invalidate;
     Exit;
   end;
@@ -3442,19 +3672,13 @@ function TAuMemo.DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos:
 begin
   Result := ContentH > Height;
   if not Result then Exit;
-  FScrollY := FScrollY - Sign(WheelDelta) * LineH * 2;
-  FScrollY := Math.Max(0, Math.Min(FScrollY, ContentH - Height));
-  Invalidate;
+  FBar.WheelBy(-Sign(WheelDelta) * LineH * 3);
 end;
 
 function TAuMemo.PanBy(DX, DY: Integer): Boolean;
 begin
   if ContentH <= Height then Exit(inherited PanBy(DX, DY));
-  if DY <> 0 then
-  begin
-    FScrollY := Math.Max(0, Math.Min(FScrollY - DY, ContentH - Height));
-    Invalidate;
-  end;
+  if DY <> 0 then SetScrollY(FScrollY - DY);
   Result := True;
 end;
 
@@ -4047,6 +4271,8 @@ begin
 end;
 
 procedure TAuCombo.PopupKey(Sender: TObject; var Key: Word; Shift: TShiftState);
+var
+  I: Integer;
 begin
   case Key of
     VK_ESCAPE, VK_TAB: FPopup.Close;
@@ -4058,7 +4284,9 @@ begin
     VK_END: FList.MoveIndex(MaxInt div 2);
     VK_RETURN, VK_SPACE: if FList.ItemIndex >= 0 then ListPick(nil, FList.ItemIndex) else FPopup.Close;
   else
-    Exit;
+    I := IndexStartingWith(FItems, FList.ItemIndex, LetterOfKey(Key, Shift));
+    if I < 0 then Exit;
+    FList.MoveIndex(I - FList.ItemIndex);
   end;
   Key := 0;
 end;
@@ -4081,6 +4309,8 @@ begin
 end;
 
 procedure TAuCombo.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  I: Integer;
 begin
   inherited KeyDown(Key, Shift);
   case Key of
@@ -4092,7 +4322,10 @@ begin
     VK_END: ItemIndex := FItems.Count - 1;
     VK_SPACE, VK_F4, VK_RETURN: OpenPopup;
   else
-    Exit;
+    { a letter or digit: the next entry that begins with it }
+    I := IndexStartingWith(FItems, FItemIndex, LetterOfKey(Key, Shift));
+    if I < 0 then Exit;
+    ItemIndex := I;
   end;
   Key := 0;
 end;
@@ -4425,10 +4658,27 @@ begin
   if Target <> FScroll.GlideTarget then FScroll.GlideTo(Target);
 end;
 
+procedure TAuScrollBox.ScrollTo(APos: Integer);
+begin
+  Relayout;
+  FScroll.Position := APos;
+  FContent.Top := -FScroll.Position;
+  { a box that has no size yet (a hidden page) cannot scroll that far: it
+    goes there when it gets its size }
+  if (FScroll.Position <> APos) and not (Visible and (ClientHeight > S(40))) then FPendingPos := APos
+  else FPendingPos := 0;
+end;
+
 procedure TAuScrollBox.Resize;
 begin
   inherited Resize;
   Relayout;
+  if (FPendingPos > 0) and Visible and (ClientHeight > S(40)) then
+  begin
+    FScroll.Position := FPendingPos;
+    FContent.Top := -FScroll.Position;
+    FPendingPos := 0;
+  end;
 end;
 
 procedure TAuScrollBox.ScaleCached(K: Double);

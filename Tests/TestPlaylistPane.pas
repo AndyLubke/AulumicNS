@@ -44,6 +44,11 @@ type
     procedure ASortedViewKeepsTheOrderAdded;
     procedure EveryClosedAlbumIsRemembered;
     procedure AFlatListHasColumnsAndSortsByThem;
+    procedure TheSelectionSurvivesTagsReadAgain;
+    procedure TheSelectionSurvivesANewOrderOfTheSort;
+    procedure OneCopyOfAFileStaysOneCopy;
+    procedure ARowHiddenInAClosedAlbumIsNotSelected;
+    procedure ALongTotalReadsInDaysAndHours;
   end;
 
 implementation
@@ -146,6 +151,206 @@ end;
 { FollowEntry ("Cursor follows playback"): the track is selected; a track in
   view stays where it is, one out of view comes to the middle, a collapsed
   album opens }
+{ what Properties and F5 do: the tags of the entries again from the library }
+procedure TTestPlaylistPane.TheSelectionSurvivesTagsReadAgain;
+var
+  I, R1, R2, RHead, Scroll: Integer;
+  T: TTrackInfo;
+  Kept: TPlSelection;
+begin
+  FTracks.Clear;
+  for I := 1 to 200 do
+  begin
+    T := Default(TTrackInfo);
+    T.FilePath := Format('C:\Music\Album %.2d\%.3d Track.flac', [(I + 9) div 10, I]);
+    T.FolderDir := ExtractFileDir(T.FilePath);
+    T.Title := Format('Track %d', [I]);
+    T.Artist := 'An Artist';
+    T.AlbumArtist := 'An Artist';
+    T.Album := Format('Album %.2d', [(I + 9) div 10]);
+    T.TrackNumber := I;
+    FTracks.Add(T);
+  end;
+  FForm.HandleNeeded;
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  FPane.AddTracks(FTracks);
+  FPane.List.SetBounds(0, 40, 800, 560);
+  FPane.List.HandleNeeded;
+
+  { two tracks and the header of another album selected, the focus on the
+    second track, the list scrolled so that they are in its middle }
+  R1 := FPane.RowOfEntry(101);
+  R2 := FPane.RowOfEntry(103);
+  RHead := FPane.List.Group[FPane.RowOfEntry(120)];
+  AssertTrue('a header row', (RHead >= 0) and (FPane.List.Kind[RHead] = rkHeader));
+  FPane.List.SelectOnly(R1);
+  FPane.List.RestoreSelection(TAuRowArray.Create(R1, R2, RHead), R2);
+  FPane.List.ScrollTo(FPane.List.RowRect(R1).Top + FPane.List.ScrollOffset - 150);
+  Scroll := FPane.List.ScrollOffset;
+  AssertTrue('scrolled', Scroll > 0);
+  AssertEquals(3, FPane.List.SelCount);
+
+  { a title was edited }
+  FTracks[103]^.Title := 'A new title';
+  FPane.SyncWithLibrary;
+
+  AssertEquals('the new title is shown', 'A new title', FPane.Entry(103).Title);
+  AssertEquals('three rows selected again', 3, FPane.List.SelCount);
+  AssertTrue('the first track', FPane.List.Selected[FPane.RowOfEntry(101)]);
+  AssertTrue('the second track', FPane.List.Selected[FPane.RowOfEntry(103)]);
+  AssertTrue('the header', FPane.List.Selected[FPane.List.Group[FPane.RowOfEntry(120)]]);
+  AssertEquals('the focus where it was', FPane.RowOfEntry(103), FPane.List.FocusedRow);
+  AssertEquals('scrolled as before', Scroll, FPane.List.ScrollOffset);
+
+  { an album tag edited: the track gets a group of its own, the rows below
+    move, the selection goes with them }
+  FTracks[101]^.Album := 'Another album';
+  FPane.SyncWithLibrary;
+  AssertEquals(3, FPane.List.SelCount);
+  AssertTrue('the track in its new group', FPane.List.Selected[FPane.RowOfEntry(101)]);
+  AssertTrue(FPane.List.Selected[FPane.RowOfEntry(103)]);
+  AssertEquals(FPane.RowOfEntry(103), FPane.List.FocusedRow);
+
+  { the list loaded again (an auto-playlist after its query ran again): the
+    entries are new ones, the rows are known by their files }
+  Scroll := FPane.List.ScrollOffset;
+  Kept := FPane.TakeSelection;
+  AssertEquals(2, Length(Kept.Items));
+  AssertEquals(1, Length(Kept.Heads));
+  FPane.Clear;
+  AssertEquals(0, FPane.List.SelCount);
+  FPane.AddTracks(FTracks);
+  AssertEquals('all three rows again', 3, FPane.PutSelection(Kept));
+  AssertEquals(3, FPane.List.SelCount);
+  AssertTrue(FPane.List.Selected[FPane.RowOfEntry(101)]);
+  AssertTrue(FPane.List.Selected[FPane.RowOfEntry(103)]);
+  AssertTrue('the header', FPane.List.Selected[FPane.List.Group[FPane.RowOfEntry(120)]]);
+  AssertEquals(FPane.RowOfEntry(103), FPane.List.FocusedRow);
+  AssertEquals('scrolled as before', Scroll, FPane.List.ScrollOffset);
+
+  { nothing of it left in the list: the list is left alone }
+  FPane.Clear;
+  AssertEquals(0, FPane.PutSelection(Kept));
+end;
+
+{ a sorted playlist whose tags were edited: the entries change places, the
+  selection stays on its track }
+procedure TTestPlaylistPane.TheSelectionSurvivesANewOrderOfTheSort;
+const
+  ARTISTS: array[1..3] of string = ('Cee', 'Bee', 'Dee');
+var
+  I, E: Integer;
+  Path: string;
+
+  function EntryOf(const APath: string): Integer;
+  var
+    K: Integer;
+  begin
+    Result := -1;
+    for K := 0 to FPane.EntryCount - 1 do
+      if FPane.Entry(K).FilePath = APath then Exit(K);
+  end;
+
+begin
+  for I := 0 to 5 do
+  begin
+    FTracks[I]^.Artist := ARTISTS[I div 2 + 1];
+    FTracks[I]^.AlbumArtist := ARTISTS[I div 2 + 1];
+  end;
+  FForm.HandleNeeded;
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False, psArtist);
+  FPane.AddTracks(FTracks);
+  Path := FTracks[0]^.FilePath;
+  E := EntryOf(Path);
+  AssertEquals('sorted by artist: Bee comes first', 2, E);
+  FPane.List.SelectOnly(FPane.RowOfEntry(E));
+
+  { its album artist now sorts before the others }
+  FTracks[0]^.AlbumArtist := 'Ay';
+  FTracks[0]^.Artist := 'Ay';
+  FTracks[1]^.AlbumArtist := 'Ay';
+  FTracks[1]^.Artist := 'Ay';
+  FPane.SyncWithLibrary;
+
+  E := EntryOf(Path);
+  AssertEquals('the album moved to the top', 0, E);
+  AssertEquals('one row selected', 1, FPane.List.SelCount);
+  AssertTrue('the same track', FPane.List.Selected[FPane.RowOfEntry(E)]);
+  AssertEquals('the focus on it', FPane.RowOfEntry(E), FPane.List.FocusedRow);
+end;
+
+{ a file that is in the playlist twice: the copy that was selected is selected
+  again, not both }
+procedure TTestPlaylistPane.OneCopyOfAFileStaysOneCopy;
+var
+  Kept: TPlSelection;
+begin
+  FForm.HandleNeeded;
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  FPane.AddTracks(FTracks);
+  FPane.AddTracks(FTracks);
+  AssertEquals(12, FPane.EntryCount);
+  FPane.List.SelectOnly(FPane.RowOfEntry(7));
+  Kept := FPane.TakeSelection;
+  FPane.Clear;
+  FPane.AddTracks(FTracks);
+  FPane.AddTracks(FTracks);
+  AssertEquals('one row found', 1, FPane.PutSelection(Kept));
+  AssertEquals(1, FPane.List.SelCount);
+  AssertTrue('the second copy', FPane.List.Selected[FPane.RowOfEntry(7)]);
+  AssertFalse('not the first', FPane.List.Selected[FPane.RowOfEntry(1)]);
+
+  { the first copy is known by its file alone }
+  FPane.List.SelectOnly(FPane.RowOfEntry(1));
+  Kept := FPane.TakeSelection;
+  AssertEquals(FTracks[1]^.FilePath, Kept.Items[0]);
+  FPane.List.SelectOnly(FPane.RowOfEntry(4));
+  AssertEquals(1, FPane.PutSelection(Kept));
+  AssertTrue(FPane.List.Selected[FPane.RowOfEntry(1)]);
+  AssertFalse(FPane.List.Selected[FPane.RowOfEntry(7)]);
+end;
+
+{ a selection put back into a list where the track's album is closed: nothing
+  that cannot be seen is selected, the focus is on the album's header }
+{ the totals of the status line: m:ss below an hour, hours and minutes below
+  a day, days and hours from there on - rounded, never with seconds; a count
+  with the thousands separator of the regional settings }
+procedure TTestPlaylistPane.ALongTotalReadsInDaysAndHours;
+var
+  Sep: Char;
+begin
+  AssertEquals('47:17', FormatLongDuration(47 * 60 + 17));
+  AssertEquals('59:59', FormatLongDuration(3599));
+  AssertEquals('1 h 00 min', FormatLongDuration(3600));
+  AssertEquals('1 h 22 min', FormatLongDuration(3600 + 21 * 60 + 55));
+  AssertEquals('16 h 05 min', FormatLongDuration(16 * 3600 + 5 * 60 + 10));
+  AssertEquals('the last half minute of a day', '1 day 0 h', FormatLongDuration(86400 - 20));
+  AssertEquals('1 day 3 h', FormatLongDuration(86400 + 3 * 3600 + 100));
+  AssertEquals('172 days 22 h', FormatLongDuration(Int64(4150) * 3600 + 3 * 60 + 11));
+  AssertEquals('nothing below zero', '0:00', FormatLongDuration(-5));
+  Sep := DefaultFormatSettings.ThousandSeparator;
+  AssertEquals('46' + Sep + '745', FormatCount(46745));
+  AssertEquals('999', FormatCount(999));
+end;
+
+procedure TTestPlaylistPane.ARowHiddenInAClosedAlbumIsNotSelected;
+var
+  Kept: TPlSelection;
+  Head: Integer;
+begin
+  FForm.HandleNeeded;
+  FPane.SetView(gmAlbum, '%album%', '%title%', '', False);
+  FPane.AddTracks(FTracks);
+  FPane.List.SelectOnly(FPane.RowOfEntry(2));
+  Kept := FPane.TakeSelection;
+  FPane.List.SelectOnly(FPane.RowOfEntry(5));
+  Head := FPane.List.Group[FPane.RowOfEntry(2)];
+  FPane.List.Collapsed[Head] := True;
+  AssertEquals('no row was put back', 0, FPane.PutSelection(Kept));
+  AssertEquals('nothing hidden is selected', 0, FPane.List.SelCount);
+  AssertEquals('the focus on the header', Head, FPane.List.FocusedRow);
+end;
+
 procedure TTestPlaylistPane.TheSelectionFollowsTheTrackThatStarts;
 var
   I, R, R2, H, Hd, Top0: Integer;

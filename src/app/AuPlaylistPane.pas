@@ -38,7 +38,7 @@ unit AuPlaylistPane;
 interface
 
 uses
-  Windows, Classes, SysUtils, Math, Controls, Forms, LCLType,
+  Windows, Classes, SysUtils, Math, Contnrs, Controls, Forms, LCLType,
   AuGfx, AuTheme, AuIcons, AuControls, AuLists, AuMenus, AuExtra, AuGroupList,
   uAppConsts, uLibraryTypes, uPlaylistFile;
 
@@ -96,8 +96,16 @@ type
     MixedArtists: Boolean;             // its tracks have more than one artist
   end;
 
+  { the selected rows of the list by the files of their tracks }
+  TPlSelection = record
+    Items, Heads: array of string;   // tracks; headers by their group's first track
+    Focus: string;                   // the focused row's track
+    FocusHead: Boolean;              // ... and whether that row is a header
+    Scroll: Integer;                 // the list's scroll offset
+  end;
+
   { a library record for a file (False: not in the library) }
-  TPlLookupEvent = function(const APath: string; out ATrack: TTrackInfo): Boolean of object;
+  TPlLookupEvent =function(const APath: string; out ATrack: TTrackInfo): Boolean of object;
   { a click on a header's cover: the group's first entry }
   TPlCoverEvent = procedure(Sender: TObject; AEntry: Integer) of object;
 
@@ -227,6 +235,16 @@ type
     procedure LoadEntries(const AEntries: TPlaylistEntries);
     function ToEntries: TPlaylistEntries;
     procedure Rebuild;
+    { Rebuild for the same entries: selection, focus and scroll position stay }
+    procedure RebuildKeepingSelection(ASortAgain: Boolean = False);
+    { the same for a list that is loaded again (its entries are new ones):
+      the rows are known by the file of their track, a header by the file of
+      its group's first track. PutSelection gives the number of rows it
+      selected and leaves the list alone when that is none. }
+    function CopyNumbers: TIntArray;
+    function SelectionKey(AEntry: Integer; const ACopies: TIntArray): string;
+    function TakeSelection: TPlSelection;
+    function PutSelection(const ASel: TPlSelection): Integer;
     procedure RemoveEntries(const Idx: TIntArray);
     { moves the entries to InsertAt (an index of the list before the move) }
     procedure MoveEntries(const Idx: TIntArray; InsertAt: Integer);
@@ -287,6 +305,11 @@ type
   end;
 
 function FormatDuration(Sec: Integer): string;
+{ a total that may be long: m:ss below an hour, "1 h 22 min" below a day,
+  "172 days 22 h" from a day on }
+function FormatLongDuration(Sec: Int64): string;
+{ a count with the thousands separator of the regional settings }
+function FormatCount(N: Integer): string;
 
 implementation
 
@@ -326,6 +349,24 @@ begin
     Result := Format('%d:%.2d:%.2d', [Sec div 3600, (Sec div 60) mod 60, Sec mod 60])
   else
     Result := Format('%d:%.2d', [Sec div 60, Sec mod 60]);
+end;
+
+function FormatLongDuration(Sec: Int64): string;
+var
+  M, H: Int64;
+begin
+  if Sec < 0 then Sec := 0;
+  if Sec < 3600 then Exit(FormatDuration(Integer(Sec)));
+  M := (Sec + 30) div 60;
+  if M < 24 * 60 then Exit(Format('%d h %.2d min', [M div 60, M mod 60]));
+  H := (Sec + 1800) div 3600;
+  if H div 24 = 1 then Result := Format('1 day %d h', [H mod 24])
+  else Result := Format('%s days %d h', [FormatCount(H div 24), H mod 24]);
+end;
+
+function FormatCount(N: Integer): string;
+begin
+  Result := Format('%.0n', [N * 1.0]);
 end;
 
 function IfIcon(AReverse: Boolean): TAuIcon;
@@ -1003,6 +1044,7 @@ begin
   BtnSortDir.Parent := FTop;
   BtnSortDir.Icon := icSortAsc;
   BtnSortDir.IconSize := 16;
+  BtnSortDir.Style := ibRect;
   BtnSortDir.Hint := 'Reverse the order';
   BtnSortDir.ShowHint := True;
   BtnEdit := TAuIconButton.Create(Self);
@@ -1056,9 +1098,11 @@ begin
   BtnSortDir.Visible := BtnSort.Visible;
   if BtnSort.Visible then
   begin
-    VW := BtnSort.PreferredWidth;
+    { the arrow belongs to the order's name: both are narrower than a button
+      of their kind, so the two stand as close as an icon and its caption }
+    VW := BtnSort.PreferredWidth - S(16);
     BtnSort.SetBounds(Right - S(4) - VW, S(10), VW, S(32));
-    BtnSortDir.SetBounds(BtnSort.Left - S(34), S(9), S(34), S(34));
+    BtnSortDir.SetBounds(BtnSort.Left - S(20), S(10), S(20), S(32));
     Right := BtnSortDir.Left;
   end;
   BtnPlaylist.SetBounds(S(10), S(10), Math.Max(S(60), Right - S(18)), S(32));
@@ -1348,6 +1392,147 @@ begin
   Changed;
 end;
 
+{ which copy of its file each entry is: 0 for the first (or only) one, 1 for
+  the second ... }
+function TPlaylistPane.CopyNumbers: TIntArray;
+var
+  Seen: TFPDataHashTable;
+  I: Integer;
+  Key: string;
+  N: PtrUInt;
+begin
+  Result := nil;
+  SetLength(Result, FCount);
+  if FCount = 0 then Exit;
+  Seen := TFPDataHashTable.CreateWith(FCount * 2 + 97, @RSHash);
+  try
+    for I := 0 to FCount - 1 do
+    begin
+      Key := LowerCase(FEntries[I].FilePath);
+      N := PtrUInt(Seen.Items[Key]);
+      Result[I] := Integer(N);
+      Seen.Items[Key] := Pointer(N + 1);
+    end;
+  finally
+    Seen.Free;
+  end;
+end;
+
+{ what a row is known by in a TPlSelection: the file of its entry, and which
+  copy it is when the playlist holds the file more than once }
+function TPlaylistPane.SelectionKey(AEntry: Integer; const ACopies: TIntArray): string;
+begin
+  Result := FEntries[AEntry].FilePath;
+  if ACopies[AEntry] > 0 then Result := Result + #9 + IntToStr(ACopies[AEntry]);
+end;
+
+function TPlaylistPane.TakeSelection: TPlSelection;
+var
+  R, E, NI, NH: Integer;
+  Copies: TIntArray;
+begin
+  Result := Default(TPlSelection);
+  Copies := CopyNumbers;
+  SetLength(Result.Items, List.RowCount);
+  SetLength(Result.Heads, List.RowCount);
+  NI := 0;
+  NH := 0;
+  for R := 0 to List.RowCount - 1 do
+    if List.Selected[R] then
+    begin
+      E := EntryOfRow(R);
+      if (E < 0) or (E >= FCount) then Continue;
+      if List.Kind[R] = rkHeader then
+      begin
+        Result.Heads[NH] := SelectionKey(E, Copies);
+        Inc(NH);
+      end
+      else
+      begin
+        Result.Items[NI] := SelectionKey(E, Copies);
+        Inc(NI);
+      end;
+    end;
+  SetLength(Result.Items, NI);
+  SetLength(Result.Heads, NH);
+  E := EntryOfRow(List.FocusedRow);
+  if (E >= 0) and (E < FCount) then
+  begin
+    Result.Focus := SelectionKey(E, Copies);
+    Result.FocusHead := List.Kind[List.FocusedRow] = rkHeader;
+  end;
+  Result.Scroll := List.ScrollOffset;
+end;
+
+function TPlaylistPane.PutSelection(const ASel: TPlSelection): Integer;
+var
+  Items, Heads: TStringList;
+  Rows: TAuRowArray;
+  R, E, At, FocusRow, FocusItem: Integer;
+  Copies: TIntArray;
+  Key: string;
+
+  function PathSet(const A: array of string): TStringList;
+  var
+    I: Integer;
+  begin
+    Result := TStringList.Create;
+    Result.UseLocale := False;
+    Result.CaseSensitive := False;
+    Result.Sorted := True;
+    Result.Duplicates := dupIgnore;
+    for I := 0 to High(A) do Result.Add(A[I]);
+  end;
+
+begin
+  Result := 0;
+  if (Length(ASel.Items) = 0) and (Length(ASel.Heads) = 0) then Exit;
+  Items := PathSet(ASel.Items);
+  Heads := PathSet(ASel.Heads);
+  try
+    Copies := CopyNumbers;
+    Rows := nil;
+    SetLength(Rows, List.RowCount);
+    FocusRow := -1;
+    FocusItem := -1;
+    for R := 0 to List.RowCount - 1 do
+    begin
+      E := EntryOfRow(R);
+      if (E < 0) or (E >= FCount) then Continue;
+      Key := SelectionKey(E, Copies);
+      if List.Kind[R] = rkHeader then
+      begin
+        if Heads.Find(Key, At) then begin Rows[Result] := R; Inc(Result); end;
+        if ASel.FocusHead and SameText(Key, ASel.Focus) then FocusRow := R;
+      end
+      else
+      begin
+        if Items.Find(Key, At) then begin Rows[Result] := R; Inc(Result); end;
+        if (FocusItem < 0) and SameText(Key, ASel.Focus) then FocusItem := R;
+      end;
+    end;
+    if Result = 0 then Exit;
+    if (FocusRow < 0) or not ASel.FocusHead then FocusRow := FocusItem;
+    if FocusRow < 0 then FocusRow := Rows[0];
+    SetLength(Rows, Result);
+    List.RestoreSelection(Rows, FocusRow);
+    { rows hidden in a collapsed group were found but are not selected }
+    Result := List.SelCount;
+    if Result = 0 then Exit;
+    List.ScrollTo(ASel.Scroll);
+  finally
+    Heads.Free;
+    Items.Free;
+  end;
+end;
+
+function ComparePtrAsInt(A, B: Pointer): Integer;
+begin
+  if PtrUInt(A) < PtrUInt(B) then Result := -1
+  else if PtrUInt(A) > PtrUInt(B) then Result := 1
+  else Result := 0;
+end;
+
 procedure TPlaylistPane.SyncWithLibrary;
 var
   I, Id, Sq: Integer;
@@ -1369,9 +1554,98 @@ begin
       Changes := True;
     end;
   { the tags a sort goes by may have changed }
-  if SortActive then ApplySort;
-  Rebuild;
+  RebuildKeepingSelection(True);
   if Changes then Changed;
+end;
+
+{ the rows again from the entries: the rows that were selected are selected
+  again, the focus is where it was and the list is scrolled as before. Rows
+  are known by the id of their entry (a header: of its first entry), so an
+  order changed in between does no harm. ASortAgain: the entries are put
+  into the order of the sort first - after the selection was read, as the
+  rows still point at the entries in their present order. }
+procedure TPlaylistPane.RebuildKeepingSelection(ASortAgain: Boolean = False);
+var
+  Items, Heads: TFPList;      // ids (above 0) as pointers, sorted
+  FocusId, Scroll, R, E, N, At: Integer;
+  FocusHead: Boolean;
+  Rows: TAuRowArray;
+  NewFocus: Integer;
+
+  function IdOfRow(ARow: Integer): Integer;
+  var
+    Entry: Integer;
+  begin
+    Entry := EntryOfRow(ARow);
+    if (Entry < 0) or (Entry >= FCount) then Result := -1 else Result := FEntries[Entry].Id;
+  end;
+
+  function Has(AList: TFPList; AId: Integer): Boolean;
+  var
+    Lo, Hi, Mid: Integer;
+  begin
+    Lo := 0;
+    Hi := AList.Count - 1;
+    while Lo <= Hi do
+    begin
+      Mid := (Lo + Hi) div 2;
+      if PtrUInt(AList[Mid]) = PtrUInt(AId) then Exit(True);
+      if PtrUInt(AList[Mid]) < PtrUInt(AId) then Lo := Mid + 1 else Hi := Mid - 1;
+    end;
+    Result := False;
+  end;
+
+begin
+  Items := TFPList.Create;
+  Heads := TFPList.Create;
+  try
+    for R := 0 to List.RowCount - 1 do
+      if List.Selected[R] then
+      begin
+        E := IdOfRow(R);
+        if E < 0 then Continue;
+        if List.Kind[R] = rkHeader then Heads.Add(Pointer(PtrUInt(E))) else Items.Add(Pointer(PtrUInt(E)));
+      end;
+    Items.Sort(@ComparePtrAsInt);
+    Heads.Sort(@ComparePtrAsInt);
+    FocusId := IdOfRow(List.FocusedRow);
+    FocusHead := (List.FocusedRow >= 0) and (List.Kind[List.FocusedRow] = rkHeader);
+    Scroll := List.ScrollOffset;
+
+    if ASortAgain and SortActive then ApplySort;
+    Rebuild;
+
+    Rows := nil;
+    SetLength(Rows, List.RowCount);
+    N := 0;
+    NewFocus := -1;
+    At := -1;
+    for R := 0 to List.RowCount - 1 do
+    begin
+      E := IdOfRow(R);
+      if E < 0 then Continue;
+      if List.Kind[R] = rkHeader then
+      begin
+        if Has(Heads, E) then begin Rows[N] := R; Inc(N); end;
+        if FocusHead and (E = FocusId) then NewFocus := R;
+      end
+      else
+      begin
+        if Has(Items, E) then begin Rows[N] := R; Inc(N); end;
+        if E = FocusId then At := R;
+      end;
+    end;
+    { the focus on a header whose group now begins with another track: on
+      the track itself }
+    if (NewFocus < 0) or not FocusHead then
+      if At >= 0 then NewFocus := At;
+    SetLength(Rows, N);
+    List.RestoreSelection(Rows, NewFocus);
+    List.ScrollTo(Scroll);
+  finally
+    Heads.Free;
+    Items.Free;
+  end;
 end;
 
 procedure TPlaylistPane.RefreshRatings;
@@ -2061,7 +2335,7 @@ procedure TPlaylistPane.SetWorkHeadings(V: Boolean);
 begin
   if V = FWorkHeadings then Exit;
   FWorkHeadings := V;
-  Rebuild;
+  RebuildKeepingSelection;
 end;
 
 { the groups and the rows from the entries; nothing is selected afterwards

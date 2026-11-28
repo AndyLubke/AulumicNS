@@ -94,6 +94,11 @@ type
 function ParseWikipediaIntro(const AJson: string; out AText, ATitle, AItemID: string;
   out AIsDisambiguation: Boolean): Boolean;
 function WikipediaPageUrl(const ATitle: string): string;
+// Reads the answer of Last.fm's artist.getinfo. The biography as plain text,
+// or '' with AErrorMsg: ERR_BIO_NOT_FOUND when Last.fm does not know the
+// artist or has no text for it, ERR_LASTFM_KEY_REJECTED for a key it does not
+// accept, else what went wrong.
+function ParseLastFmBio(const AJson: string; out AErrorMsg: string): string;
 function LastFmArtistUrl(const AArtist: string): string;
 // Where the saved biography in AArtistDir (with trailing delimiter) came
 // from: bsNone without one or for the user's own text. AUrl is the article's
@@ -424,6 +429,62 @@ const
     '&format=json&formatversion=2&titles=';
   // A shorter text is a stub line, not a biography
   WIKIPEDIA_MIN_INTRO   = 40;
+
+function ParseLastFmBio(const AJson: string; out AErrorMsg: string): string;
+const
+  LASTFM_ERR_NOT_FOUND   = 6;   // "The artist you supplied could not be found"
+  LASTFM_ERR_INVALID_KEY = 10;
+  LASTFM_ERR_BLOCKED_KEY = 26;
+var
+  Root, Node: TJSONData;
+begin
+  Result    := '';
+  AErrorMsg := '';
+  try
+    Root := GetJSON(AJson);
+    try
+      if not Assigned(Root) then
+      begin
+        AErrorMsg := ERR_LASTFM_GENERIC;
+        Exit;
+      end;
+
+      Node := Root.FindPath('error');
+      if Assigned(Node) then
+      begin
+        if (Node.JSONType = jtNumber) and
+           ((Node.AsInteger = LASTFM_ERR_INVALID_KEY) or (Node.AsInteger = LASTFM_ERR_BLOCKED_KEY)) then
+          AErrorMsg := ERR_LASTFM_KEY_REJECTED
+        else if (Node.JSONType = jtNumber) and (Node.AsInteger = LASTFM_ERR_NOT_FOUND) then
+          AErrorMsg := ERR_BIO_NOT_FOUND
+        else
+        begin
+          Node := Root.FindPath('message');
+          if Assigned(Node) and (Node.JSONType = jtString) then
+            AErrorMsg := ERR_LASTFM_API_PREFIX + Node.AsString
+          else
+            AErrorMsg := ERR_LASTFM_GENERIC;
+        end;
+        Exit;
+      end;
+
+      Node := Root.FindPath('artist.bio.content');
+      if Assigned(Node) and (Node.JSONType = jtString) and (Trim(Node.AsString) <> '') then
+        Result := StripHTML(Node.AsString);
+      // An artist Last.fm knows without a text
+      if Result = '' then
+        AErrorMsg := ERR_BIO_NOT_FOUND;
+    finally
+      Root.Free;
+    end;
+  except
+    on E: Exception do
+    begin
+      Result    := '';
+      AErrorMsg := ERR_LASTFM_PARSE_PREFIX + E.Message;
+    end;
+  end;
+end;
 
 function ParseWikipediaIntro(const AJson: string; out AText, ATitle, AItemID: string;
   out AIsDisambiguation: Boolean): Boolean;
@@ -1059,7 +1120,6 @@ var
   function TryFetchLastFmBio(const ASearchArtist: string; out AErrorMsg: string): string;
   var
     JSONRaw: string;
-    JSONData, TempNode, ArtistNode, BioNode, ContentNode: TJSONData;
   begin
     Result    := '';
     AErrorMsg := '';
@@ -1088,52 +1148,7 @@ var
     if (JSONRaw = '') or Cancelled then
       Exit;
 
-    try
-      JSONData := GetJSON(JSONRaw);
-      try
-        if Assigned(JSONData) then
-        begin
-          TempNode := JSONData.FindPath('error');
-          // 10 = invalid API key, 26 = suspended (blocked) key:
-          // a fixed text, recognised (and logged once) by Artist Info
-          if Assigned(TempNode) and (TempNode.JSONType = jtNumber) and
-             ((TempNode.AsInteger = 10) or (TempNode.AsInteger = 26)) then
-            AErrorMsg := ERR_LASTFM_KEY_REJECTED
-          else if Assigned(TempNode) then
-          begin
-            TempNode := JSONData.FindPath('message');
-            if Assigned(TempNode) and (TempNode.JSONType = jtString) then
-              AErrorMsg := ERR_LASTFM_API_PREFIX + TempNode.AsString
-            else
-              AErrorMsg := ERR_LASTFM_GENERIC;
-          end
-          else
-          begin
-            ArtistNode := JSONData.FindPath('artist');
-            if Assigned(ArtistNode) and (ArtistNode.JSONType = jtObject) then
-            begin
-              BioNode := ArtistNode.FindPath('bio');
-              if Assigned(BioNode) and (BioNode.JSONType = jtObject) then
-              begin
-                ContentNode := BioNode.FindPath('content');
-                if Assigned(ContentNode) and (ContentNode.JSONType = jtString) then
-                begin
-                  if Trim(ContentNode.AsString) <> '' then
-                    Result := StripHTML(ContentNode.AsString);
-                end;
-              end;
-            end;
-          end;
-        end;
-      finally
-        JSONData.Free;
-      end;
-    except
-      on E: Exception do
-        AErrorMsg := ERR_LASTFM_PARSE_PREFIX + E.Message;
-      else
-        ;
-    end;
+    Result := ParseLastFmBio(JSONRaw, AErrorMsg);
   end;
 
   function WikipediaBioForName(const ACandidateName: string; out APageUrl: string): string; forward;

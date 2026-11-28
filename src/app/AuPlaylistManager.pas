@@ -60,12 +60,14 @@ type
     FOnImport: TPlImportEvent;
     FOnExport: TPlExportEvent;
     FResult: ^TPlaylistManagerResult;
-    procedure LoadNames(const ASelect: string);
+    { the list again; ASelect is selected, or without it the row AElseRow }
+    procedure LoadNames(const ASelect: string; AElseRow: Integer = 0);
     function SelectedName: string;
     function KindOf(Row: Integer): TPlaylistKind;
     procedure UpdateButtons;
     procedure RecordRename(const AOld, ANew: string);
     procedure RecordChange(const AName: string);
+    function RowName(Sender: TObject; Row: Integer): string;
     procedure DrawRow(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure SelChange(Sender: TObject);
     procedure ListActivate(Sender: TObject; Row: Integer);
@@ -151,6 +153,7 @@ begin
   FList.BackRole := crCard;
   FList.EmptyText := 'No playlists.';
   FList.OnDrawCell := @DrawRow;
+  FList.OnTypeText := @RowName;
   FList.OnSelChange := @SelChange;
   FList.OnActivate := @ListActivate;
   FList.TabOrder := 0;
@@ -175,7 +178,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TPlaylistManagerForm.LoadNames(const ASelect: string);
+procedure TPlaylistManagerForm.LoadNames(const ASelect: string; AElseRow: Integer);
 var
   I, Sel: Integer;
 begin
@@ -187,9 +190,15 @@ begin
   Sel := -1;
   for I := 0 to FNames.Count - 1 do
     if SameText(FNames[I], ASelect) then Sel := I;
-  if (Sel < 0) and (FNames.Count > 0) then Sel := 0;
+  if (Sel < 0) and (FNames.Count > 0) then Sel := EnsureRange(AElseRow, 0, FNames.Count - 1);
   if Sel >= 0 then FList.SelectOnly(Sel);
   UpdateButtons;
+end;
+
+{ what typing the first letters is matched against: the playlist's name }
+function TPlaylistManagerForm.RowName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row < FNames.Count) then Result := FNames[Row] else Result := '';
 end;
 
 function TPlaylistManagerForm.KindOf(Row: Integer): TPlaylistKind;
@@ -390,7 +399,8 @@ begin
   finally
     Names.Free;
   end;
-  LoadNames('');
+  { the playlist that is now where the first removed one was }
+  LoadNames('', Sel[0]);
 end;
 
 procedure TPlaylistManagerForm.ImportClick(Sender: TObject);

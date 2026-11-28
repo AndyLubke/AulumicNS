@@ -33,7 +33,7 @@ program LibBench;
 uses
   Interfaces, Forms, Classes, SysUtils, Windows, Math,
   uLibraryManager, uLibraryTypes, uUserStatsManager, uAppConsts, uAppStrings,
-  uPlaylistFile, uPlaylistStore, AuPlaylistPane, AuLog, uLibraryCheck;
+  uPlaylistFile, uPlaylistStore, AuPlaylistPane, AuLog, uLibraryCheck, uDbStore, uMetaUtils;
 
 var
   Lib: TLibraryManager;
@@ -723,6 +723,200 @@ begin
   Run('GetTracksByQuery ' + AQuery, @OpQuery);
 end;
 
+{ --tilesearch=<text>: what the library pane does to fill the album tiles for
+  a search (TLibraryPane.RebuildTiles), step by step with its times; the
+  making of the tiles themselves is not in it }
+procedure TileSearch(const AQuery: string);
+var
+  L, Part, MTrk: TTrackList;
+  Found, Whole, Done, MArt, MAlb, MGen, MFld: TStringList;
+  T, P: PTrackInfo;
+  I, J, At: Integer;
+  NoAlbum: Boolean;
+  Key: string;
+  T0, TAll: Double;
+
+  function PathSet: TStringList;
+  begin
+    Result := TStringList.Create;
+    Result.UseLocale := False;
+    Result.CaseSensitive := True;
+    Result.Sorted := True;
+    Result.Duplicates := dupIgnore;
+  end;
+
+  procedure Step(const AName: string; ACount: Integer);
+  begin
+    WriteLn(Format('  %-34s %9.2f ms   n=%d   tracks so far %d', [AName, NowMs - T0, ACount, L.Count]));
+    T0 := NowMs;
+  end;
+
+begin
+  L := TTrackList.Create;
+  Part := TTrackList.Create;
+  MTrk := TTrackList.Create;
+  Found := PathSet;
+  Whole := PathSet;
+  Done := PathSet;
+  MArt := TStringList.Create;
+  MAlb := TStringList.Create;
+  MGen := TStringList.Create;
+  MFld := TStringList.Create;
+  try
+    WriteLn('Tile search "', AQuery, '"');
+    TAll := NowMs;
+    T0 := TAll;
+    Lib.SearchLibrary(AQuery, MArt, MAlb, MGen, MFld, MTrk);
+    Step('SearchLibrary (tracks found)', MTrk.Count);
+    for I := 0 to MArt.Count - 1 do
+    begin
+      Part.Clear;
+      Lib.GetTracksByArtist(MArt[I], Part);
+      L.AddList(Part);
+    end;
+    Step('artists found: their tracks', MArt.Count);
+    for I := 0 to MAlb.Count - 1 do
+    begin
+      Part.Clear;
+      Lib.GetTracksByAlbum(MAlb[I], Part);
+      L.AddList(Part);
+    end;
+    Step('albums found: their tracks', MAlb.Count);
+    for I := 0 to MGen.Count - 1 do
+    begin
+      Part.Clear;
+      Lib.GetTracksByGenre(MGen[I], Part);
+      L.AddList(Part);
+    end;
+    Step('genres found: their tracks', MGen.Count);
+    for I := 0 to MFld.Count - 1 do
+    begin
+      Part.Clear;
+      Lib.GetTracksInFolderRecursive(ExcludeTrailingPathDelimiter(MFld[I]), Part);
+      L.AddList(Part);
+    end;
+    Step('folders found: their tracks', MFld.Count);
+    for I := 0 to L.Count - 1 do Whole.Add(L[I]^.FilePath);
+    Step('the paths of all these, sorted', Whole.Count);
+    for I := 0 to MTrk.Count - 1 do
+    begin
+      T := MTrk[I];
+      Found.Add(T^.FilePath);
+      if Whole.Find(T^.FilePath, At) then Continue;
+      NoAlbum := (Trim(T^.Album) = '') or SameText(Trim(T^.Album), 'Unknown Album');
+      if NoAlbum or (Trim(T^.AlbumArtist) = '') then
+        Key := #1 + T^.FolderDir + #1 + T^.Album
+      else
+        Key := T^.AlbumArtist + #1 + T^.Album;
+      if Done.Find(Key, At) then Continue;
+      Done.Add(Key);
+      Part.Clear;
+      if NoAlbum then
+        Lib.GetTracksInFolder(ExcludeTrailingPathDelimiter(T^.FolderDir), Part)
+      else
+        Lib.GetTracksByAlbum(T^.Album, Part);
+      for J := 0 to Part.Count - 1 do
+      begin
+        P := Part[J];
+        if P^.Album <> T^.Album then Continue;
+        if P^.AlbumArtist <> T^.AlbumArtist then Continue;
+        if (NoAlbum or (Trim(T^.AlbumArtist) = '')) and (P^.FolderDir <> T^.FolderDir) then Continue;
+        L.Add(P^);
+      end;
+    end;
+    Step('tracks found: their albums', Done.Count);
+    WriteLn(Format('  %-34s %9.2f ms   tracks handed to the tiles %d', ['in all (the old way)', NowMs - TAll, L.Count]));
+    { what the pane does now: the albums of the tracks found, in one walk }
+    L.Clear;
+    TAll := NowMs;
+    Lib.SearchLibrary(AQuery, MArt, MAlb, MGen, MFld, MTrk);
+    T0 := NowMs;
+    Lib.GetAlbumsOfTracks(MTrk, L);
+    WriteLn(Format('  %-34s %9.2f ms   of it GetAlbumsOfTracks %.2f ms   tracks handed to the tiles %d',
+      ['NOW: search + albums of the hits', NowMs - TAll, NowMs - T0, L.Count]));
+  finally
+    MFld.Free;
+    MGen.Free;
+    MAlb.Free;
+    MArt.Free;
+    Done.Free;
+    Whole.Free;
+    Found.Free;
+    MTrk.Free;
+    Part.Free;
+    L.Free;
+  end;
+end;
+
+{ --loadparts=1: what loading the library is made of, each part on its own
+  for all tracks (the file, its checksum, the search form of the titles, the
+  file names, the fingerprints of the play statistics, the path dictionary) }
+procedure LoadParts(const ADir: string);
+var
+  TL: TTrackList;
+  FS: TFileStream;
+  Buf: TBytes;
+  I: Integer;
+  T0: Double;
+  S1: string;
+  Stats: TUserStatsManager;
+  Dict: TStringList;
+  Crc: Cardinal;
+
+  procedure Took(const AName: string);
+  begin
+    WriteLn(Format('  %-46s %8.2f ms', [AName, NowMs - T0]));
+    T0 := NowMs;
+  end;
+
+begin
+  WriteLn('Parts of loading the library (', Lib.GetTrackCount, ' tracks)');
+  TL := TTrackList.Create;
+  Dict := TStringList.Create;
+  Stats := TUserStatsManager.Create(ADir + 'no-such-stats.adb');
+  try
+    Lib.GetAllTracks(TL);
+    T0 := NowMs;
+    FS := TFileStream.Create(ADir + 'library.adb', fmOpenRead or fmShareDenyWrite);
+    try
+      Buf := nil;
+      SetLength(Buf, FS.Size);
+      FS.ReadBuffer(Buf[0], Length(Buf));
+    finally
+      FS.Free;
+    end;
+    Took(Format('reading the file (%.1f MB, in the file cache)', [Length(Buf) / 1048576]));
+    Crc := Crc32Of(@Buf[0], Length(Buf) - 4);
+    Took('its checksum');
+    if Crc = 0 then WriteLn('  (checksum 0)');
+    S1 := '';
+    for I := 0 to TL.Count - 1 do S1 := LowerCase(StripAccents(TL[I]^.Title));
+    Took('the search form of every title');
+    for I := 0 to TL.Count - 1 do S1 := ExtractFileName(TL[I]^.FilePath);
+    Took('the file name of every path');
+    for I := 0 to TL.Count - 1 do
+    begin
+      S1 := Stats.GenerateFingerprintFromClean(TL[I]^.CleanAlbumArtist, TL[I]^.CleanAlbum, TL[I]^.CleanTitle);
+      if TL[I]^.CleanAlbumArtist <> TL[I]^.CleanArtist then
+        S1 := Stats.GenerateFingerprintFromClean(TL[I]^.CleanArtist, TL[I]^.CleanAlbum, TL[I]^.CleanTitle);
+    end;
+    Took('the fingerprints for the play statistics');
+    Dict.Sorted := False;
+    Dict.CaseSensitive := False;
+    Dict.UseLocale := False;
+    Dict.Capacity := TL.Count;
+    for I := 0 to TL.Count - 1 do Dict.AddObject(TL[I]^.FilePath, TObject(TL[I]));
+    Took('the path dictionary: filling');
+    Dict.Sorted := True;
+    Took('the path dictionary: sorting');
+    if S1 = '' then WriteLn('  (empty)');
+  finally
+    Stats.Free;
+    Dict.Free;
+    TL.Free;
+  end;
+end;
+
 procedure ExportTracks(const AFile: string);
 var
   TL: TTrackList;
@@ -800,6 +994,24 @@ begin
         ExportTracks(Copy(ParamStr(I), 10, MaxInt));
         Halt(0);
       end;
+
+    for I := 2 to ParamCount do
+      if ParamStr(I) = '--loadparts=1' then
+      begin
+        LoadParts(Dir);
+        Halt(0);
+      end;
+
+    { --tilesearch=<text> (several allowed): the steps of a search in the
+      album tiles with their times, and nothing else }
+    N := 0;
+    for I := 2 to ParamCount do
+      if Copy(ParamStr(I), 1, 13) = '--tilesearch=' then
+      begin
+        TileSearch(Copy(ParamStr(I), 14, MaxInt));
+        Inc(N);
+      end;
+    if N > 0 then Halt(0);
 
     { the arguments: the artist and the genre with the most tracks, a root }
     SL := TStringList.Create;

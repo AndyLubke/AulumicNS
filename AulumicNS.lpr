@@ -18,7 +18,7 @@ uses
     closed in the reverse order, so it is still there while the LCL destroys
     the windows at the end (a window may paint once more then) }
   AuD2D, AuGfx,
-  Interfaces, Forms,
+  Interfaces, Forms, uStartTimes,
   { the GUI library }
   AuAnim, AuTheme, AuIcons, AuControls, AuMenus, AuLists, AuForms, AuTree, AuGroupList, AuTileGrid, AuExtra, AuTitleBar,
   AuCrumbBar, AuFolderPicker, AuAppIcon,
@@ -33,7 +33,7 @@ uses
   AuAudioTypes, AuDecoder, AuDecFlac, AuDecWav, AuDecDsd, AuResample, uToneControl, uAudioUtils,
   { the library (stored by uDbStore) }
   uDbStore, uLibraryTypes, uLibraryQuery, uTagParser, uUserStatsManager,
-  uLibraryScanner, uLibraryManager, uLibraryWatcher, AuLogForm, AuDebugQueue, AuPrefs, uSettingsLog, AuPlaylistEditor, AuPlaylistManager, uMetadataCustodian, AuTagLoader, AuPropertiesForm, AuLoudness, uReplayGainScan, uReplayGainThread, AuReplayGainForm, AuVirtualFolderForm, uLastFmScraper, AuCoverViewer, AuArtistInfo, AuPdf, AuBooklet, AuSignalPath, AuDemoLibrary, AuHelp, uVersionHelper, uUpdateCheck, AuAbout,
+  uLibraryScanner, uLibraryManager, uLibraryWatcher, AuLogForm, AuDebugQueue, AuPrefs, uSettingsLog, AuPlaylistEditor, AuPlaylistManager, uMetadataCustodian, AuTagLoader, uInspectorSummary, AuPropertiesForm, AuLoudness, uReplayGainScan, uReplayGainThread, AuReplayGainForm, AuVirtualFolderForm, uLastFmScraper, AuCoverViewer, AuArtistInfo, AuPdf, AuBooklet, AuSignalPath, AuDemoLibrary, AuHelp, uVersionHelper, uUpdateCheck, AuAbout,
   uPlaylistFile, uPlaylistRows, uAutoPlaylist, uPlaylistImport, uPlaylistStore,
   { tags (the AulumicTag units) }
   audiotag, basetag, commonfunctions, id3v1genres, song, registerallreader, file_dsf, file_dff, file_dummy,
@@ -77,6 +77,9 @@ var
   Ok: Boolean;
   {$ENDIF}
 begin
+  { how long the start takes (one line in the log): up to here Windows has
+    loaded the program and its units have set themselves up }
+  StartMark('loading the program');
   {$IFDEF DEBUG}
   { memory leak report of the debug build goes to a file next to the exe }
   {$if declared(UseHeapTrace)}
@@ -181,6 +184,7 @@ begin
     Application.HasOption('icon-preview');
   {$ENDIF}
   InstallErrorBox;
+  StartMark('settings and theme');
   try
     Application.Initialize;
     Application.CreateForm(TMainForm, MainForm);

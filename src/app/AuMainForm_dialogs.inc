@@ -426,6 +426,16 @@ begin
     if (Screen.CustomForms[I].ClassName = 'TDriveWaitForm') and Screen.CustomForms[I].Visible then Exit(True);
 end;
 
+{ F10 (or Alt) pressed and let go on the real keyboard }
+procedure PressMenuKey(AAlt: Boolean);
+var
+  K: Byte;
+begin
+  if AAlt then K := VK_MENU else K := VK_F10;
+  keybd_event(K, 0, 0, 0);
+  keybd_event(K, 0, KEYEVENTF_KEYUP, 0);
+end;
+
 procedure TMainForm.DriveWaitTestTick(Sender: TObject);
 begin
   Inc(FWaitTestTicks);
@@ -435,6 +445,8 @@ begin
   case FWaitTestStep of
     1: PostMessage(Handle, WM_KEYDOWN, VK_F1, 0);        // would open the help
     2, 3: PostMessage(Handle, WM_KEYDOWN, VK_ESCAPE, 0);
+    5, 6: PressMenuKey(FWaitTestStep = 6);
+    7, 8: PressMenuKey(FWaitTestStep = 8);   // (the wait window is up)
   end;
 end;
 
@@ -455,6 +467,26 @@ var
       R.Add('FAIL  ' + AText);
       Inc(Fails);
     end;
+  end;
+
+  procedure Pump(AMs: Integer);
+  var
+    Began: QWord;
+  begin
+    Began := GetTickCount64;
+    while GetTickCount64 - Began < AMs do
+    begin
+      Application.ProcessMessages;
+      Sleep(10);
+    end;
+  end;
+
+  procedure CloseMenuByKey;
+  begin
+    if not FMainMenu.IsOpen then Exit;
+    keybd_event(VK_ESCAPE, 0, 0, 0);
+    keybd_event(VK_ESCAPE, 0, KEYEVENTF_KEYUP, 0);
+    Pump(400);
   end;
 
   procedure Wait(AStep, AWakeMs, ATickMs: Integer);
@@ -559,6 +591,80 @@ begin
     BeginBusy;
     EndBusy;
     Check(Screen.Cursor = crDefault, 'a later action ends without an hourglass');
+
+    { F10 and Alt from the real keyboard open the main menu - but not while
+      the program is busy or waits for a drive }
+    R.Add('--- F10 and Alt while busy');
+    SetForegroundWindow(Handle);
+    Pump(300);
+    if GetForegroundWindow <> Handle then
+      R.Add('skipped: the window is not in front')
+    else
+    begin
+      PressMenuKey(False);
+      Pump(400);
+      Check(FMainMenu.IsOpen, 'control: F10 opens the main menu');
+      CloseMenuByKey;
+      PressMenuKey(True);
+      Pump(400);
+      Check(FMainMenu.IsOpen, 'control: Alt opens the main menu');
+      CloseMenuByKey;
+
+      BeginBusy;
+      PressMenuKey(False);
+      Sleep(400);
+      EndBusy;
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'F10 pressed in a busy section opens nothing');
+      CloseMenuByKey;
+      BeginBusy;
+      PressMenuKey(True);
+      Sleep(400);
+      EndBusy;
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'Alt pressed in a busy section opens nothing');
+      CloseMenuByKey;
+
+      Wait(5, 1500, 600);
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'F10 pressed during a wait for a drive opens nothing');
+      CloseMenuByKey;
+      Wait(6, 1500, 600);
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'Alt pressed during a wait for a drive opens nothing');
+      CloseMenuByKey;
+
+      { the key goes down in the busy section and comes up after it }
+      BeginBusy;
+      keybd_event(VK_F10, 0, 0, 0);
+      Sleep(300);
+      EndBusy;
+      Pump(100);
+      keybd_event(VK_F10, 0, KEYEVENTF_KEYUP, 0);
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'F10 down while busy, up afterwards opens nothing');
+      CloseMenuByKey;
+      BeginBusy;
+      keybd_event(VK_MENU, 0, 0, 0);
+      Sleep(300);
+      EndBusy;
+      Pump(100);
+      keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'Alt down while busy, up afterwards opens nothing');
+      CloseMenuByKey;
+
+      { the "Waiting for drive..." window is up and takes the keys }
+      Wait(7, 7000, DRIVE_WAIT_SHOW_DELAY_MS + 600);
+      Pump(400);
+      Check(FWaitTestPopup, 'the window was up');
+      Check(not FMainMenu.IsOpen, 'F10 pressed in the "Waiting for drive..." window opens nothing');
+      CloseMenuByKey;
+      Wait(8, 7000, DRIVE_WAIT_SHOW_DELAY_MS + 600);
+      Pump(400);
+      Check(not FMainMenu.IsOpen, 'Alt pressed in the "Waiting for drive..." window opens nothing');
+      CloseMenuByKey;
+    end;
   finally
     DriveWakeProc := nil;
     FileSaveProc := nil;

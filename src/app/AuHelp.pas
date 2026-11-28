@@ -279,6 +279,7 @@ type
     procedure PicStep(Sender: TObject);
     procedure PicDragBy(Sender: TObject);    procedure TopicDraw(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure TopicClick(Sender: TObject; Row: Integer);
+    function TopicName(Sender: TObject; Row: Integer): string;
     procedure TopicSel(Sender: TObject);
     procedure ViewScrolled(Sender: TObject);
     procedure SearchEnter(Sender: TObject);
@@ -439,6 +440,7 @@ begin
   inherited Create(AOwner);
   FWantKeys := True;
   TabStop := True;
+  FocusEdge := True;
   FSize := 14;
   FHighlight := -1;
   FScroll := TAuScrollBar.Create(Self);
@@ -1970,7 +1972,7 @@ end;
 constructor THelpWindow.Create(AOwner: TComponent);
 var
   Left_, Bottom_: TAuPanel;
-  B: TAuButton;
+  B, BClose: TAuButton;
 begin
   inherited CreateAu(AOwner, 'Aulumic - Help', 1180, 820);
   BorderStyle := bsSizeable;
@@ -1989,9 +1991,9 @@ begin
   Bottom_.Align := alBottom;
   Bottom_.Height := S(56);
   Bottom_.BackRole := crPanel;
-  B := AddButton(Bottom_, 'Close', 0, 12, 100, bkPrimary, @CloseClick);
-  B.Align := alRight;
-  B.BorderSpacing.Around := S(12);
+  BClose := AddButton(Bottom_, 'Close', 0, 12, 100, bkPrimary, @CloseClick);
+  BClose.Align := alRight;
+  BClose.BorderSpacing.Around := S(12);
   B := AddButton(Bottom_, 'A+', 0, 12, 52, bkNormal, @ZoomIn);
   B.Align := alLeft;
   B.BorderSpacing.Left := S(16);
@@ -2036,6 +2038,7 @@ begin
   FTopics.AutoFit := True;
   FTopics.MultiSelect := False;
   FTopics.OnDrawCell := @TopicDraw;
+  FTopics.OnTypeText := @TopicName;
   FTopics.OnSelChange := @TopicSel;
   FTopics.OnActivate := @TopicClick;
 
@@ -2063,6 +2066,11 @@ begin
   ArrangeRight;
   FTopics.RowCount := Length(FView.Topics);
   if FTopics.RowCount > 0 then FTopics.SelectOnly(0);
+  { Tab goes as the window reads: the search box, the topics, the text, then
+    the line at the bottom with Close last (it is made first, for its place
+    in the layout) }
+  Bottom_.TabOrder := Body.ControlCount - 1;
+  BClose.TabOrder := Bottom_.ControlCount - 1;
   ActiveControl := FView;
 end;
 
@@ -2074,6 +2082,12 @@ begin
     G.Text(FView.Topics[Row].Title, X + S(10), Y, W - S(16), H, UIFont(13, True), clText, 0, 1)
   else
     G.Text(FView.Topics[Row].Title, X + S(26), Y, W - S(32), H, UIFont(13), clTextDim, 0, 1);
+end;
+
+{ what typing the first letters is matched against: the topic's title }
+function THelpWindow.TopicName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row <= High(FView.Topics)) then Result := FView.Topics[Row].Title else Result := '';
 end;
 
 procedure THelpWindow.TopicSel(Sender: TObject);

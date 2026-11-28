@@ -154,6 +154,11 @@ type
     procedure CollapseAll;
     { expands the parents, scrolls the node into view }
     procedure MakeVisible(N: TAuTreeNode);
+    { the node in the first row shown (nil: no rows) }
+    function TopNode: TAuTreeNode;
+    { the node's row becomes the first row shown, as far as the rows below
+      it allow; False: the node is in no row (a parent is closed) }
+    function ScrollNodeToTop(N: TAuTreeNode): Boolean;
     procedure SelectNode(N: TAuTreeNode);
     procedure ClearSelection;
     function SelectedNodes: TAuTreeNodeArray;
@@ -625,6 +630,25 @@ begin
   if R < 0 then Exit;
   if R < FTop then FScroll.Position := R
   else if R >= FTop + VisibleRows then FScroll.Position := R - VisibleRows + 1;
+  FTop := FScroll.Position;
+  Invalidate;
+end;
+
+function TAuTreeView.TopNode: TAuTreeNode;
+begin
+  NeedRows;
+  if (FTop >= 0) and (FTop <= High(FRows)) then Result := FRows[FTop] else Result := nil;
+end;
+
+function TAuTreeView.ScrollNodeToTop(N: TAuTreeNode): Boolean;
+var
+  R: Integer;
+begin
+  UpdateScroll;
+  R := RowOf(N);
+  Result := R >= 0;
+  if not Result then Exit;
+  FScroll.Position := R;
   FTop := FScroll.Position;
   Invalidate;
 end;

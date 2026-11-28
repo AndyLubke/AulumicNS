@@ -125,6 +125,50 @@ begin
   FPl.SetView(G, HF, TF, ADateSuffix, (P <> nil) and (P^.Kind = pkAuto), SM, Rev);
 end;
 
+{ the selection a playlist had when it was left, kept while the program runs
+  (the newest last; more than PL_SELECTIONS_KEPT: the oldest goes) }
+procedure TMainForm.RememberPlSelection(const AName: string; const ASel: TPlSelection);
+const
+  PL_SELECTIONS_KEPT = 100;
+var
+  I, At: Integer;
+begin
+  At := -1;
+  for I := 0 to High(FPlSelNames) do
+    if SameText(FPlSelNames[I], AName) then At := I;
+  if At < 0 then
+  begin
+    if Length(FPlSelNames) >= PL_SELECTIONS_KEPT then At := 0
+    else
+    begin
+      SetLength(FPlSelNames, Length(FPlSelNames) + 1);
+      SetLength(FPlSels, Length(FPlSelNames));
+      At := High(FPlSelNames);
+    end;
+  end;
+  for I := At to High(FPlSelNames) - 1 do
+  begin
+    FPlSelNames[I] := FPlSelNames[I + 1];
+    FPlSels[I] := FPlSels[I + 1];
+  end;
+  FPlSelNames[High(FPlSelNames)] := AName;
+  FPlSels[High(FPlSels)] := ASel;
+end;
+
+function TMainForm.RecallPlSelection(const AName: string; out ASel: TPlSelection): Boolean;
+var
+  I: Integer;
+begin
+  ASel := Default(TPlSelection);
+  for I := High(FPlSelNames) downto 0 do
+    if SameText(FPlSelNames[I], AName) then
+    begin
+      ASel := FPlSels[I];
+      Exit(True);
+    end;
+  Result := False;
+end;
+
 procedure TMainForm.ShowPlaylist(const AName: string; AForce: Boolean);
 var
   P: PStoredPlaylist;
@@ -132,16 +176,24 @@ var
   Suffix: string;
   E, OldSel: Integer;
   Sel: TIntArray;
+  Keep: TPlSelection;
+  Again: Boolean;
 begin
   if FPlaylists = nil then Exit;
   if (not AForce) and SameText(AName, FShownPl) then Exit;
   { the same playlist built again (tags were saved): where the selection was }
   OldSel := -1;
-  if SameText(AName, FShownPl) then
+  Keep := Default(TPlSelection);
+  Again := SameText(AName, FShownPl);
+  if Again then
   begin
     Sel := FPl.SelectedEntries;
     if Length(Sel) > 0 then OldSel := Sel[0];
+    Keep := FPl.TakeSelection;
   end;
+  { the playlist that is left: every selected row and where it is scrolled
+    to, for when it is shown again in this run }
+  if (FShownPl <> '') and not FPl.IsDemo then RememberPlSelection(FShownPl, FPl.TakeSelection);
   { the playlist on screen keeps its changes and the selected track }
   SaveShownPlaylist(True);
   P := FPlaylists.Find(AName);
@@ -192,6 +244,16 @@ begin
   end
   else
     FPl.PlayingEntry := -1;
+  { the same playlist again, or one that was shown before in this run: every
+    row that was selected, the list where it was. Else (a playlist not seen
+    yet, or none of the rows left) the one track and the top track that are
+    stored with the playlist. }
+  if not Again and not RecallPlSelection(FShownPl, Keep) then Keep := Default(TPlSelection);
+  if FPl.PutSelection(Keep) > 0 then
+  begin
+    AppSettings.Data.ActivePlayList := FShownPl;
+    Exit;
+  end;
   { the track selected when the playlist was left }
   if P^.LastFile <> '' then
   begin
@@ -252,6 +314,7 @@ end;
   when this is the playing playlist }
 procedure TMainForm.PlChanged(Sender: TObject);
 begin
+  FPlStatusDirty := True;
   if FShuttingDown or FPl.IsDemo or FLoadingPl then Exit;
   if not FPl.ReadOnly then FPlSaveDue := GetTickCount64 + PL_SAVE_DELAY_MS;
   if SameText(FShownPl, FPlayingPl) then
@@ -579,7 +642,13 @@ begin
     FPlaylists.Changed(P);
     Sel := FPl.SelectedFilePath;
     ShowPlaylist(FShownPl, True);
-    if Sel <> '' then FPl.SelectEntry(FPl.IndexOfFile(Sel), False, True);
+    { the rows are selected again (ShowPlaylist); with another grouping or
+      order they are elsewhere: the focused one into the middle }
+    if Sel <> '' then
+    begin
+      if FPl.List.SelCount > 0 then FPl.List.EnsureVisible(FPl.List.FocusedRow, True)
+      else FPl.SelectEntry(FPl.IndexOfFile(Sel), False, True);
+    end;
     { on the screen before the hourglass goes: what is clicked next is what
       is seen }
     FPl.List.Update;
@@ -775,6 +844,11 @@ begin
   end;
 end;
 
+procedure TMainForm.MnPlShowCover(Sender: TObject);
+begin
+  PlCoverClick(Sender, FCtxPlEntry);
+end;
+
 { ---- the playlist context menu ---- }
 
 procedure TMainForm.PlContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
@@ -814,6 +888,9 @@ begin
   FCtxMenu.AddSeparator;
   It := FCtxMenu.Add('Open folder...', @MnShowInExplorer, icFolder);
   It.Enabled := HasSel;
+  { the cover of the row's album, as a click on the cover in its header }
+  It := FCtxMenu.Add('Cover Art Viewer...', @MnPlShowCover, icAlbum);
+  It.Enabled := FCtxPlEntry >= 0;
   { what works on the selected tracks as a whole }
   Sub := FCtxMenu.AddSub('Tools', icSliders);
   It := Sub.Add('Calculate ReplayGain...', @MnPlReplayGain, icWave);

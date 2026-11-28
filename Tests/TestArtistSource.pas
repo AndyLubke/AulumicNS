@@ -16,7 +16,7 @@ unit TestArtistSource;
 interface
 
 uses
-  Classes, SysUtils, fpcunit, testregistry, uLastFmScraper, uAppConsts;
+  Classes, SysUtils, fpcunit, testregistry, uLastFmScraper, uAppConsts, uAppStrings;
 
 type
   TTestArtistSource = class(TTestCase)
@@ -31,6 +31,7 @@ type
     procedure AMissingPageGivesNothing;
     procedure ADisambiguationPageIsToldApart;
     procedure AStubOrBrokenAnswerGivesNothing;
+    procedure LastFmAnswersAreToldApart;
     procedure AnArticleAddressIsEncoded;
     procedure ADownloadedTextWithoutASourceFileIsLastFm;
     procedure ATextWithAnArticleAddressIsWikipedia;
@@ -124,6 +125,37 @@ begin
   AssertFalse('Cut off', ParseWikipediaIntro('{"query":{"pages":[{"pageid":3,"tit', Text, Title, Item, Dis));
   AssertFalse('Empty', ParseWikipediaIntro('', Text, Title, Item, Dis));
   AssertFalse('No pages', ParseWikipediaIntro('{"query":{"pages":[]}}', Text, Title, Item, Dis));
+end;
+
+procedure TTestArtistSource.LastFmAnswersAreToldApart;
+var
+  Err: string;
+begin
+  AssertEquals('A biography', 'A band from Leeds.', ParseLastFmBio(
+    '{"artist":{"name":"X","bio":{"content":"A band from <b>Leeds</b>."}}}', Err));
+  AssertEquals('', Err);
+
+  AssertEquals('', ParseLastFmBio(
+    '{"error":6,"message":"The artist you supplied could not be found"}', Err));
+  AssertEquals('An unknown artist', ERR_BIO_NOT_FOUND, Err);
+
+  AssertEquals('', ParseLastFmBio('{"artist":{"name":"X","bio":{"content":"  "}}}', Err));
+  AssertEquals('A known artist without a text', ERR_BIO_NOT_FOUND, Err);
+  AssertEquals('', ParseLastFmBio('{"artist":{"name":"X"}}', Err));
+  AssertEquals('No bio at all', ERR_BIO_NOT_FOUND, Err);
+
+  AssertEquals('', ParseLastFmBio('{"error":10,"message":"Invalid API key"}', Err));
+  AssertEquals('An invalid key', ERR_LASTFM_KEY_REJECTED, Err);
+  AssertEquals('', ParseLastFmBio('{"error":26,"message":"Suspended API key"}', Err));
+  AssertEquals('A blocked key', ERR_LASTFM_KEY_REJECTED, Err);
+
+  AssertEquals('', ParseLastFmBio('{"error":29,"message":"Rate limit exceeded"}', Err));
+  AssertEquals('Another error keeps its text', ERR_LASTFM_API_PREFIX + 'Rate limit exceeded', Err);
+  AssertEquals('', ParseLastFmBio('{"error":8}', Err));
+  AssertEquals('An error without a text', ERR_LASTFM_GENERIC, Err);
+
+  AssertEquals('', ParseLastFmBio('<html>error</html>', Err));
+  AssertEquals('Not JSON', 1, Pos(ERR_LASTFM_PARSE_PREFIX, Err));
 end;
 
 procedure TTestArtistSource.AnArticleAddressIsEncoded;

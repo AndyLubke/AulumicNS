@@ -48,6 +48,7 @@ type
     procedure TrackNumbersTwiceAndGaps;
     procedure TheWindowShowsOneKind;
     procedure SortedByFindingAnAlbumStaysTogether;
+    procedure TheSelectionGoesWithItsFindings;
   end;
 
 implementation
@@ -459,6 +460,46 @@ begin
     AssertTrue('One kind', LibraryCheckFilter(F, 'No composer'));
     AssertEquals('Its two lines by album', 'Abel - Alpha', LibraryCheckCell(F, 0, 1));
     AssertEquals('Zed - Zulu', LibraryCheckCell(F, 1, 1));
+  finally
+    F.Free;
+  end;
+end;
+
+{ the findings that are selected stay selected when the list is sorted,
+  filtered or filled again }
+procedure TTestLibraryCheck.TheSelectionGoesWithItsFindings;
+var
+  F: TAuForm;
+begin
+  Add('m:\z', '1.flac', 'Zed', 'Zulu', '');
+  Add('m:\z', '2.flac', 'Unknown Artist', 'Zulu', '');
+  Last^.AlbumArtist := 'Zed';
+  Add('m:\a', '1.flac', 'Abel', 'Alpha', '');
+  Add('m:\a', '2.flac', 'Unknown Artist', 'Alpha', '');
+  Last^.AlbumArtist := 'Abel';
+  F := CreateLibraryCheckForm(nil, 'A test', FTracks);
+  try
+    AssertEquals(4, LibraryCheckRowCount(F));
+    { the last line: Zulu without a composer }
+    LibraryCheckSort(F, 1);
+    LibraryCheckSelect(F, [3]);
+    AssertEquals('No composer: Zed - Zulu', LibraryCheckSelection(F));
+    { backwards: it is the first line now, and still the selected one }
+    LibraryCheckSort(F, 1);
+    AssertEquals('No composer: Zed - Zulu', LibraryCheckSelection(F));
+    { by kind }
+    LibraryCheckSort(F, 0);
+    AssertEquals('No composer: Zed - Zulu', LibraryCheckSelection(F));
+    { only its kind }
+    AssertTrue(LibraryCheckFilter(F, 'No composer'));
+    AssertEquals('No composer: Zed - Zulu', LibraryCheckSelection(F));
+    { two lines, and all kinds again }
+    LibraryCheckSelect(F, [0, 1]);
+    AssertTrue(LibraryCheckFilter(F, ''));
+    AssertEquals('No composer: Abel - Alpha | No composer: Zed - Zulu', LibraryCheckSelection(F));
+    { a kind none of them has: the first line, as before }
+    AssertTrue(LibraryCheckFilter(F, 'No artist'));
+    AssertEquals('one line, the first', 'No artist: Abel - Alpha', LibraryCheckSelection(F));
   finally
     F.Free;
   end;

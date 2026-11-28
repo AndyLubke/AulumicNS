@@ -61,6 +61,7 @@ type
     procedure ListCellClick(Sender: TObject; Row, Col, XInCell: Integer);
     procedure ListActivate(Sender: TObject; Row: Integer);
     procedure ListSel(Sender: TObject);
+    function ListRowName(Sender: TObject; Row: Integer): string;
     procedure ListDraw(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure ListKey(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure OkClick(Sender: TObject);
@@ -136,6 +137,7 @@ begin
   FList.AutoFit := True;
   FList.EmptyText := 'No sub folders';
   FList.OnDrawCell := @ListDraw;
+  FList.OnTypeText := @ListRowName;
   FList.OnActivate := @ListActivate;
   FList.OnCellClick := @ListCellClick;
   FList.OnSelChange := @ListSel;
@@ -384,6 +386,12 @@ begin
   { the arrow that opens the row }
   DrawIcon(G, icChevronRight, X + W - S(22), Y + H / 2, S(12), clTextDim);
   Handled := True;
+end;
+
+{ what typing the first letters is matched against: the folder's name }
+function TFolderPickForm.ListRowName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row <= High(FEntries)) then Result := FEntries[Row].Name else Result := '';
 end;
 
 procedure TFolderPickForm.OkClick(Sender: TObject);

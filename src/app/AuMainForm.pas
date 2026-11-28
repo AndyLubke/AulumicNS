@@ -87,6 +87,10 @@ type
     FStallProgress: Double;
     FStallShown: Boolean;
     FLastStatusTick: QWord;
+    FDropTick: QWord;            // when the last interruption of the sound was seen
+    FDropsSeen: Integer;         // the stream's interruptions at the last look
+    FPlStatusDirty: Boolean;     // the status line's playlist text is due
+    FPlStatusCount, FPlStatusSel: Integer;   // what that text was made for
     FLastPlaySec: Integer;
     FLastBitPerfect: Boolean;
     FRateShown: Boolean;
@@ -112,6 +116,12 @@ type
     FCtxNode: TAuTreeNode;       // the node of the library context menu
     FCtxTile: Integer;           // the tile of the library context menu
     FStartupScanDone: Boolean;
+    FPlSelNames: array of string;    // the playlists shown in this run ...
+    FPlSels: array of TPlSelection;  // ... and the selection each had when it was left
+    FStartLogged: Boolean;           // the log has its start-up line
+    FStartShown: Boolean;            // ... and the mark of the window being shown is set
+    FNowMenu: TAuMenu;               // Main menu > Now playing
+    FNowFavItem: TAuMenuItem;        // ... > Favourite (its tick)
     FStopAfterItem: TAuMenuItem;     // Main menu > Playback > Stop after current track (its tick)
     FPrefsOld: TAppSettingsData;     // the settings before Preferences changed them (ApplyPrefs)
     FPrefsOldDevName: string;
@@ -207,6 +217,8 @@ type
     procedure UpdatePosition;
     procedure UpdateMeter;
     procedure UpdateEngineStatus;
+    procedure UpdatePlaylistStatus;
+    procedure PlSelChange(Sender: TObject);
     procedure CheckOpeningUI;
     procedure CheckStallUI;
     procedure EndOpeningUI(ADone: Boolean);
@@ -256,6 +268,8 @@ type
     procedure FreePlaylists;
     function ShownPlaylist: PStoredPlaylist;
     procedure ShowPlaylist(const AName: string; AForce: Boolean = False);
+    procedure RememberPlSelection(const AName: string; const ASel: TPlSelection);
+    function RecallPlSelection(const AName: string; out ASel: TPlSelection): Boolean;
     procedure ApplyView(P: PStoredPlaylist; const ADateSuffix: string);
     function PlGroupMode(P: PStoredPlaylist): TGroupingMode;
     procedure SaveShownPlaylist(ANow: Boolean);
@@ -357,6 +371,7 @@ type
     { events }
     procedure TitleBack(Sender: TObject; G: TGfx);
     procedure TitleMenuClick(Sender: TObject);
+    procedure OpenMainMenuByKey;
     procedure TitlePrefsClick(Sender: TObject);
     procedure BannerCover(Sender: TObject);
     procedure BannerAlbum(Sender: TObject);
@@ -367,6 +382,9 @@ type
     procedure FillSignalPath(P: TAuSignalPath);
     procedure BannerHeart(Sender: TObject);
     procedure BannerBooklet(Sender: TObject);
+    procedure MnNowArtist(Sender: TObject);
+    procedure MnNowSignalPath(Sender: TObject);
+    procedure UpdateNowMenu;
     procedure TopSplitMoved(Sender: TObject);
     procedure MainSplitMoved(Sender: TObject);
     procedure MidResize(Sender: TObject);
@@ -375,6 +393,7 @@ type
     procedure TreeActivate(Sender: TObject; Node: TAuTreeNode; var Handled: Boolean);
     procedure TreeContext(Sender: TObject; Node: TAuTreeNode; ScreenPt: TPoint);
     procedure TilesActivate(Sender: TObject; Index: Integer);
+    procedure TilesPlay(Sender: TObject; Index: Integer);
     procedure TilesContext(Sender: TObject; Index: Integer; ScreenPt: TPoint);
     procedure MnTileShowInTree(Sender: TObject);
     procedure MnTileOpenFolder(Sender: TObject);
@@ -432,6 +451,7 @@ type
     procedure MnPlSticky(Sender: TObject);
     procedure MnViewWorks(Sender: TObject);
     procedure MnPlSelectWork(Sender: TObject);
+    procedure MnPlShowCover(Sender: TObject);
     procedure SortClick(Sender: TObject);
     procedure MnSort(Sender: TObject);
     procedure MnSortReverse(Sender: TObject);
@@ -451,6 +471,9 @@ type
   protected
     procedure CreateWnd; override;
     procedure WndProc(var Message: TLMessage); override;
+    procedure NowOnScreen; override;
+    procedure AboutToShow; override;
+    procedure AboutToPaint; override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure ThemeUpdated; override;
   public
@@ -466,7 +489,7 @@ implementation
 uses
   AuAudioTypes, ALAudioEngine, AuFolderPicker, AuLogForm, AuDebugQueue, uSettingsLog,
   AuCoverViewer, AuArtistInfo, AuBooklet, AuHelp, uHangWatch, uDriveKeepAlive, ALHeadroom,
-  AuAbout, uVersionHelper, uInputBlock, AuFormatBoxes;
+  AuAbout, uVersionHelper, uInputBlock, AuFormatBoxes, uStartTimes;
 
 { the list font sizes of the settings are 6 .. 20; the panes use pixels }
 function PaneTextPx(FontSize: Integer): Single;
@@ -593,6 +616,7 @@ begin
   Caption := IdleCaption;
   { the library before the panes that show it }
   InitLibrary;
+  StartMark('library');
   { our own title bar, drawn in the theme (first: it is the topmost control);
     the debug build's --ui-bench-noframe leaves it out (a measurement) }
   {$IFDEF DEBUG}
@@ -608,6 +632,7 @@ begin
   end;
   BuildUI;
   BuildMenus;
+  StartMark('building the window');
   FPl.OnLookup := @LibLookup;
   FPl.OnChange := @PlChanged;
   FPl.OnCollapseChange := @PlCollapseChanged;
@@ -618,6 +643,10 @@ begin
   FPl.List.OnEndDrag := @PlEndDrag;
   ApplyView(nil, '');           // the default grouping and formats (also for the screenshots)
   ApplyWindowSettings;
+  { the keyboard starts in the playlist: Space, Enter and the arrow keys do
+    what they say at once (in the search box, the first tab stop, Space and
+    Ctrl+Left / Right would belong to the text) }
+  ActiveControl := FPl.List;
   OnCloseQuery := @FormCloseQuery;
   Application.OnException := @AppException;
   Application.AddOnQueryEndSessionHandler(@AppQueryEndSession);
@@ -672,7 +701,9 @@ begin
   {$ENDIF}
   begin
     FLib.Init(FLibrary, True);
+    StartMark('library tree');
     InitPlaylists;
+    StartMark('playlist');
     RestartWatcher;
     Application.QueueAsyncCall(@StartWatchAsync, 0);
     {$IFDEF DEBUG}
@@ -702,6 +733,52 @@ begin
     {$ENDIF}
   end;
   InitPlayback;
+  StartMark('audio and the rest');
+end;
+
+{ the parts of showing the window for the first time: its handles and those
+  of its controls made, then sized and laid out, then painted }
+procedure TMainForm.AboutToShow;
+begin
+  inherited AboutToShow;
+  if not FStartLogged and not FStartShown then
+  begin
+    FStartShown := True;
+    StartMark('creating the controls');
+  end;
+end;
+
+procedure TMainForm.AboutToPaint;
+begin
+  inherited AboutToPaint;
+  if not FStartLogged then
+  begin
+    StartMark('layout');
+    { --start-tally: which controls the first painting goes to (the log) }
+    if Application.HasOption('start-tally') and (PaintTally = nil) then PaintTally := TStringList.Create;
+  end;
+end;
+
+{ the first time the window is on the screen: how long the start took }
+procedure TMainForm.NowOnScreen;
+var
+  I: Integer;
+  Fq: Int64;
+begin
+  inherited NowOnScreen;
+  if FStartLogged then Exit;
+  FStartLogged := True;
+  StartMark('first painting');
+  AddLog('[Start-up] ' + StartReport + '.');
+  if Application.HasOption('start-tally') and (PaintTally <> nil) then
+  begin
+    Fq := 1;
+    QueryPerformanceFrequency(Fq);
+    for I := 0 to PaintTally.Count - 1 do
+      AddLog(Format('[Start-up] painting: %-34s %4d times, %8.2f ms in all', [PaintTally.Names[I],
+        PtrInt(PaintTally.Objects[I]), StrToInt64Def(PaintTally.ValueFromIndex[I], 0) * 1000 / Fq]));
+    FreeAndNil(PaintTally);
+  end;
 end;
 
 {$IFDEF DEBUG}
@@ -1104,6 +1181,7 @@ begin
   FLib.BtnRescan.OnClick := @RescanClick;
   FLib.Tiles.Grid.OnActivate := @TilesActivate;
   FLib.Tiles.Grid.OnTileContext := @TilesContext;
+  FLib.Tiles.Grid.OnTilePlay := @TilesPlay;
   FLib.OnTileModeChange := @LibTileMode;
   FMainSplit := TAuSplitter.Create(Self);
   FMainSplit.Parent := FMid;
@@ -1123,6 +1201,8 @@ begin
   FPl.List.TextSize := PaneTextPx(Dat.PlayListFontSize);
   FPl.List.OnTextSizeChange := @PlTextSize;
   FPl.List.OnActivate := @PlActivate;
+  FPl.List.OnSelChange := @PlSelChange;
+  FPlStatusDirty := True;
   FPl.List.OnRowContext := @PlContext;
   FPl.List.OnKeyDown := @PlKeyDown;
   FPl.BtnPlaylist.OnClick := @PlaylistDrop;
@@ -1179,6 +1259,13 @@ begin
   M.AddSeparator;
   M.Add('Tone Control...', @ToneClick, icSliders, 'Ctrl+T');
   M.Add('Jump to Now Playing', @JumpClick, icLocate, 'Ctrl+J');
+  { what the Now Playing banner opens with a click, for the keyboard }
+  FNowMenu := FMainMenu.AddSub('Now playing', icNote);
+  FNowMenu.Add('Cover Art Viewer...', @BannerCover, icAlbum);
+  FNowMenu.Add('Artist Info...', @MnNowArtist, icArtist);
+  FNowMenu.Add('Booklet Viewer...', @BannerBooklet, icDocument);
+  FNowMenu.Add('Signal Path', @MnNowSignalPath, icWave);
+  FNowFavItem := FNowMenu.Add('Favourite', @BannerHeart, icHeart);
   M := FMainMenu.AddSub('Library', icLibrary);
   M.Add('Search', @MnSearch, icSearch, 'Ctrl+F');
   M.Add('Refresh', @MnRefresh, icRefresh, 'F5');
@@ -1554,6 +1641,16 @@ begin
       12: begin PrevTrack; Message.Result := 1; Exit; end;    // APPCOMMAND_MEDIA_PREVIOUSTRACK
     end;
   end;
+  if (Message.Msg = WM_SYSCOMMAND) and ((Message.WParam and $FFF0) = SC_KEYMENU) and
+     (Message.LParam = 0) then
+  begin
+    { F10, or Alt pressed and let go: what opens a menu bar opens the main
+      menu (Alt+Space, the system menu, comes with a character). The key of
+      another window of the program arrives here too: it does nothing. }
+    if GetActiveWindow = Handle then OpenMainMenuByKey;
+    Message.Result := 0;
+    Exit;
+  end;
   inherited WndProc(Message);
   if (Message.Msg = WM_SETTINGCHANGE) and (ThemeMode = tmSystem) and (Message.LParam <> 0) and
      (UnicodeString(PWideChar(Message.LParam)) = 'ImmersiveColorSet') then
@@ -1595,7 +1692,17 @@ var
   R: TRect;
 begin
   R := TitleBar.ButtonScreenRect(0);
+  UpdateNowMenu;
   FMainMenu.Popup(R.Left, R.Bottom);
+end;
+
+{ the main menu from the keyboard: its first entry is marked, the arrow keys
+  go on from there }
+procedure TMainForm.OpenMainMenuByKey;
+begin
+  if FShuttingDown or (FMainMenu = nil) or FMainMenu.IsOpen then Exit;
+  KeyboardCues := True;
+  TitleMenuClick(nil);
 end;
 
 procedure TMainForm.TitlePrefsClick(Sender: TObject);
@@ -1661,6 +1768,34 @@ begin
   finally
     L.Free;
   end;
+end;
+
+{ Main menu > Now playing: the first of the playing track's artists }
+procedure TMainForm.MnNowArtist(Sender: TObject);
+var
+  N: string;
+begin
+  if FPlayingPath = '' then Exit;
+  N := FBanner.FirstPerson;
+  if N = '' then N := FCurrentMeta.Artist;
+  if N <> '' then BannerArtist(Sender, N);
+end;
+
+procedure TMainForm.MnNowSignalPath(Sender: TObject);
+begin
+  if FPlayingPath = '' then Exit;
+  BannerBadge(Sender, FBanner.BadgePopupPoint);
+end;
+
+{ the entries of Now playing work on the playing track: greyed out while
+  nothing plays, Favourite ticked as the heart is }
+procedure TMainForm.UpdateNowMenu;
+var
+  I: Integer;
+begin
+  if FNowMenu = nil then Exit;
+  for I := 0 to FNowMenu.Count - 1 do FNowMenu.Item(I).Enabled := FPlayingPath <> '';
+  if FNowFavItem <> nil then FNowFavItem.Checked := (FPlayingPath <> '') and FBanner.Favorite;
 end;
 
 { ---- panes ---- }
@@ -2109,7 +2244,6 @@ procedure TMainForm.ShotTick(Sender: TObject);
     FBanner.Codec := 'FLAC';
     FBanner.Channels := 'Stereo';
     FBanner.Badge := bbBitPerfect;
-    FBanner.BadgeText := 'Bit-perfect';
     FBanner.Meter.Active := True;
     { (about -16 / -18 dBFS: up to the amber; the meter rises 35 % of the
       way per read, so it reads a while) }
@@ -2166,6 +2300,8 @@ begin
     1: CaptureWindow('01-dark-main');
     2: begin
          FTransport.SetPlaying(True);
+         { the banner shows the first track: it is the one marked in the playlist }
+         if FPl.EntryCount > 0 then FPl.PlayingEntry := 0;
          FPl.List.SelectOnly(3);
          DemoPosition;
          { --shot-flat: the playlist as a flat list with its columns }
@@ -2231,6 +2367,9 @@ begin
            end;
            FLib.Tiles.Grid.TileSize := StrToIntDef(Application.GetOptionValue('shot-tiles'), 2);
            FLib.SetTileMode(True, False);
+           { a selected tile, which shows its two buttons }
+           if Application.HasOption('shot-tile-select') then
+             FLib.Tiles.Grid.SelectOnly(StrToIntDef(Application.GetOptionValue('shot-tile-select'), 0));
            { the Tab order above the tiles, to compare with the left edges }
            with TStringList.Create do
            try
@@ -2241,7 +2380,13 @@ begin
            end;
          end;
        end;
-    3: CaptureWindow('02-dark-playing');
+    3: begin
+         { the status line as it is while a track plays }
+         UpdatePlaylistStatus;
+         FStatus.EngineText := 'CPU: 2.1%';
+         if Application.HasOption('shot-status-warn') then FStatus.WarnText := 'Sound interrupted (2 times)';
+         CaptureWindow('02-dark-playing');
+       end;
     4: SetTheme(tmLight, AccentIndex);
     5: CaptureWindow('03-light-playing');
     6: begin FBanner.Height := S(110); end;

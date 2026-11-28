@@ -27,12 +27,16 @@ interface
 
 uses
   Windows, Classes, SysUtils, Math, Controls, Forms, LCLType, LazUTF8,
-  AuGfx, AuAnim, AuTheme, AuControls, AuLists;
+  AuGfx, AuAnim, AuTheme, AuIcons, AuControls, AuLists;
 
 const
   TILE_SIZE_LIST = 0;        // a list: a small picture, the text beside it
   TILE_SIZE_MAX = 3;
   TILE_SIZE_DEFAULT = 2;
+  { the two buttons on a tile }
+  TILE_BTN_NONE = 0;
+  TILE_BTN_PLAY = 1;
+  TILE_BTN_MENU = 2;
 
 type
   TAuTileInfo = record
@@ -67,16 +71,18 @@ type
     FTopPad: Integer;                // the room above the first row (unscaled)
     FDownPt: TPoint;
     FDownOnSelected, FDragArmed, FDragEnabled, FMoreQueued: Boolean;
+    FHoverBtn, FDownBtn: Integer;    // TILE_BTN_*: under the pointer, pressed
     FEmptyText, FTypeText: string;
     FTypeTick: QWord;
     FOnInfo: TAuTileInfoEvent;
     FOnArt: TAuTileArtEvent;
-    FOnActivate, FOnSizeWheel: TAuTileEvent;
+    FOnActivate, FOnSizeWheel, FOnTilePlay: TAuTileEvent;
     FOnTileContext: TAuTileContextEvent;
     FOnTypeText: TAuTileTextEvent;
     FOnSelChange, FOnPrepare: TNotifyEvent;
     procedure ScrollChanged(Sender: TObject);
     procedure Layout;
+    procedure LayoutKeepingTop;
     function ViewW: Integer;
     function TextW: Integer;
     function HighlightRect(I: Integer): TRect;
@@ -113,9 +119,20 @@ type
     { the same tiles in another order or with other texts }
     procedure Changed;
     function IndexAt(X, Y: Integer): Integer;
+    { the play and the menu button: on the tile under the pointer and on the
+      selected tile that has the focus }
+    function ShowsButtons(I: Integer): Boolean;
+    procedure ButtonRects(I: Integer; out APlay, AMenu: TRect);
+    { which button of which tile is at this point (TILE_BTN_NONE: none) }
+    function ButtonAt(X, Y: Integer; out AIndex: Integer): Integer;
     { the place of a tile's picture and text (client coordinates) }
     function TileRect(I: Integer): TRect;
     procedure EnsureVisible(I: Integer);
+    { the first tile of the top row in view (-1 without tiles) and how many
+      pixels of that row are scrolled out }
+    function TopTile(out AOffset: Integer): Integer;
+    { the row of tile I at the top, AOffset pixels of it scrolled out }
+    procedure ScrollToTile(I: Integer; AOffset: Integer = 0);
     procedure SelectOnly(I: Integer);
     { after SetCount: this selection and focus again, scrolled to AScroll
       (below 0: to where the focus is) }
@@ -125,6 +142,8 @@ type
     property Count: Integer read FTileCount;
     { the side of a tile's picture in pixels }
     property ArtPixels: Integer read FArt;
+    { the height of a row of tiles in pixels }
+    property RowHeight: Integer read FCellH;
     property Selected[I: Integer]: Boolean read GetSelected;
     property FocusIndex: Integer read FFocusIdx;
     property TileSize: Integer read FTileSize write SetTileSize;
@@ -138,6 +157,8 @@ type
     { called before a paint draws anything: the owner may free pictures here }
     property OnPrepare: TNotifyEvent read FOnPrepare write FOnPrepare;
     property OnActivate: TAuTileEvent read FOnActivate write FOnActivate;
+    { the play button of a tile was clicked (the tile is selected then) }
+    property OnTilePlay: TAuTileEvent read FOnTilePlay write FOnTilePlay;
     property OnTileContext: TAuTileContextEvent read FOnTileContext write FOnTileContext;
     property OnTypeText: TAuTileTextEvent read FOnTypeText write FOnTypeText;
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
@@ -230,7 +251,7 @@ end;
 procedure TAuTileGrid.Resize;
 begin
   inherited Resize;
-  Layout;
+  LayoutKeepingTop;
 end;
 
 procedure TAuTileGrid.ScaleCached(K: Double);
@@ -254,16 +275,44 @@ begin
   Result := FScroll.Position;
 end;
 
-procedure TAuTileGrid.SetTileSize(V: Integer);
+function TAuTileGrid.TopTile(out AOffset: Integer): Integer;
 var
-  Keep: Integer;
+  Row: Integer;
+begin
+  AOffset := 0;
+  if (FTileCount = 0) or (FCellH <= 0) or (FCols <= 0) then Exit(-1);
+  Row := Math.Max(0, FScroll.Position) div FCellH;
+  AOffset := Math.Max(0, FScroll.Position) - Row * FCellH;
+  Result := Math.Min(Row * FCols, FTileCount - 1);
+end;
+
+procedure TAuTileGrid.ScrollToTile(I: Integer; AOffset: Integer);
+begin
+  if (I < 0) or (I >= FTileCount) or (FCols <= 0) then Exit;
+  FScroll.Position := (I div FCols) * FCellH + EnsureRange(AOffset, 0, Math.Max(0, FCellH - 1));
+  Invalidate;
+end;
+
+{ a layout with other columns or another tile height: the tiles that were at
+  the top stay there }
+procedure TAuTileGrid.LayoutKeepingTop;
+var
+  Keep, Off, OldH: Integer;
+begin
+  Keep := TopTile(Off);
+  OldH := FCellH;
+  Layout;
+  if Keep < 0 then Exit;
+  if (OldH > 0) and (FCellH <> OldH) then Off := Int64(Off) * FCellH div OldH;
+  ScrollToTile(Keep, Off);
+end;
+
+procedure TAuTileGrid.SetTileSize(V: Integer);
 begin
   V := EnsureRange(V, TILE_SIZE_LIST, TILE_SIZE_MAX);
   if V = FTileSize then Exit;
-  Keep := FFocusIdx;
   FTileSize := V;
-  Layout;
-  if Keep >= 0 then EnsureVisible(Keep);
+  LayoutKeepingTop;
   Invalidate;
 end;
 
@@ -356,6 +405,47 @@ begin
     Result := Rect(S(4), Result.Top + 1, ViewW - S(4), Result.Bottom - 1)
   else
     Result := Rect(Result.Left - S(5), Result.Top - S(5), Result.Right + S(5), Result.Bottom + S(5));
+end;
+
+function TAuTileGrid.ShowsButtons(I: Integer): Boolean;
+begin
+  Result := (I >= 0) and (I < FTileCount) and ((I = FHoverIdx) or (FSel[I] and (I = FFocusIdx)));
+end;
+
+procedure TAuTileGrid.ButtonRects(I: Integer; out APlay, AMenu: TRect);
+var
+  R: TRect;
+  D, Y: Integer;
+begin
+  R := TileRect(I);
+  if FTileSize = TILE_SIZE_LIST then
+  begin
+    { a list: at the right end of the row }
+    D := Math.Min(S(26), FCellH - S(8));
+    Y := R.Top + (FCellH - D) div 2;
+    AMenu := Rect(ViewW - S(10) - D, Y, ViewW - S(10), Y + D);
+    APlay := Rect(AMenu.Left - S(6) - D, Y, AMenu.Left - S(6), Y + D);
+  end
+  else
+  begin
+    { on the lower edge of the picture: play at the left, the menu at the right }
+    D := Math.Max(S(8), Math.Min(S(28), (FArt - S(16)) div 2));   // (two of them fit side by side)
+    Y := R.Top + FArt - S(6) - D;
+    APlay := Rect(R.Left + S(6), Y, R.Left + S(6) + D, Y + D);
+    AMenu := Rect(R.Left + FArt - S(6) - D, Y, R.Left + FArt - S(6), Y + D);
+  end;
+end;
+
+function TAuTileGrid.ButtonAt(X, Y: Integer; out AIndex: Integer): Integer;
+var
+  RP, RM: TRect;
+begin
+  Result := TILE_BTN_NONE;
+  AIndex := IndexAt(X, Y);
+  if not ShowsButtons(AIndex) then Exit;
+  ButtonRects(AIndex, RP, RM);
+  if PtInRect(RP, Point(X, Y)) then Result := TILE_BTN_PLAY
+  else if PtInRect(RM, Point(X, Y)) then Result := TILE_BTN_MENU;
 end;
 
 function TAuTileGrid.IndexAt(X, Y: Integer): Integer;
@@ -458,11 +548,32 @@ procedure TAuTileGrid.DoPaint(G: TGfx);
 var
   F, F2: TGfxFont;
   I, Budget, TX, TY, TW: Integer;
-  R, HR: TRect;
+  R, HR, RP, RM: TRect;
   Info: TAuTileInfo;
   Bmp: TGfxBitmap;
   Bg, Fg, Fg2: TARGB;
   Foc, Pending, More: Boolean;
+
+  { a round button on a picture: dark under any cover, the accent under the pointer }
+  procedure DrawButton(const ARect: TRect; AIcon: TAuIcon; AHot: Boolean);
+  var
+    CX, CY, Rad: Single;
+  begin
+    CX := (ARect.Left + ARect.Right) / 2;
+    CY := (ARect.Top + ARect.Bottom) / 2;
+    Rad := (ARect.Right - ARect.Left) / 2;
+    if AHot then
+    begin
+      G.FillCircle(CX, CY, Rad, clAccent);
+      DrawIcon(G, AIcon, CX, CY, S(14), clOnAccent);
+    end
+    else
+    begin
+      G.FillCircle(CX, CY, Rad, TARGB($C8101216));
+      DrawIcon(G, AIcon, CX, CY, S(14), TARGB($FFFFFFFF));
+    end;
+  end;
+
 begin
   G.FillRect(0, 0, Width, Height, EffBack);
   if Assigned(FOnPrepare) then FOnPrepare(Self);
@@ -529,6 +640,12 @@ begin
     end;
     G.Text(Info.Title, TX, TY, TW, FLineH, F, Fg, 0, 1);
     if Info.Sub <> '' then G.Text(Info.Sub, TX, TY + FLineH, TW, FLineH, F2, Fg2, 0, 1);
+    if ShowsButtons(I) then
+    begin
+      ButtonRects(I, RP, RM);
+      DrawButton(RP, icPlay, (I = FHoverIdx) and (FHoverBtn = TILE_BTN_PLAY));
+      DrawButton(RM, icMore, (I = FHoverIdx) and (FHoverBtn = TILE_BTN_MENU));
+    end;
     Inc(I);
   end;
   { pictures that had to wait: the next paint loads some more }
@@ -546,7 +663,10 @@ var
   TW: Integer;
 begin
   HintInfo^.HintStr := '';
-  I := IndexAt(HintInfo^.CursorPos.X, HintInfo^.CursorPos.Y);
+  case ButtonAt(HintInfo^.CursorPos.X, HintInfo^.CursorPos.Y, I) of
+    TILE_BTN_PLAY: begin HintInfo^.HintStr := 'Play'; Exit; end;
+    TILE_BTN_MENU: begin HintInfo^.HintStr := 'More actions'; Exit; end;
+  end;
   if (I < 0) or not Assigned(FOnInfo) then Exit;
   FOnInfo(Self, I, Info);
   { only when a line is cut: the full text }
@@ -560,12 +680,13 @@ end;
 
 procedure TAuTileGrid.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  I: Integer;
+  I, B: Integer;
   HR: TRect;
 begin
   inherited MouseDown(Button, Shift, X, Y);
   I := IndexAt(X, Y);
   FDownIdx := -1;
+  FDownBtn := TILE_BTN_NONE;
   FDragArmed := False;
   FDownOnSelected := False;
   if I < 0 then
@@ -592,6 +713,27 @@ begin
     Exit;
   end;
   if Button <> mbLeft then Exit;
+  { a button of the tile. A finger has no pointer that shows the buttons
+    first: there they count only on the tile that had them before the tap. }
+  if (not MouseFromTouch) or (FSel[I] and (I = FFocusIdx)) then
+    FDownBtn := ButtonAt(X, Y, B)
+  else
+    FDownBtn := TILE_BTN_NONE;
+  if FDownBtn <> TILE_BTN_NONE then
+  begin
+    { a selected tile keeps the selection (the button acts on all of it),
+      any other becomes the one selected }
+    if not FSel[I] then
+    begin
+      SelectRange(I, I, False);
+      FAnchorIdx := I;
+    end;
+    FFocusIdx := I;
+    FDownIdx := I;
+    Invalidate;
+    DoSelChange;
+    Exit;
+  end;
   HR := HighlightRect(I);
   if (FTileSize <> TILE_SIZE_LIST) and ((X < HR.Left) or (X >= HR.Right)) then Exit;
   FFocusIdx := I;
@@ -618,7 +760,7 @@ end;
 
 procedure TAuTileGrid.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
-  I: Integer;
+  I, B: Integer;
 begin
   inherited MouseMove(Shift, X, Y);
   if FDragArmed and (ssLeft in Shift) and (FDownIdx >= 0) and
@@ -635,13 +777,41 @@ begin
     FHoverIdx := I;
     Invalidate;
   end;
+  B := ButtonAt(X, Y, I);
+  if B <> FHoverBtn then
+  begin
+    FHoverBtn := B;
+    Invalidate;
+  end;
 end;
 
 procedure TAuTileGrid.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var
-  I: Integer;
+  I, B, D: Integer;
+  RP, RM: TRect;
 begin
   inherited MouseUp(Button, Shift, X, Y);
+  { a button: released where it was pressed }
+  if FDownBtn <> TILE_BTN_NONE then
+  begin
+    B := FDownBtn;
+    D := FDownIdx;
+    FDownBtn := TILE_BTN_NONE;
+    FDownIdx := -1;
+    if (Button = mbLeft) and (ButtonAt(X, Y, I) = B) and (I = D) then
+    begin
+      if B = TILE_BTN_PLAY then
+      begin
+        if Assigned(FOnTilePlay) then FOnTilePlay(Self, I);
+      end
+      else if Assigned(FOnTileContext) then
+      begin
+        ButtonRects(I, RP, RM);
+        FOnTileContext(Self, I, ClientToScreen(Point(RM.Left, RM.Bottom + S(2))));
+      end;
+    end;
+    Exit;
+  end;
   I := IndexAt(X, Y);
   if FDownOnSelected and (I >= 0) and (I = FDownIdx) then
   begin
@@ -658,6 +828,7 @@ end;
 procedure TAuTileGrid.MouseLeave;
 begin
   inherited MouseLeave;
+  FHoverBtn := TILE_BTN_NONE;
   if FHoverIdx <> -1 then
   begin
     FHoverIdx := -1;
@@ -672,7 +843,8 @@ var
 begin
   inherited DblClick;
   P := ScreenToClient(Mouse.CursorPos);
-  I := IndexAt(P.X, P.Y);
+  { a button has done its work at the first click }
+  if ButtonAt(P.X, P.Y, I) <> TILE_BTN_NONE then Exit;
   if (I >= 0) and Assigned(FOnActivate) then FOnActivate(Self, I);
 end;
 

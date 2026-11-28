@@ -16,7 +16,7 @@ unit TestLibraryTiles;
 interface
 
 uses
-  Classes, SysUtils, Forms, fpcunit, testregistry, uLibraryTypes, AuLibraryTiles, AuTileGrid;
+  Classes, SysUtils, Types, Controls, Forms, fpcunit, testregistry, uLibraryTypes, AuLibraryTiles, AuTileGrid;
 
 type
   TTestLibraryTiles = class(TTestCase)
@@ -24,10 +24,15 @@ type
     FForm: TForm;
     FTiles: TLibraryTiles;
     FTracks: TTrackList;
+    FPlayed, FMenuOf, FPlayCount, FMenuCount: Integer;
     procedure Add(const AFolder, AFile, AAlbumArtist, AArtist, AAlbum: string;
       ADisc, ATrack: Integer; AYear: Integer = 0; AAdded: Int64 = 0);
     function IndexOfTitle(const ATitle: string): Integer;
     function Titles: string;
+    procedure AddAlbums(ACount: Integer);
+    function Part(AFrom, ATo: Integer): TTrackList;
+    procedure NotePlay(Sender: TObject; Index: Integer);
+    procedure NoteMenu(Sender: TObject; Index: Integer; ScreenPt: TPoint);
   protected
     procedure SetUp; override;
     procedure TearDown; override;
@@ -38,11 +43,103 @@ type
     procedure TheSameFileTwiceCountsOnce;
     procedure TheTilesFollowTheChosenOrder;
     procedure ByComposerKeepsRecordingsOfAWorkTogether;
+    procedure ByFolderFollowsTheTree;
     procedure ASearchCountsTheTracksFound;
     procedure TheSelectionSurvivesReadingTheSameAgain;
+    procedure APlaceComesBackAsItWasLeft;
+    procedure ASearchInBetweenReturnsToThePlace;
+    procedure ComingUpShowsTheAlbumThatWasLeft;
+    procedure TheTopTilesStayWhenTheSizeChanges;
+    procedure TheButtonsOfATilePlayAndOpenTheMenu;
   end;
 
 implementation
+
+type
+  { the grid's mouse methods, for the tests }
+  TGridAccess = class(TAuTileGrid);
+
+procedure TTestLibraryTiles.NotePlay(Sender: TObject; Index: Integer);
+begin
+  FPlayed := Index;
+  Inc(FPlayCount);
+end;
+
+procedure TTestLibraryTiles.NoteMenu(Sender: TObject; Index: Integer; ScreenPt: TPoint);
+begin
+  FMenuOf := Index;
+  Inc(FMenuCount);
+end;
+
+{ the play and the menu button of a tile: on the tile under the pointer and
+  on the selected tile with the focus; a click on a selected tile's button
+  keeps the selection, on another tile it selects that one; a press that is
+  let go elsewhere does nothing }
+procedure TTestLibraryTiles.TheButtonsOfATilePlayAndOpenTheMenu;
+var
+  G: TGridAccess;
+  RP, RM, R: TRect;
+  Idx: Integer;
+
+  procedure ClickAt(const ARect: TRect; AShift: TShiftState = []);
+  var
+    X, Y: Integer;
+  begin
+    X := (ARect.Left + ARect.Right) div 2;
+    Y := (ARect.Top + ARect.Bottom) div 2;
+    G.MouseMove([], X, Y);
+    G.MouseDown(mbLeft, AShift + [ssLeft], X, Y);
+    G.MouseUp(mbLeft, AShift, X, Y);
+  end;
+
+begin
+  Add('m:\a', '1.flac', 'A', 'A', 'Alpha', 1, 1);
+  Add('m:\b', '1.flac', 'B', 'B', 'Bravo', 1, 1);
+  Add('m:\c', '1.flac', 'C', 'C', 'Charlie', 1, 1);
+  FTiles.Sort := tsAlbum;
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False);
+  G := TGridAccess(FTiles.Grid);
+  G.TabStop := False;       // (a click takes the focus, which a hidden form cannot give)
+  G.OnTilePlay := @NotePlay;
+  G.OnTileContext := @NoteMenu;
+  FPlayed := -1;
+  FMenuOf := -1;
+  AssertFalse('no pointer, nothing selected: no buttons', G.ShowsButtons(1));
+  R := G.TileRect(1);
+  G.MouseMove([], R.Left + 10, R.Top + 10);
+  AssertTrue('under the pointer', G.ShowsButtons(1));
+  AssertFalse('and only there', G.ShowsButtons(0));
+  G.ButtonRects(1, RP, RM);
+  ClickAt(RP);
+  AssertEquals('play', 1, FPlayed);
+  AssertEquals('once', 1, FPlayCount);
+  AssertTrue('the tile is the one selected', G.Selected[1] and (G.SelCount = 1));
+  G.MouseMove([], (RM.Left + RM.Right) div 2, (RM.Top + RM.Bottom) div 2);
+  AssertEquals('the menu button is found', TILE_BTN_MENU,
+    G.ButtonAt((RM.Left + RM.Right) div 2, (RM.Top + RM.Bottom) div 2, Idx));
+  ClickAt(RM);
+  AssertEquals('the menu of that tile', 1, FMenuOf);
+  AssertEquals('no second play', 1, FPlayCount);
+  { two tiles selected: the button of one of them keeps both }
+  G.SelectOnly(0);
+  R := G.TileRect(2);
+  ClickAt(Rect(R.Left + 4, R.Top + 4, R.Left + 12, R.Top + 12), [ssCtrl]);
+  AssertEquals(2, G.SelCount);
+  G.ButtonRects(2, RP, RM);
+  ClickAt(RP);
+  AssertEquals('play on a selected tile', 2, FPlayed);
+  AssertEquals('the selection stays', 2, G.SelCount);
+  { without the pointer: the selected tile with the focus has them }
+  G.MouseLeave;
+  AssertTrue(G.ShowsButtons(2));
+  AssertFalse('a selected tile without the focus has none', G.ShowsButtons(0));
+  { pressed on the button, let go beside it }
+  G.MouseMove([], RP.Left + 3, RP.Top + 3);
+  G.MouseDown(mbLeft, [ssLeft], RP.Left + 3, RP.Top + 3);
+  G.MouseUp(mbLeft, [], RP.Left + 3, RP.Top - 30);
+  AssertEquals('nothing played', 2, FPlayCount);
+  AssertEquals('no menu', 1, FMenuCount);
+end;
 
 procedure TTestLibraryTiles.SetUp;
 begin
@@ -214,6 +311,25 @@ begin
   AssertEquals('backwards', 'Songs|Recital|Goldberg L|Goldberg G|Trios', Titles);
 end;
 
+{ the order by folder: as the tree lists the folders - part by part of the
+  path, not the path as one text; a folder's sub folders before the album
+  in the folder itself; two albums of one folder by their titles }
+procedure TTestLibraryTiles.ByFolderFollowsTheTree;
+begin
+  Add('m:\Rock', '1.flac', 'A', 'A', 'Loose', 1, 1);
+  Add('m:\Rock\Zed', '1.flac', 'A', 'A', 'Inner', 1, 1);
+  Add('m:\jazz live\x', '1.flac', 'B', 'B', 'Live', 1, 1);
+  Add('m:\Jazz\b', '1.flac', 'C', 'C', 'Studio', 1, 1);
+  Add('m:\Jazz\b', '2.flac', 'D', 'D', 'Another', 1, 1);
+  Add('m:\Jazz\a', '1.flac', 'Z', 'Z', 'Zulu', 1, 1);
+  FTiles.Sort := tsFolder;
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False);
+  AssertEquals('as the folders stand in the tree', 'Zulu|Another|Studio|Live|Inner|Loose', Titles);
+  FTiles.Reverse := True;
+  AssertEquals('backwards', 'Loose|Inner|Live|Studio|Another|Zulu', Titles);
+  AssertEquals('one folder', 0, CompareFolderOrder('m:\a\', 'M:\A'));
+end;
+
 procedure TTestLibraryTiles.ASearchCountsTheTracksFound;
 var
   Found: TStringList;
@@ -257,6 +373,143 @@ begin
   { without AKeep: a new set of tiles, nothing selected }
   FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False);
   AssertEquals(0, FTiles.Grid.SelCount);
+end;
+
+{ ACount albums "Album 01" .. of one band, a folder each; the tiles show them
+  in this order }
+procedure TTestLibraryTiles.AddAlbums(ACount: Integer);
+var
+  I: Integer;
+begin
+  for I := 1 to ACount do
+    Add(Format('m:\%.2d', [I]), '1.flac', 'Band', 'Band', Format('Album %.2d', [I]), 1, 1);
+  FTiles.Sort := tsAlbum;
+end;
+
+{ only the albums AFrom .. ATo of AddAlbums, as a part of the library }
+function TTestLibraryTiles.Part(AFrom, ATo: Integer): TTrackList;
+var
+  I: Integer;
+begin
+  Result := TTrackList.Create;
+  for I := AFrom to ATo do Result.Add(FTracks[I - 1]^);
+end;
+
+procedure TTestLibraryTiles.APlaceComesBackAsItWasLeft;
+var
+  Top, Off, Got: Integer;
+begin
+  AddAlbums(90);
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  AssertEquals('a place not shown before starts at the top', 0, FTiles.Grid.ScrollOffset);
+  FTiles.Grid.SelectOnly(IndexOfTitle('Album 62'));
+  FTiles.Grid.ScrollToTile(IndexOfTitle('Album 60'), 7);
+  Top := FTiles.Grid.TopTile(Off);
+  AssertTrue('the test scrolled', FTiles.Grid.ScrollOffset > 0);
+  AssertEquals(7, Off);
+  { the tiles are put away (the tree is shown) and come back }
+  FTiles.SetTracks(nil, nil, '', '', '', False);
+  AssertEquals(0, FTiles.TileCount);
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  Got := FTiles.Grid.TopTile(Off);
+  AssertEquals('the same album at the top', Top, Got);
+  AssertEquals('scrolled as far into its row', 7, Off);
+  AssertTrue('the selection is back', FTiles.Grid.Selected[IndexOfTitle('Album 62')]);
+  AssertEquals(1, FTiles.Grid.SelCount);
+  AssertEquals('and the focus', IndexOfTitle('Album 62'), FTiles.Grid.FocusIndex);
+end;
+
+procedure TTestLibraryTiles.ASearchInBetweenReturnsToThePlace;
+var
+  Top, Off, Got: Integer;
+  Few: TTrackList;
+begin
+  AddAlbums(90);
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  FTiles.Grid.ScrollToTile(IndexOfTitle('Album 45'), 3);
+  Top := FTiles.Grid.TopTile(Off);
+  Few := Part(10, 12);
+  try
+    { two letters typed, then a third: two searches }
+    FTiles.SetTracks(Few, nil, 'al', 'Search: al', '', False);
+    AssertEquals('a search starts at the top', 0, FTiles.Grid.ScrollOffset);
+    FTiles.SetTracks(Few, nil, 'alb', 'Search: alb', '', False);
+  finally
+    Few.Free;
+  end;
+  { the search box is emptied }
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  Got := FTiles.Grid.TopTile(Off);
+  AssertEquals('where it was before the search', Top, Got);
+  AssertEquals(3, Off);
+end;
+
+procedure TTestLibraryTiles.ComingUpShowsTheAlbumThatWasLeft;
+var
+  Few: TTrackList;
+  R: TRect;
+  I, Off: Integer;
+begin
+  AddAlbums(90);
+  { all albums were looked at, near their beginning }
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  FTiles.Grid.ScrollToTile(IndexOfTitle('Album 10'));
+  { a folder inside (reached through the tree: the tiles were put away) }
+  FTiles.SetTracks(nil, nil, '', '', '', False);
+  Few := Part(70, 75);
+  try
+    FTiles.SetTracks(Few, nil, '', 'Folders'#1'Seventies', '', True, False, 'Folders'#1'Seventies');
+    AssertEquals(6, FTiles.TileCount);
+    FTiles.Grid.SelectOnly(IndexOfTitle('Album 72'));
+  finally
+    Few.Free;
+  end;
+  { up through the path above the tiles }
+  FTiles.SetTracks(FTracks, nil, '', 'Folders', '', True, False, 'Folders');
+  I := IndexOfTitle('Album 72');
+  AssertEquals('the album left has the focus', I, FTiles.Grid.FocusIndex);
+  AssertTrue('and is selected', FTiles.Grid.Selected[I]);
+  R := FTiles.Grid.TileRect(I);
+  AssertTrue('in the top row', (R.Top >= 0) and (R.Top < FTiles.Grid.RowHeight));
+  { and up to all albums: again the album left, not where all albums were
+    scrolled to before }
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  R := FTiles.Grid.TileRect(IndexOfTitle('Album 72'));
+  AssertTrue('in the top row of all albums', (R.Top >= 0) and (R.Top < FTiles.Grid.RowHeight));
+  { a folder beside it is no way up: it starts at the top }
+  Few := Part(1, 60);
+  try
+    FTiles.SetTracks(Few, nil, '', 'Folders'#1'Other', '', True, False, 'Folders'#1'Other');
+    AssertEquals(0, FTiles.Grid.TopTile(Off));
+    AssertEquals(0, FTiles.Grid.ScrollOffset);
+  finally
+    Few.Free;
+  end;
+end;
+
+procedure TTestLibraryTiles.TheTopTilesStayWhenTheSizeChanges;
+var
+  I, Size: Integer;
+  R: TRect;
+begin
+  AddAlbums(90);
+  FTiles.SetTracks(FTracks, nil, '', 'All albums', '', False, False, TILE_PLACE_ALL);
+  I := FTiles.Grid.TopTile(Size);
+  FTiles.Grid.ScrollToTile(IndexOfTitle('Album 50'));
+  I := FTiles.Grid.TopTile(Size);
+  AssertTrue('scrolled', I > 0);
+  for Size := TILE_SIZE_LIST to TILE_SIZE_MAX do
+  begin
+    FTiles.Grid.TileSize := Size;
+    R := FTiles.Grid.TileRect(I);
+    AssertTrue(Format('size %d: the album is still in the top row', [Size]),
+      (R.Top >= 0) and (R.Top < FTiles.Grid.RowHeight));
+  end;
+  { a narrower pane: other columns }
+  FTiles.Grid.TileSize := 2;
+  FTiles.SetBounds(0, 0, 380, 600);
+  R := FTiles.Grid.TileRect(I);
+  AssertTrue('narrower: still in the top row', (R.Top >= 0) and (R.Top < FTiles.Grid.RowHeight));
 end;
 
 initialization

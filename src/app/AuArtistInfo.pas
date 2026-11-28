@@ -71,6 +71,8 @@ type
     FQueuedArtist: string;
     FQueuedForce: Boolean;
     FFetching: Boolean;          // between LoadArtist and the scraper's answer
+    FAskedAt: QWord;             // when the scraper was asked (0: not yet)
+    FAskedStored: Boolean;       // ... and whether a text was on disk then
     FIsEditing: Boolean;
     FBioModified: Boolean;
     FBioIsPlaceholder: Boolean;  // the memo shows one of our messages
@@ -363,7 +365,7 @@ begin
   T := Trim(AText);
   Result := (T = '') or (T = LBL_FETCHING_INFO) or (T = LBL_BIO_UNAVAILABLE) or
     (T = LBL_ARTIST_INFO_UNAVAILABLE) or (T = ERR_LASTFM_MISSING_API_KEY) or
-    (T = ERR_LASTFM_GENERIC) or (T = ERR_LASTFM_KEY_REJECTED) or
+    (T = ERR_LASTFM_GENERIC) or (T = ERR_LASTFM_KEY_REJECTED) or (T = ERR_BIO_NOT_FOUND) or
     (Pos(ERR_LASTFM_NETWORK_PREFIX, T) = 1) or (Pos(ERR_LASTFM_API_PREFIX, T) = 1) or
     (Pos(ERR_LASTFM_PARSE_PREFIX, T) = 1) or (Pos(ERR_LASTFM_RESOLVE_PREFIX, T) = 1);
 end;
@@ -611,7 +613,8 @@ begin
   FSourceLbl.FitWidth;
   FSourceLbl.Visible := Line <> '';
   FSourceLbl.ShowHint := FSourceUrl <> '';
-  if FSourceUrl <> '' then FSourceLbl.Cursor := crHandPoint else FSourceLbl.Cursor := crDefault;
+  { with an address to open it is a link, for the mouse and for the keyboard }
+  FSourceLbl.Link := FSourceUrl <> '';
 end;
 
 procedure TArtistInfoForm.PicClick(Sender: TObject);
@@ -825,11 +828,19 @@ begin
   { one permanent worker; a newer request supersedes this one }
   if FScraper = nil then FScraper := TLastFmWorker.Create(@BioReceived);
   FFetching := True;
+  FAskedStored := (not FQueuedForce) and FileExists(BioFilePath);
+  FAskedAt := GetTickCount64;
   FScraper.RequestArtist(FQueuedArtist, FQueuedForce);
 end;
 
 procedure TArtistInfoForm.BioReceived(const AArtistName, ABioText, AImagePath: string);
+const
+  SLOW_INFO_LOG_MS = 300;
+  FROM_TEXT: array[Boolean] of string = ('looked up', 'stored text');
+var
+  Came, Took: QWord;
 begin
+  Came := GetTickCount64;
   if (ABioText = ERR_LASTFM_KEY_REJECTED) and not LastFmKeyRejectedLogged then
   begin
     LastFmKeyRejectedLogged := True;
@@ -847,6 +858,11 @@ begin
   UpdateSource;
   LayoutControls;
   UpdateButtons;
+  { a slow one goes into the log: waiting for the answer, or showing it }
+  Took := GetTickCount64 - Came;
+  if (FAskedAt <> 0) and (Came - FAskedAt + Took >= SLOW_INFO_LOG_MS) then
+    AddLog(SafeFormat('[Artist Info] %s: %s, answer after %d ms, shown in %d ms (%d characters).',
+      [AArtistName, FROM_TEXT[FAskedStored], Integer(Came - FAskedAt), Integer(Took), Length(ABioText)]));
 end;
 
 procedure TArtistInfoForm.ShowDemo(const AArtist, ABio, AStats: string; AEditing: Boolean);

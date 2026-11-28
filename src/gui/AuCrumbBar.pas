@@ -7,7 +7,9 @@ unit AuCrumbBar;
 
   TCrumbBar: a path shown as its parts with arrows between them. Every part
   but the last can be clicked (OnPartClick), so the bar is also the way back
-  up: above the album tiles of the library, and in the folder dialog.
+  up: above the album tiles of the library, and in the folder dialog. With
+  the keyboard: Tab reaches the bar, Left and Right go from part to part,
+  Enter or Space goes to the part.
   =============================================================================}
 
 {$mode objfpc}{$H+}
@@ -31,6 +33,8 @@ type
     FRects: array of TRect;           // where each part was drawn (empty: not shown)
     FLinks: Boolean;
     FHotPart: Integer;
+    FKeyPart: Integer;                // the part the keyboard is on (-1: none)
+    FFirstShown: Integer;             // the first part that is drawn
     FFontSize: Single;
     FOnPartClick: TCrumbClickEvent;
     function PartAt(X, Y: Integer): Integer;
@@ -39,12 +43,16 @@ type
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseLeave; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
+    procedure DoEnter; override;
   public
     constructor Create(AOwner: TComponent); override;
     { APath: the parts joined by #1; with more than one part all but the
       last are links }
     procedure SetPath(const APath: string);
     function PartCount: Integer;
+    { the part the keyboard is on while the bar has the focus (-1: none) }
+    property KeyPart: Integer read FKeyPart;
     { the width the whole path needs }
     function NeededWidth: Integer;
     property FontSize: Single read FFontSize write FFontSize;
@@ -69,6 +77,7 @@ constructor TCrumbBar.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FHotPart := -1;
+  FKeyPart := -1;
   FFontSize := 12;
 end;
 
@@ -107,6 +116,10 @@ begin
     SL.Free;
   end;
   FLinks := Length(FParts) > 1;
+  { something to go to: the Tab key stops here, on the part above the last }
+  TabStop := FLinks;
+  if FLinks then FKeyPart := High(FParts) - 1 else FKeyPart := -1;
+  FFirstShown := 0;
   SetLength(FRects, Length(FParts));
   for I := 0 to High(FRects) do FRects[I] := Rect(0, 0, 0, 0);
   FHotPart := -1;
@@ -157,6 +170,7 @@ begin
     Dec(Total, W[First] + SepW);
     Inc(First);
   end;
+  FFirstShown := First;
   X := 0;
   if First > 0 then
   begin
@@ -168,10 +182,10 @@ begin
   begin
     PW := Math.Min(W[I], Math.Max(S(10), Width - X));
     if I = High(FParts) then C := clText
-    else if I = FHotPart then C := clAccentText
+    else if (I = FHotPart) or (ShowFocus and (I = FKeyPart)) then C := clAccentText
     else C := clTextDim;
     G.Text(FParts[I], X, 0, PW, Height, F, C, 0, 1);
-    if (I = FHotPart) and (I < High(FParts)) then
+    if ((I = FHotPart) or (ShowFocus and (I = FKeyPart))) and (I < High(FParts)) then
       G.FillRect(X, Height div 2 + S(9), PW - S(2), Math.Max(1, S(1)), clAccentText);
     FRects[I] := Rect(X, S(4), X + PW, Height - S(4));
     Inc(X, PW);
@@ -201,6 +215,43 @@ begin
   if FHotPart < 0 then Exit;
   FHotPart := -1;
   Cursor := crDefault;
+  Invalidate;
+end;
+
+procedure TCrumbBar.DoEnter;
+begin
+  { always from the part above the last: one Enter is one level up }
+  if FLinks then FKeyPart := High(FParts) - 1;
+  inherited DoEnter;
+end;
+
+procedure TCrumbBar.KeyDown(var Key: Word; Shift: TShiftState);
+var
+  P: Integer;
+begin
+  inherited KeyDown(Key, Shift);
+  if not FLinks or (Shift <> []) then Exit;
+  { a bar so narrow that only the last part is drawn has nothing to go to }
+  if FFirstShown > High(FParts) - 1 then Exit;
+  P := EnsureRange(FKeyPart, FFirstShown, High(FParts) - 1);
+  case Key of
+    VK_LEFT: P := Math.Max(Math.Min(FFirstShown, High(FParts) - 1), P - 1);
+    VK_RIGHT: P := Math.Min(High(FParts) - 1, P + 1);
+    VK_HOME: P := Math.Min(FFirstShown, High(FParts) - 1);
+    VK_END: P := High(FParts) - 1;
+    VK_RETURN, VK_SPACE:
+      begin
+        Key := 0;
+        FKeyPart := P;
+        if Assigned(FOnPartClick) then FOnPartClick(Self, P);
+        Exit;
+      end;
+  else
+    Exit;
+  end;
+  Key := 0;
+  if P = FKeyPart then Exit;
+  FKeyPart := P;
   Invalidate;
 end;
 

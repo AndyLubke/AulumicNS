@@ -18,7 +18,7 @@
 
 Aulumic is a free music player for Windows. It sends the music straight to the DAC, over WASAPI exclusive mode or the DAC's ASIO driver. Out of the box nothing is touched: resampling is off, DSD goes out as DSD, and the only thing in the way is the volume control.
 
-With the volume at 100 % and nothing else switched on, the DAC gets the audio exactly as it's stored in the file (bit-perfect). The **Bit-perfect** badge in the top banner shows whether that's the case right now; click it to see the whole signal path. See *Configuring bit-perfect playback*.
+With the volume at 100 % and nothing else switched on, the DAC gets the audio exactly as it's stored in the file (bit-perfect). The Signal path badge in the top banner is green with a tick when that's the case right now and amber with a dot when it isn't; click it to see the whole signal path. See *Configuring bit-perfect playback*.
 
 When something does change the audio, such as the volume, ReplayGain, the tone control or the resampler, it is calculated in 64-bit floating point and rounded once, at the very end. The figures are in Audio concepts.
 
@@ -58,7 +58,7 @@ Both skip the Windows mixer, so neither changes the audio.
 
 - **Lossless only:** FLAC, WAV, AIFF, Apple Lossless (ALAC, in M4A files), DSF and DFF. MP3, AAC and other lossy formats won't play. AIFF files must be uncompressed (the usual kind).
 - **M4A files:** Only those with Apple Lossless inside play; an M4A file with AAC is listed but refused with a message.
-- **More than two channels:** FLAC, WAV, AIFF and Apple Lossless files with more channels (5.1, for example) are mixed to stereo; the badge then shows **Processed**. A DSD file with more than two channels is converted to PCM for this, also when Play DSD natively is on.
+- **More than two channels:** FLAC, WAV, AIFF and Apple Lossless files with more channels (5.1, for example) are mixed to stereo; the Signal path badge is then amber. A DSD file with more than two channels is converted to PCM for this, also when Play DSD natively is on.
 - **High resolution:** High-resolution PCM (including DXD) in FLAC, WAV, AIFF or Apple Lossless, and DSD in DSF and DFF files.
 - **Local files:** A music collection on local or network drives. There's no internet radio or streaming.
 
@@ -86,12 +86,13 @@ Both skip the Windows mixer, so neither changes the audio.
 
 From top to bottom; the numbers are those in the picture:
 
-**Title bar:** In the colours of the theme. Drag it to move the window, double-click it to maximize; snapping to the screen edges and the snap layouts of Windows 11 work as usual. The Main menu button (three lines) {1} is at the left, next to the program icon; the Preferences gear {2} is at the right, before the minimize button. A click on the program icon itself opens the window menu of Windows (Restore, Move, Size ...), as in every Windows program. The title shows the playing track; while nothing plays, it shows the version number.
+**Title bar:** In the colours of the theme. Drag it to move the window, double-click it to maximize; snapping to the screen edges and the snap layouts of Windows 11 work as usual. The Main menu button (three lines) {1} is at the left, next to the program icon (F10 or Alt opens it from the keyboard); the Preferences gear {2} is at the right, before the minimize button. A click on the program icon itself opens the window menu of Windows (Restore, Move, Size ...), as in every Windows program. The title shows the playing track; while nothing plays, it shows the version number.
 
 {1} **Main menu:** The button with the three lines at the left of the title bar opens all main functions and tools:
 
 - **File:** Add files or a folder to the playlist.
 - **Playback:** Play, stop, previous and next, the shuffle and repeat modes, the Tone Control and Jump to Now Playing. Stop after current track lets the playing track be the last one: the Stop button is marked until then, and Play later goes on with the next track.
+- **Now playing:** The Cover Art Viewer, Artist Info, the Booklet Viewer, the Signal Path and Favourite for the playing track. The same as a click in the Now Playing banner, for the keyboard.
 - **Library:** Search, refresh, rescan and the library folders.
 - **Playlist:** New playlist, the Playlist Manager, import and export, expand or collapse all albums, remove dead items and clear the playlist.
 - **View:** The switches that are changed now and then, without opening Preferences: dark or light mode and the accent colour under Theme, Compact rows, Peak meter, Keep album headers in view, Cursor follows playback and Library as tiles. A tick shows what is on.
@@ -104,7 +105,7 @@ From top to bottom; the numbers are those in the picture:
 
 - **Cover & album title:** Click the cover or the album title to open the Cover Art Viewer.
 - **Artists, performers & composers:** Everyone is listed once, with what they do behind the name in smaller text (*piano, composer*). Click a name to open Artist Info. If the line gets too long, the roles are left out to make room for more names; if there are still more names than fit, click +n more at the end of the line for the others.
-- **Bit-perfect / Processed badge:** Click it to see the Signal Path.
+- **Signal path badge:** Green with a tick while the DAC gets the file's samples unchanged, amber with a dot otherwise. Click it to see the Signal Path.
 - **Booklet & favourite:** If the album folder contains a PDF booklet, a Booklet icon appears; click it to read the booklet. Click the Heart to mark the playing album as a favourite.
 - **Output sample rate:** Click the output rate on the right of the banner to choose another resampling target rate.
 - **Sizes:** Drag the lower edge of the banner to make it smaller or larger, and the border between the library and the playlist to change their widths.
@@ -113,9 +114,9 @@ From top to bottom; the numbers are those in the picture:
 
 {5} **Tree or tiles:** The two buttons next to the search bar switch the library pane between the tree (the button with the lines) and album tiles (the button with the squares). Ctrl+G does the same, and so does Library as tiles in the View menu of the main menu.
 
-- **Narrow pane:** There is one button, which switches to and fro.
+- **Narrow pane:** There is one button, which switches between the two.
 - **Sort buttons:** With the tiles shown, their two sort buttons stand between the search bar and these buttons.
-- **More:** The tiles are described further down, under their picture.
+- **More:** The tiles are described further down.
 
 **Rescan button:** The round arrow at the right of this row checks the library folders for new, changed and removed files (Ctrl+F5).
 
@@ -149,7 +150,7 @@ From top to bottom; the numbers are those in the picture:
   - **Remembered:** Each playlist keeps its own columns, widths and sort. As with the album sort, the order in which the music was added is kept, and tracks can't be dragged while a column sort is on. The track format isn't used in a flat list.
 - **Position:** Each playlist remembers its scroll position and which albums were closed, also after a restart.
 - **Several discs:** An album on more than one disc gets a small Disc 1, Disc 2 heading above the first track of each disc.
-- **Works:** The movements of a classical work stand under a heading of their own. This is described further down, under its picture.
+- **Works:** The movements of a classical work stand under a heading of their own. This is described further down.
 - **Guest artists:** In an album whose tracks aren't all by the same artist (a compilation, or a track with a guest), the artist is shown behind the title of each track that isn't by the album artist alone. If the track format shows the artist itself, this is left out.
 
 Drag tracks or folders here from the library or from Windows Explorer; they are inserted where they are dropped, and an album is never split. Drag tracks inside the playlist to change the order. Hold Ctrl while dropping from Explorer to replace the playlist and start playing.
@@ -160,7 +161,7 @@ Remove dead items (right-click menu) takes out the tracks whose files are gone. 
 
 **Output & audio controls:** Click the device name to choose the output device, the sliders icon to open the Tone Control, or the speaker icon to change or mute the volume.
 
-**Status line:** Shows background tasks, such as a library scan, a ReplayGain scan or saving tags. During playback it also shows engine details.
+**Status line:** At the left it shows background tasks, such as a library scan, a ReplayGain scan or saving tags; otherwise the number of tracks in the playlist and their total time, or the same for the selection when several tracks are selected. At the right, during playback, it shows the processor load, and a note for a few seconds when the sound was interrupted.
 
 ![Searching the library](09-library-search)
 
@@ -170,8 +171,9 @@ While typing in the search bar, the library shows only what matches, with the al
 
 **Album tiles:** A second way to look at the library: the albums as covers, with the album and the artist under each. The tree stays the way to choose what is shown.
 
-- **What is shown:** The albums under the node that is selected in the tree: a genre, an artist, a composer, a folder (with the albums of the Virtual Folders inside it). A line above the tiles shows the path to it (*Folders > Music > Jazz*). Click a part of the path to go up to it; the first part and the cross behind the path show all albums. With the top node of a group selected, all albums are shown, and the line isn't there.
-- **Order:** Next to the search bar are two buttons, as above the playlist (in a narrow pane they are in the line above the tiles). The button with the name chooses the order: Artist, Composer, Album, Year (the oldest first) or Added to library (the newest first). The arrow button next to it reverses that order; the arrow points down while it is reversed. By composer, the composer stands under each album; an album with several composers is listed as *Various composers*.
+- **What is shown:** The albums under the node that is selected in the tree: a genre, an artist, a composer, a folder (with the albums of the Virtual Folders inside it). A line above the tiles shows the path to it (*Folders > Music > Jazz*). Click a part of the path to go up to it; the first part and the cross behind the path show all albums. With the keyboard: Tab to the path, Left and Right to choose a part, Enter to go there. With the top node of a group selected, all albums are shown, and the line says All albums.
+- **Order:** At the right end of the line above the tiles are two buttons, as above the playlist. The button with the name chooses the order: Artist, Composer, Album, Year (the oldest first), Added to library (the newest first) or Folder (as the folders stand in the tree). The arrow button next to it reverses that order; the arrow points down while it is reversed. By composer, the composer stands under each album; an album with several composers is listed as *Various composers*.
+- **Buttons on a tile:** The tile under the pointer and the selected tile show two round buttons: one plays the album, the one with the three dots opens the tile's menu. With several tiles selected, they act on all of them.
 - **Size:** Hold Ctrl and scroll the mouse wheel over the tiles, or choose it in Preferences > Appearance. The smallest size is a list: a small cover with the album and the artist beside it. A text that doesn't fit is cut short; resting the pointer on the tile shows all of it.
 - **Using a tile:** A tile stands for all tracks of its album. Double-click plays it (or shows it in the tree, as set for the double click in Preferences), drag it onto the playlist to add it, right-click for the menu: Play, Add to and Replace current playlist, Show in tree, Open folder, Tools (ReplayGain and the tag consistency check) and Properties. Several tiles can be selected with Ctrl and Shift.
 - **Search:** The search bar fills the tiles with the albums found. An album that is there because of some of its tracks says how many were found; the menu entry Show in tree then shows the tracks themselves.
@@ -194,7 +196,7 @@ The same window in the light theme, with a smaller banner.
 
 # Signal Path
 
-Click the **Bit-perfect** or **Processed** badge in the banner to see every stage between the file and the DAC. The popup keeps up with playback while it's open; click the badge again or press Esc to close it.
+Click the Signal path badge in the banner to see every stage between the file and the DAC. A stage that changes the signal is amber and has a dot at its icon. The popup keeps up with playback while it's open; click the badge again or press Esc to close it.
 
 ![The signal path of a processed DSD stream](44-signal-path)
 
@@ -228,6 +230,7 @@ All shortcuts are also listed in Preferences > Shortcuts.
 
 ## Application controls
 
+- **Main menu:** `F10` or `Alt`
 - **Search:** `Ctrl + F`
 - **Library as tree or album tiles:** `Ctrl + G`
 - **Switch between library and playlist:** `Ctrl + Tab`
@@ -531,7 +534,7 @@ The tabs {2} switch between the tags and the Inspector.
 - {3} **Fields:** Title, Artist, Album artist, Album, Genre, Composer, Year, Track, Disc, Work, Performer and Comment (several lines).
 - **Work:** The large piece a track is a part of, such as the symphony whose movement it is. Give all its tracks the same text here (select them together); the playlist then shows them under a heading with that name.
 - **Several names:** For Artist, Album artist, Genre, Composer and Performer, separate several entries with a semicolon (;). For a performer, the instrument or role can be put in brackets behind the name, such as *Ida Feld (double bass)*; the banner shows it next to the name.
-- **Several tracks:** Fields that differ between the selected tracks show *Multiple values*; Title and Track stay unique per track. A value typed in a shared field is applied to all selected tracks. Only the changed fields are written.
+- **Several tracks:** Fields that differ between the selected tracks show Varies; Title and Track show Unique and are edited one track at a time. A value typed in a shared field is applied to all selected tracks. Only the changed fields are written.
 - {4} **Cover:** The Load button chooses an image file, Search the web looks for the cover online, and Remove takes the cover out of the selected files. An image file can also be dropped on the window or pasted with Ctrl+V.
 - {5} **Save:** Writes the changes. They're written in the background, so listening can go on. Cancel (or Esc) drops them. DFF files can be tagged too.
 - **Open folder:** Shows the selected file in Explorer; also in the right-click menu of the file list.
@@ -542,7 +545,7 @@ The tabs {2} switch between the tags and the Inspector.
 
 ![Properties: the Inspector tab](36-properties-inspector)
 
-The Inspector shows the technical details of the files; nothing can be changed here. It lists the audio format, the file (size, location, date added), the play statistics and every tag exactly as it is stored in the file. With several tracks selected it shows their number and total size.
+The Inspector shows the technical details of the files; nothing can be changed here. It lists the audio format, the file (size, location, date added), the play statistics and every tag exactly as it is stored in the file. With several tracks selected it shows a summary of the selection: the number of tracks, their total time and size, the formats, the folders, album artist, album, year and genre, how many tracks have ReplayGain, and the play statistics. A property that differs between the tracks lists its most frequent values with their counts.
 
 # Tag consistency
 
@@ -558,7 +561,7 @@ Open it for a selection with Tools > Check tag consistency in the right-click me
 - **Names:** Composers with the same surname that are written in more than one way, side by side with the number of tracks of each: *Johann Sebastian Bach (311) | J. S. Bach (48)*. For artists and genres: names that are the same once capitals, accents, spaces and punctuation are left out, such as *Dvorak* and *Dvořák*.
 - **Not every line is a mistake:** A gap can be an album of which only some tracks are there, and two composers can share a surname.
 - **Filter:** The box at the top right shows the findings of one kind, with the number of each.
-- **Order:** Click a column heading to sort by it, and again to reverse. Sorted by Finding, all lines of one album stand together.
+- **Order:** Click a column heading to sort by it, and again to reverse; Sort by in the right-click menu does the same. Sorted by Finding, all lines of one album stand together.
 - **Open in Properties:** Double-click a line (or press Enter) to open its files in Properties, where they are changed and saved as usual. Several lines can be selected with Ctrl or Shift and opened together.
 - **Open folder:** Shows the folder of the selected line in Explorer; also in the right-click menu.
 - **Check again:** Reads the same part of the library anew.
@@ -640,7 +643,7 @@ A folder counts with the Virtual Folders inside it: playing or adding that folde
 
 # Cover Art Viewer
 
-The Cover Art Viewer shows an album's cover at full size. To open it, click the cover or the album title in the banner, or the cover in an album header of the playlist.
+The Cover Art Viewer shows an album's cover at full size. To open it, click the cover or the album title in the banner, or the cover in an album header of the playlist. From the keyboard: Now playing in the main menu, or Cover Art Viewer in the playlist's right-click menu.
 
 ![The Cover Art Viewer](40-cover-viewer)
 
@@ -728,7 +731,7 @@ Out of the box the output is bit-perfect as long as the volume is at 100 %. To m
 - **DSD natively:** Keep *Play DSD natively* turned on, so DSF and DFF files reach the DAC as DSD.
 - **Two channels:** A file with more than two channels is mixed to stereo, so it is never bit-perfect.
 
-> The badge in the banner shows **Bit-perfect** when the DAC receives the samples unchanged. Click it to see which stage changes the signal when it shows **Processed**.
+> The Signal path badge in the banner is green when the DAC receives the samples unchanged. Click it to see which stage changes the signal when it's amber.
 
 # Log files & troubleshooting
 

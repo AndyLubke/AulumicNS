@@ -146,6 +146,12 @@ begin
   begin
     Key := 0;
     CloseTree;
+  end
+  else if (Key = Ord('M')) and (Shift = [ssCtrl]) then
+  begin
+    { the popup has the keys while it is open: the mute key works here too }
+    Key := 0;
+    MuteClick(nil);
   end;
 end;
 

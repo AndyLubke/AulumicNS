@@ -6,6 +6,132 @@ Coming in the next version
 -------------------------------------------------------------------------------
 
 
+Version 1.1.0.21 (28 November 2026)
+-------------------------------------------------------------------------------
+
+Properties
+  - The Inspector now sums up a selection of several tracks: their number,
+    total time and size, the formats, sample rates and bit depths, the
+    folders, album artist, album, year and genre, how many tracks have
+    ReplayGain, and the play statistics. A property that differs between
+    the tracks lists its most frequent values with their counts.
+  - With several tracks selected, a field that differs now shows "Varies"
+    and Title and Track show "Unique" (before: "<< Multiple Values >>" and
+    "(Unique per track)", which did not fit into the small boxes). Year,
+    Track and Disc have more room.
+
+Library
+  - Album tiles: the tile under the pointer and the selected tile show two
+    buttons. One plays the album, the other opens the tile's menu. With
+    several tiles selected, they act on all of them.
+  - The sort arrow and the order of the album tiles now always stand at the
+    right end of the line above the tiles, which is always shown. Before,
+    they moved between that line and the search bar, and the search box
+    changed its width with them.
+  - The album tiles have a new order, Folder: the albums stand as their
+    folders do in the library tree.
+  - The album tiles keep their place. Going up through the path above the
+    tiles, or to all albums, shows the album that was just left at the
+    top, selected as it was. Switching to the tree and back, and emptying
+    the search box, return the tiles to where they were, with their
+    selection. A change of the tile size or of the pane's width keeps the
+    albums at the top in view.
+  - A search with the album tiles shown is much faster and shows only the
+    albums that contain a track found; before, it also showed every album
+    of the artists and genres of those tracks, which could be most of the
+    library.
+  - The library tree keeps its place. Emptying the search box brings the
+    tree back as it was before the search: the same nodes open, the same
+    selection, scrolled to the same spot. After tags are saved or a scan
+    finds changes, the tree stays where it was scrolled to and keeps a
+    selection of several nodes; a search on screen stays on screen. F5 on
+    a folder keeps the folders inside it open.
+
+Playlist
+  - The playlist keeps its selection after tags are saved in Properties
+    and after F5: the same tracks and album headers are selected, the
+    focus is on the same row and the list stays where it was scrolled to.
+    This holds for auto-playlists too, and a change of the grouping, the
+    order or the formats keeps a selection of several rows.
+  - Switching to another playlist and back brings back every selected row
+    and the scroll position, not only one selected track (while the
+    program runs; after a restart, the one selected track as before).
+
+Artist Info
+  - When neither Last.fm nor Wikipedia has a biography, the window says so
+    ("No biography found on Last.fm or Wikipedia.") in place of Last.fm's
+    own message, which looked as if Wikipedia had not been asked.
+  - A long biography appears much faster; before, the window could show
+    "Fetching information..." for seconds although the text was stored.
+
+General
+  - The status line is tidier. At the left it shows the number of tracks in
+    the playlist and their total time, or the same for the selection when
+    several tracks are selected. At the right, during playback, it shows
+    the processor load, and a note for a few seconds when the sound was
+    interrupted. The resampler's phase, the gain and the buffer size are
+    no longer listed there: the Signal Path shows them.
+  - The badge in the Now Playing banner is now called "Signal path", after
+    the window it opens. Its colour and its mark tell the state: green
+    with a tick when the DAC gets the file's samples unchanged, amber with
+    a dot when they are processed.
+  - Easier to read with colour blindness: the green and the amber that
+    mark good and changed (badge, Signal Path, log and other lists) are
+    further apart, and in the Signal Path a stage that changes the signal
+    has a dot at its icon.
+  - The sort arrows above the playlist and of the album tiles stand closer
+    to the name of the order they belong to, and light up as a rounded
+    rectangle under the pointer.
+  - Jump to now playing shows the busy pointer while it switches to another
+    playlist, as the other playlist switches do.
+  - The pictures of the main window in the help now show the playing track
+    marked in the playlist, as the program does.
+  - Preferences: Enter (or a double click) on a page's name now goes into
+    that page; before, it pressed OK and closed the window.
+  - More places keep their position instead of going back to the top:
+    the Tag consistency list keeps its selection when it is sorted,
+    filtered or checked again; the Inspector in Properties and the text in
+    Artist Info stay where they were scrolled to when the same text is
+    shown again; the Playlist Manager selects the next playlist after one
+    is removed; a Preferences page is where it was scrolled to when the
+    window is opened again.
+  - F10, or pressing and releasing Alt, opens the main menu, so every menu
+    entry can be reached from the keyboard.
+  - More can be done without the mouse. The main menu has a new entry,
+    Now playing, with the Cover Art Viewer, Artist Info, the Booklet
+    Viewer, the Signal Path and Favourite for the playing track (what a
+    click in the Now Playing banner does). The playlist's right-click menu
+    opens the Cover Art Viewer for an album; the Tag consistency list can
+    be sorted from its right-click menu; and Tools > Calculate ReplayGain
+    brings a scan window that was hidden back to the front. Links (the
+    data folder and the website in About, the source in Artist Info) and
+    the path above the album tiles can be reached with Tab: Enter or
+    Space opens a link; in the path, Left and Right choose a part and
+    Enter goes there.
+  - The Tab key goes through message boxes from left to right, and through
+    the help window from the search box to the Close button.
+  - The coloured main button of a dialog (OK, Save ...) now shows when it
+    has the keyboard focus. So do the help text, the biography in Artist
+    Info and the page in the Booklet Viewer, with a line at their left
+    edge.
+  - Typing a letter jumps to the next entry that begins with it in menus
+    and in the boxes with a list of choices; in lists (the files in
+    Properties, the Playlist Manager, the log ...) typing the first
+    letters goes to that row, as in the library and the playlist.
+  - When the program starts, the keyboard is in the playlist, so Space,
+    Enter and the arrow keys work at once. Ctrl+M also mutes while the
+    volume popup is open.
+  - The log has a line that says how long the program took to start, and
+    how that time was spent.
+  - The program starts faster with a large library, most of all when
+    groups of the library tree (Artists, Albums ...) were left open.
+  - Text boxes with several lines (the Inspector and the Comment box in
+    Properties, the biography in Artist Info) now have the same scroll bar
+    as the lists: it can be dragged, a click beside it moves a page, and
+    the mouse wheel scrolls smoothly.
+  - Some small improvements in the help text.
+
+
 Version 1.1.0.20 (25 November 2026)
 -------------------------------------------------------------------------------
 

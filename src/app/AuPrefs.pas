@@ -289,6 +289,8 @@ type
     procedure LinkClick(Sender: TObject);
     procedure GoToPage(APage: Integer; const ACard: string; AFocus: Boolean);
     function OpenCardIds: string;
+    procedure RestoreScrolls(Data: PtrInt);
+    procedure KeepScrolls;
     function SumMainWindow: string;
     function SumPaneText: string;
     function SumFilter: string;
@@ -323,6 +325,7 @@ type
     procedure FillDevices;
     function SelectedApi: Integer;
     { events }
+    function NavRowName(Sender: TObject; Row: Integer): string;
     procedure NavCell(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure NavSel(Sender: TObject);
     procedure NavActivate(Sender: TObject; Row: Integer);
@@ -330,6 +333,7 @@ type
     procedure ApiChange(Sender: TObject);
     procedure DeviceChange(Sender: TObject);
     procedure ThemePreview(Sender: TObject);
+    function FolderRowName(Sender: TObject; Row: Integer): string;
     procedure FolderCell(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure FolderSel(Sender: TObject);
     procedure FolderKey(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -369,7 +373,7 @@ const
   TEXT_SIZES: array[0..3] of Integer = (90, 100, 110, 120);
 
   { the keyboard shortcuts of the Shortcuts page }
-  SHORTCUTS: array[0..34, 0..1] of string = (
+  SHORTCUTS: array[0..35, 0..1] of string = (
     ('Space', 'Play / pause'),
     ('Ctrl+Left / Ctrl+Right', 'Back / forward 10 seconds'),
     ('Ctrl+Up / Ctrl+Down', 'Volume up / down'),
@@ -397,6 +401,7 @@ const
     ('Ctrl+L', 'Log window'),
     ('Ctrl+D', 'Debug Queue'),
     ('F1', 'Help'),
+    ('F10 / Alt', 'Main menu'),
     ('Ctrl+Q', 'Quit'),
     ('Ctrl+mouse wheel', 'Text size of the library or the playlist'),
     ('Shift+F10 / Menu key', 'Context menu of the selection'),
@@ -408,6 +413,9 @@ const
 
 var
   GPrefs: TPrefsForm = nil;
+  { how far each page was scrolled when the window was closed (pixels); as
+    the page shown and the open cards, kept only while the program runs }
+  GPrefsScroll: array[0..PREFS_PAGE_COUNT - 1] of Integer;
 
 procedure FillOptions(C: TAuCombo; const AOpts: array of TFormatDef);
 var
@@ -574,7 +582,10 @@ begin
     F.FOnScan := AOnScan;
     F.FOnApply := AOnApply;
     if (ALibrary <> nil) and ALibrary.IsScanning then F.ScanStatus(STATUS_SCANNING_FULL);
+    { once the window is laid out: its pages where they were scrolled to }
+    Application.QueueAsyncCall(@F.RestoreScrolls, 0);
     Result := F.ShowModal = mrOK;
+    F.KeepScrolls;
     AppSettings.Data.PrefsPage := F.CurrentPage;
     AppSettings.Data.PrefsCards := F.OpenCardIds;        // kept with OK and with Cancel, as the page
     if Result then
@@ -647,6 +658,7 @@ begin
   FNav.AutoFit := True;
   FNav.BackRole := crPanel;
   FNav.OnDrawCell := @NavCell;
+  FNav.OnTypeText := @NavRowName;
   FNav.OnSelChange := @NavSel;
   FNav.OnActivate := @NavActivate;
 
@@ -689,8 +701,24 @@ begin
   ActiveControl := FNav;
 end;
 
+procedure TPrefsForm.RestoreScrolls(Data: PtrInt);
+var
+  I: Integer;
+begin
+  for I := 0 to Math.Min(High(FPages), High(GPrefsScroll)) do
+    if GPrefsScroll[I] > 0 then FPages[I].ScrollTo(GPrefsScroll[I]);
+end;
+
+procedure TPrefsForm.KeepScrolls;
+var
+  I: Integer;
+begin
+  for I := 0 to Math.Min(High(FPages), High(GPrefsScroll)) do GPrefsScroll[I] := FPages[I].ScrollOffset;
+end;
+
 destructor TPrefsForm.Destroy;
 begin
+  Application.RemoveAsyncCalls(Self);
   if GPrefs = Self then GPrefs := nil;
   FFolderMenu.Free;
   FFolders.Free;
@@ -1379,6 +1407,7 @@ begin
   FFolderList.EmptyText := 'No library folder yet.' + LineEnding + 'Add the folders that hold the music.';
   FFolderList.BackRole := crCard;
   FFolderList.OnDrawCell := @FolderCell;
+  FFolderList.OnTypeText := @FolderRowName;
   FFolderList.OnSelChange := @FolderSel;
   FFolderList.OnKeyDown := @FolderKey;
   FFolderList.OnRowContext := @FolderContext;
@@ -1921,6 +1950,19 @@ begin
   G.Text(FNavCaptions[Row], X + S(42), Y, W - S(46), H, UIFont(13.5, FNav.Selected[Row]), C, 0, 1);
 end;
 
+{ what typing the first letters is matched against: the page's name, and a
+  library folder's last part (every path begins with a drive) }
+function TPrefsForm.NavRowName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row <= High(FNavCaptions)) then Result := FNavCaptions[Row] else Result := '';
+end;
+
+function TPrefsForm.FolderRowName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row < FFolders.Count) then Result := ExtractFileName(ExcludeTrailingPathDelimiter(FFolders[Row]))
+  else Result := '';
+end;
+
 procedure TPrefsForm.NavSel(Sender: TObject);
 var
   I, P: Integer;
@@ -1935,9 +1977,13 @@ begin
 end;
 
 { Enter on the page list: OK (the list itself has no use for it) }
+{ Enter or a double click on a page's name: into the page, on its first
+  setting. The window stays open (Enter in a list never runs the default
+  button). }
 procedure TPrefsForm.NavActivate(Sender: TObject; Row: Integer);
 begin
-  ModalResult := mrOK;
+  GoToPage(Row, '', False);
+  SelectNext(FNav, True, True);
 end;
 
 { The settings of the page in view back to their defaults, in the dialog

@@ -58,6 +58,7 @@ type
     procedure Layout;
     procedure UpdateButtons;
     procedure AnyChange(Sender: TObject);
+    function ListRowName(Sender: TObject; Row: Integer): string;
     procedure ListCell(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure ListKey(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure AddRelative(const ADir: string; ASelect: Boolean);
@@ -208,6 +209,7 @@ begin
   FList.EmptyText := 'No folders yet: add some, drop them here from Explorer or use Auto-find.';
   FList.Hint := HINT_ALIAS_LIST;
   FList.OnDrawCell := @ListCell;
+  FList.OnTypeText := @ListRowName;
   FList.OnSelChange := @AnyChange;
   FList.OnKeyDown := @ListKey;
   FBtnAdd := AddButton(Self, 'Add folder...', 0, 0, 150, bkNormal, @AddClick);
@@ -371,6 +373,13 @@ begin
   Handled := True;
   DrawIcon(G, icFolder, X + S(14), Y + H / 2, S(16), clTextDim);
   G.Text(FPaths[Row], X + S(30), Y, W - S(34), H, UIFont(12.5), clText, 0, 1);
+end;
+
+{ what typing the first letters is matched against: the folder's last part }
+function TVirtualFolderForm.ListRowName(Sender: TObject; Row: Integer): string;
+begin
+  if (Row >= 0) and (Row < FPaths.Count) then Result := ExtractFileName(ExcludeTrailingPathDelimiter(FPaths[Row]))
+  else Result := '';
 end;
 
 procedure TVirtualFolderForm.ListKey(Sender: TObject; var Key: Word; Shift: TShiftState);

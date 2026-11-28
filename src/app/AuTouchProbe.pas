@@ -127,7 +127,10 @@ type
     mkLButtonDown, mkMouseMove, mkWheel);
 
 const
-  MSG_IDS: array[TMsgKind] of UINT = ($0246, $0245, $0247, $011A, $0119, $0240,
+  { the moves of a simulated finger, 15 ms apart: a swipe, and a tap }
+  SWIPE_STEPS = 24;
+  TAP_STEPS = 2;
+  MSG_IDS: array[TMsgKind] of UINT =($0246, $0245, $0247, $011A, $0119, $0240,
     $0201, $0200, $020A);
   MSG_NAMES: array[TMsgKind] of string = ('pointer down', 'pointer update', 'pointer up',
     'gesture notify', 'gesture', 'touch', 'left button down', 'mouse move', 'wheel');
@@ -278,6 +281,7 @@ type
     FBusy: LongInt;               // 1 while initialising or swiping
     FInject: TInjectTouchInput_;
     FP0, FP1: TPoint;
+    FSteps: Integer;              // the moves of a swipe, 15 ms apart (a tap: two)
     FOk: Boolean;
     FError: string;
     function Touch(X, Y: Integer; AFlags: DWORD): Boolean;
@@ -299,7 +303,7 @@ type
     function WaitInjector(AMs: Integer): Boolean;
     procedure Mouse(AFlags: DWORD; AData: DWORD = 0);
     procedure MouseAt(X, Y: Integer);
-    function Swipe(const P0, P1: TPoint): Boolean;
+    function Swipe(const P0, P1: TPoint; ASteps: Integer = SWIPE_STEPS): Boolean;
     procedure Wheel(const P: TPoint; ADelta: Integer);
     procedure Drag(const P0, P1: TPoint);
     procedure Click(const P: TPoint);
@@ -493,18 +497,19 @@ end;
 { a finger from FP0 to FP1 (screen pixels) }
 procedure TInjector.DoSwipe;
 const
-  STEPS = 24;
   STEP_MS = 15;
 var
-  I: Integer;
+  I, Steps: Integer;
 begin
   FOk := False;
+  Steps := FSteps;
+  if Steps < 1 then Steps := 1;
   if not Assigned(FInject) then Exit;
   if not Touch(FP0.X, FP0.Y, PF_DOWN or PF_INRANGE or PF_INCONTACT) then Exit;
   Sleep(30);
-  for I := 1 to STEPS do
+  for I := 1 to Steps do
   begin
-    if not Touch(FP0.X + (FP1.X - FP0.X) * I div STEPS, FP0.Y + (FP1.Y - FP0.Y) * I div STEPS,
+    if not Touch(FP0.X + (FP1.X - FP0.X) * I div Steps, FP0.Y + (FP1.Y - FP0.Y) * I div Steps,
       PF_UPDATE or PF_INRANGE or PF_INCONTACT) then
     begin
       Touch(FP1.X, FP1.Y, PF_UP);           // never leave the finger down
@@ -589,7 +594,7 @@ begin
 end;
 
 { a finger from P0 to P1 (screen pixels), then the inertia of the pan }
-function TProbe.Swipe(const P0, P1: TPoint): Boolean;
+function TProbe.Swipe(const P0, P1: TPoint; ASteps: Integer): Boolean;
 begin
   Result := False;
   if not Assigned(FInj.FInject) then
@@ -599,6 +604,7 @@ begin
   end;
   FInj.FP0 := P0;
   FInj.FP1 := P1;
+  FInj.FSteps := ASteps;
   InterlockedExchange(FInj.FBusy, 1);
   RTLEventSetEvent(FInj.FGo);
   if not WaitInjector(15000) then
@@ -952,9 +958,11 @@ begin
   C := APane.Width;
   Check('splitter: a finger beside it (left) narrows it again', Abs(C - A) <= 3,
     Format('%d -> %d px; %s', [B, C, MsgSummary]));
-  { a tap there is no drag }
+  { a tap there is no drag. A short one (TAP_STEPS): a finger that rests for
+    half a second and more is a press-and-hold to Windows, which opens the
+    row's menu - and the click that follows would choose its first entry. }
   P0 := Sp.ClientToScreen(Point(Sp.ClientWidth + Round(8 * K), Sp.ClientHeight div 2));
-  Swipe(P0, Point(P0.X + 1, P0.Y));
+  Swipe(P0, Point(P0.X + 1, P0.Y), TAP_STEPS);
   Check('splitter: a tap beside it resizes nothing', APane.Width = C, Format('%d -> %d px', [C, APane.Width]));
   { the mouse has to hit the splitter itself: a click beside it }
   Click(P0);

@@ -290,6 +290,10 @@ type
     // MatchTracks: copies, in library order
     procedure SearchLibrary(const Query: string;
       MatchArtists, MatchAlbums, MatchGenres, MatchFolders: TStrings; MatchTracks: TTrackList);
+    // Every track of the albums that the tracks of ATracks belong to (copies,
+    // library order): an album is what AlbumKeyOf says. One walk over the
+    // library, however many albums there are.
+    procedure GetAlbumsOfTracks(ATracks, AResult: TTrackList);
 
     procedure QueueOrStartScan(FullRebuild: boolean = False; SilentQueue: boolean = False);
     procedure TryDispatchPendingQueue;
@@ -308,6 +312,11 @@ type
     procedure GetTracksInFolderRecursive(const FolderDir: string; ATracks: TTrackList);
     procedure GetDistinctAlbumBuckets(out AlbumBuckets: TList; out TotalMissingGain: Integer);
   end;
+
+// What makes tracks one album for the album tiles: album artist and album;
+// without an album artist the folder too (two albums of one name stay apart);
+// without an album tag the folder alone. Letters count without their case.
+function AlbumKeyOf(const ATrack: TTrackInfo): string;
 
 implementation
 
@@ -420,12 +429,89 @@ begin
   end;
 end;
 
+// Into an empty sorted list the names go in one piece: sorted here, each
+// name converted for the comparison once, and then appended in order. Adding
+// them one by one would search the list for every name, and the list's
+// comparison converts both of its strings every time. The order and the
+// choice among names that compare as equal (the one noted first stays) are
+// those of the list itself.
 procedure TNameSet.AddTo(AList: TStrings);
 var
-  I: Integer;
+  I, N, K: Integer;
+  W: array of UnicodeString;
+  Idx, Tmp: array of Integer;
+  SL: TStringList;
+
+  function Before(A, B: Integer): Boolean;
+  var
+    C: PtrInt;
+  begin
+    C := WideCompareText(W[A], W[B]);
+    Result := (C < 0) or ((C = 0) and (A < B));
+  end;
+
+  procedure MergeSort(L, R: Integer);
+  var
+    M, P, Q, O: Integer;
+  begin
+    if R - L < 1 then Exit;
+    M := (L + R) div 2;
+    MergeSort(L, M);
+    MergeSort(M + 1, R);
+    if Before(Idx[M], Idx[M + 1]) then Exit;      // already in order
+    P := L;
+    Q := M + 1;
+    O := L;
+    while (P <= M) and (Q <= R) do
+    begin
+      if Before(Idx[Q], Idx[P]) then begin Tmp[O] := Idx[Q]; Inc(Q); end
+      else begin Tmp[O] := Idx[P]; Inc(P); end;
+      Inc(O);
+    end;
+    while P <= M do begin Tmp[O] := Idx[P]; Inc(P); Inc(O); end;
+    while Q <= R do begin Tmp[O] := Idx[Q]; Inc(Q); Inc(O); end;
+    for O := L to R do Idx[O] := Tmp[O];
+  end;
+
 begin
-  for I := 0 to FNames.Count - 1 do
-    AList.Add(FNames[I]);
+  N := FNames.Count;
+  SL := nil;
+  if (AList is TStringList) and (AList.Count = 0) and TStringList(AList).Sorted and
+     (not TStringList(AList).CaseSensitive) and TStringList(AList).UseLocale and
+     (TStringList(AList).Duplicates = dupIgnore) then
+    SL := TStringList(AList);
+  if (SL = nil) or (N < 2) then
+  begin
+    for I := 0 to N - 1 do
+      AList.Add(FNames[I]);
+    Exit;
+  end;
+  W := nil;
+  Idx := nil;
+  Tmp := nil;
+  SetLength(W, N);
+  SetLength(Idx, N);
+  SetLength(Tmp, N);
+  for I := 0 to N - 1 do
+  begin
+    W[I] := UTF8Decode(FNames[I]);
+    Idx[I] := I;
+  end;
+  MergeSort(0, N - 1);
+  // in order, without the names that compare as equal to the one before
+  // (of those the one noted first comes first: it is the one that stays)
+  SL.Sorted := False;
+  SL.Capacity := N;
+  K := -1;
+  for I := 0 to N - 1 do
+  begin
+    if (K >= 0) and (WideCompareText(W[Idx[I]], W[K]) = 0) then Continue;
+    K := Idx[I];
+    SL.Add(FNames[K]);
+  end;
+  // the list is in its own order: it may say so again without sorting
+  // itself, which a list of one line or none does at once
+  if SL.Count < 2 then SL.Sorted := True;
 end;
 { TLibraryManager }
 
@@ -656,6 +742,70 @@ begin
     Result := FTracks.Count;
   finally
     FCriticalSection.Leave;
+  end;
+end;
+
+function AlbumKeyOf(const ATrack: TTrackInfo): string;
+var
+  Alb, Art: string;
+begin
+  Alb := Trim(ATrack.Album);
+  Art := Trim(ATrack.AlbumArtist);
+  if (Alb = '') or SameText(Alb, LBL_UNKNOWN_ALBUM) then
+    Result := #2 + UTF8LowerCase(ExcludeTrailingPathDelimiter(ATrack.FolderDir))
+  else if Art = '' then
+    Result := #1 + UTF8LowerCase(Alb) + #1 + UTF8LowerCase(ExcludeTrailingPathDelimiter(ATrack.FolderDir))
+  else
+    Result := UTF8LowerCase(Art) + #1 + UTF8LowerCase(Alb);
+end;
+
+procedure TLibraryManager.GetAlbumsOfTracks(ATracks, AResult: TTrackList);
+var
+  Keys: TStringList;
+  I, At: Integer;
+  Last, Key: string;
+  LastIn: Boolean;
+  T, Prev: PTrackInfo;
+begin
+  AResult.Clear;
+  if (ATracks = nil) or (ATracks.Count = 0) then Exit;
+  Keys := TStringList.Create;
+  try
+    Keys.UseLocale := False;
+    Keys.CaseSensitive := True;
+    Keys.Sorted := True;
+    Keys.Duplicates := dupIgnore;
+    // (tracks of one album follow each other: the key of the track before
+    // saves most of the look-ups)
+    Last := #0;
+    for I := 0 to ATracks.Count - 1 do
+    begin
+      Key := AlbumKeyOf(ATracks[I]^);
+      if Key = Last then Continue;
+      Last := Key;
+      Keys.Add(Key);
+    end;
+    FCriticalSection.Enter;
+    try
+      Prev := nil;
+      LastIn := False;
+      for I := 0 to FTracks.Count - 1 do
+      begin
+        T := PTrackInfo(FTracks[I]);
+        if T = nil then Continue;
+        // (the same album, album artist and folder as the track before: the
+        // same answer, without making the key)
+        if (Prev = nil) or (T^.Album <> Prev^.Album) or (T^.AlbumArtist <> Prev^.AlbumArtist) or
+           (T^.FolderDir <> Prev^.FolderDir) then
+          LastIn := Keys.Find(AlbumKeyOf(T^), At);
+        Prev := T;
+        if LastIn then AResult.Add(T^);
+      end;
+    finally
+      FCriticalSection.Leave;
+    end;
+  finally
+    Keys.Free;
   end;
 end;
 
@@ -2867,18 +3017,23 @@ begin
 end;
 
 procedure TLibraryManager.ClearCaches;
+
+  // Empty, and a sorted list again: TNameSet.AddTo fills an empty sorted
+  // list in one piece and leaves it marked as unsorted (the names are in
+  // order, but a list cannot be told so without sorting itself again). An
+  // empty list is sorted at once.
+  procedure Reset(AList: TStringList);
+  begin
+    AList.Clear;
+    AList.Capacity := 0;
+    AList.Sorted := True;
+  end;
+
 begin
-  FArtistSummaryCache.Clear;
-  FArtistSummaryCache.Capacity := 0;
-
-  FGenreSummaryCache.Clear;
-  FGenreSummaryCache.Capacity := 0;
-
-  FComposerSummaryCache.Clear;
-  FComposerSummaryCache.Capacity := 0;
-
-  FAlbumSummaryCache.Clear;
-  FAlbumSummaryCache.Capacity := 0;
+  Reset(FArtistSummaryCache);
+  Reset(FGenreSummaryCache);
+  Reset(FComposerSummaryCache);
+  Reset(FAlbumSummaryCache);
 
   ClearFolderIndex;
   ClearTrackIndex;
@@ -2919,84 +3074,164 @@ begin
 end;
 
 // Called under FCriticalSection.
+//
+// The tracks of an album follow each other and share the strings of their
+// tags (one string per distinct text in the library), so most tracks have the
+// very same folder, artist, genre, composer and album strings as the track
+// before. Each tag therefore remembers the lists its last string led to
+// (TTagMemo): for the next track the look-up is a pointer comparison, and
+// lower-casing, splitting and searching the index run once per album instead
+// of once per track.
 procedure TLibraryManager.ValidateTrackIndex;
+type
+  TTagMemo = record
+    Valid: Boolean;
+    Raw: Pointer;                 // the string the lists were found for
+    Lists: array of TFPList;      // the lists of its names
+  end;
 var
   I: Integer;
   Track: PTrackInfo;
+  MFolder, MAlbumArtist, MArtist, MGenre, MComposer: TTagMemo;
+  // the album's name is made of three tags
+  MAlbum: TTagMemo;
+  AlbumArt, AlbumArtist2: Pointer;
 
-  procedure Put(AIndex: TStringList; const AName: string);
+  function ListOf(AIndex: TStringList; const AName: string): TFPList;
   var
     Idx: Integer;
-    L: TFPList;
     Key: string;
   begin
     Key := LowerCase(AName);
     if AIndex.Find(Key, Idx) then
-      L := TFPList(AIndex.Objects[Idx])
+      Result := TFPList(AIndex.Objects[Idx])
     else
     begin
-      L := TFPList.Create;
-      AIndex.AddObject(Key, L);
+      Result := TFPList.Create;
+      AIndex.AddObject(Key, Result);
     end;
-    // (a track named twice in one tag is listed once)
-    if (L.Count = 0) or (PtrUInt(L.Last) <> PtrUInt(I)) then
-      L.Add(Pointer(PtrInt(I)));
+  end;
+
+  procedure Keep(var M: TTagMemo; L: TFPList);
+  begin
+    SetLength(M.Lists, Length(M.Lists) + 1);
+    M.Lists[High(M.Lists)] := L;
+  end;
+
+  // The track goes into the lists of the memo
+  // (a track named twice in one tag is listed once)
+  procedure AddTo(const M: TTagMemo);
+  var
+    K: Integer;
+    L: TFPList;
+  begin
+    for K := 0 to High(M.Lists) do
+    begin
+      L := M.Lists[K];
+      if (L.Count = 0) or (PtrUInt(L.Last) <> PtrUInt(I)) then
+        L.Add(Pointer(PtrInt(I)));
+    end;
+  end;
+
+  function Same(var M: TTagMemo; const ARaw: string): Boolean;
+  begin
+    Result := M.Valid and (M.Raw = Pointer(ARaw));
+    if Result then Exit;
+    M.Valid := True;
+    M.Raw := Pointer(ARaw);
+    SetLength(M.Lists, 0);
+  end;
+
+  // One name
+  procedure Put(var M: TTagMemo; AIndex: TStringList; const AName: string);
+  begin
+    if not Same(M, AName) then
+      Keep(M, ListOf(AIndex, AName));
+    AddTo(M);
   end;
 
   // The items of a tag as ContainsDelimitedItem sees them: separated by
-  // ';', trimmed; an empty tag stands for both "unknown" names
-  procedure PutItems(AIndex: TStringList; const ARaw: string);
+  // ';', trimmed; an empty tag stands for both "unknown" names (or, with
+  // AUnknown, for that one name)
+  procedure PutItems(var M: TTagMemo; AIndex: TStringList; const ARaw: string; const AUnknown: string = '');
   var
     Rem, S: string;
     P: Integer;
   begin
-    Rem := Trim(ARaw);
-    if Rem = '' then
+    if not Same(M, ARaw) then
     begin
-      Put(AIndex, LBL_UNKNOWN_ARTIST);
-      Put(AIndex, LBL_UNKNOWN_GENRE);
-      Exit;
-    end;
-    repeat
-      P := Pos(';', Rem);
-      if P > 0 then
+      Rem := Trim(ARaw);
+      if Rem = '' then
       begin
-        S := Trim(Copy(Rem, 1, P - 1));
-        Rem := Trim(Copy(Rem, P + 1, Length(Rem)));
+        if AUnknown <> '' then
+          Keep(M, ListOf(AIndex, AUnknown))
+        else
+        begin
+          Keep(M, ListOf(AIndex, LBL_UNKNOWN_ARTIST));
+          Keep(M, ListOf(AIndex, LBL_UNKNOWN_GENRE));
+        end;
       end
       else
-      begin
-        S := Trim(Rem);
-        Rem := '';
-      end;
-      if S <> '' then
-        Put(AIndex, S);
-    until P = 0;
+        repeat
+          P := Pos(';', Rem);
+          if P > 0 then
+          begin
+            S := Trim(Copy(Rem, 1, P - 1));
+            Rem := Trim(Copy(Rem, P + 1, Length(Rem)));
+          end
+          else
+          begin
+            S := Trim(Rem);
+            Rem := '';
+          end;
+          if S <> '' then
+            Keep(M, ListOf(AIndex, S));
+        until P = 0;
+    end;
+    AddTo(M);
   end;
 
 begin
   if FTrackIndexValid and (FTrackIndexCount = FTracks.Count) then
     Exit;
   ClearTrackIndex;
+  MFolder := Default(TTagMemo);
+  MAlbumArtist := Default(TTagMemo);
+  MArtist := Default(TTagMemo);
+  MGenre := Default(TTagMemo);
+  MComposer := Default(TTagMemo);
+  MAlbum := Default(TTagMemo);
+  AlbumArt := nil;
+  AlbumArtist2 := nil;
   for I := 0 to FTracks.Count - 1 do
   begin
     Track := PTrackInfo(FTracks[I]);
     if Track = nil then
       Continue;
-    Put(FIdxFolder, ExcludeTrailingPathDelimiter(Track^.FolderDir));
-    PutItems(FIdxArtist, Track^.AlbumArtist);
-    PutItems(FIdxArtist, Track^.Artist);
-    PutItems(FIdxGenre, Track^.Genre);
-    if Trim(Track^.Composer) = '' then
-      Put(FIdxComposer, LBL_UNKNOWN_COMPOSER)
-    else
-      PutItems(FIdxComposer, Track^.Composer);
-    Put(FIdxAlbum, AlbumCompositeOf(Track));
+    if not Same(MFolder, Track^.FolderDir) then
+      Keep(MFolder, ListOf(FIdxFolder, ExcludeTrailingPathDelimiter(Track^.FolderDir)));
+    AddTo(MFolder);
+    PutItems(MAlbumArtist, FIdxArtist, Track^.AlbumArtist);
+    PutItems(MArtist, FIdxArtist, Track^.Artist);
+    PutItems(MGenre, FIdxGenre, Track^.Genre);
+    PutItems(MComposer, FIdxComposer, Track^.Composer, LBL_UNKNOWN_COMPOSER);
+    // the album as the Albums category names it: of the album, the album
+    // artist and the artist
+    if not (MAlbum.Valid and (MAlbum.Raw = Pointer(Track^.Album)) and
+            (AlbumArt = Pointer(Track^.AlbumArtist)) and (AlbumArtist2 = Pointer(Track^.Artist))) then
+    begin
+      MAlbum.Valid := True;
+      MAlbum.Raw := Pointer(Track^.Album);
+      AlbumArt := Pointer(Track^.AlbumArtist);
+      AlbumArtist2 := Pointer(Track^.Artist);
+      SetLength(MAlbum.Lists, 0);
+      Keep(MAlbum, ListOf(FIdxAlbum, AlbumCompositeOf(Track)));
+    end;
+    AddTo(MAlbum);
   end;
   FTrackIndexCount := FTracks.Count;
   FTrackIndexValid := True;
 end;
-
 // The indices into FTracks of the tracks that may belong to AName (nil:
 // none). Called under FCriticalSection; the caller tests each one.
 function TLibraryManager.TrackCandidates(AIndex: TStringList; const AName: string): TFPList;
@@ -3454,11 +3689,20 @@ var
   I: Integer;
   Track: PTrackInfo;
   Art, Alb: string;
+  // the tag strings of the track before
+  Seen: Boolean;
+  PAlbum, PAlbumArtist, PArtist, PGenre, PComposer: Pointer;
 begin
   if FCachesValid then
     Exit;
 
   ClearCaches;
+  Seen := False;
+  PAlbum := nil;
+  PAlbumArtist := nil;
+  PArtist := nil;
+  PGenre := nil;
+  PComposer := nil;
   Albums  := TNameSet.Create;
   Artists := TNameSet.Create;
   Genres  := TNameSet.Create;
@@ -3468,24 +3712,42 @@ begin
     begin
       Track := PTrackInfo(FTracks[I]);
 
+      // The tracks of an album follow each other and share the strings of
+      // their tags: a tag that is the very same string as the track before
+      // had has been noted already (a set: noting it again changes nothing).
+
       // The album as the tree shows it: "Artist - Album" (the album artist,
       // else the artist)
-      Alb := Trim(Track^.Album);
-      if Alb = '' then
-        Alb := LBL_UNKNOWN_ALBUM;
-      Art := Trim(Track^.AlbumArtist);
-      if Art = '' then
-        Art := Trim(Track^.Artist);
-      if Art = '' then
-        Art := LBL_UNKNOWN_ARTIST;
-      Albums.Note(Art + ' - ' + Alb);
+      if (not Seen) or (PAlbum <> Pointer(Track^.Album)) or (PAlbumArtist <> Pointer(Track^.AlbumArtist)) or
+         (PArtist <> Pointer(Track^.Artist)) then
+      begin
+        Alb := Trim(Track^.Album);
+        if Alb = '' then
+          Alb := LBL_UNKNOWN_ALBUM;
+        Art := Trim(Track^.AlbumArtist);
+        if Art = '' then
+          Art := Trim(Track^.Artist);
+        if Art = '' then
+          Art := LBL_UNKNOWN_ARTIST;
+        Albums.Note(Art + ' - ' + Alb);
+      end;
 
-      if not Artists.NoteItems(Track^.AlbumArtist) then
-        Artists.Note(LBL_UNKNOWN_ARTIST);
-      if not Genres.NoteItems(Track^.Genre) then
-        Genres.Note(LBL_UNKNOWN_GENRE);
-      if not Composers.NoteItems(Track^.Composer) then
-        Composers.Note(LBL_UNKNOWN_COMPOSER);
+      if (not Seen) or (PAlbumArtist <> Pointer(Track^.AlbumArtist)) then
+        if not Artists.NoteItems(Track^.AlbumArtist) then
+          Artists.Note(LBL_UNKNOWN_ARTIST);
+      if (not Seen) or (PGenre <> Pointer(Track^.Genre)) then
+        if not Genres.NoteItems(Track^.Genre) then
+          Genres.Note(LBL_UNKNOWN_GENRE);
+      if (not Seen) or (PComposer <> Pointer(Track^.Composer)) then
+        if not Composers.NoteItems(Track^.Composer) then
+          Composers.Note(LBL_UNKNOWN_COMPOSER);
+
+      Seen := True;
+      PAlbum := Pointer(Track^.Album);
+      PAlbumArtist := Pointer(Track^.AlbumArtist);
+      PArtist := Pointer(Track^.Artist);
+      PGenre := Pointer(Track^.Genre);
+      PComposer := Pointer(Track^.Composer);
     end;
 
     Albums.AddTo(FAlbumSummaryCache);

@@ -421,6 +421,12 @@ begin
   else FLib.ShowTileInTree(Index);
 end;
 
+{ the play button of a tile: plays, whatever a double click is set to do }
+procedure TMainForm.TilesPlay(Sender: TObject; Index: Integer);
+begin
+  LibPlay(FLib.ActionNodes);
+end;
+
 procedure TMainForm.TilesContext(Sender: TObject; Index: Integer; ScreenPt: TPoint);
 var
   It: TAuMenuItem;

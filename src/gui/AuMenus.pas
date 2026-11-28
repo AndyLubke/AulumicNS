@@ -104,6 +104,9 @@ type
     function PanBy(DX, DY: Integer): Boolean; override;
     function ScrollOffset: Integer; override;
     procedure MoveHover(D: Integer);
+    { the next entry that can be chosen and begins with this letter or digit;
+      False: none }
+    function HoverLetter(ACh: Char): Boolean;
     { the first (ALast: the last) item that can be chosen, or a page up / down }
     procedure HoverEnd(ALast: Boolean);
     procedure HoverPage(ADown: Boolean);
@@ -630,6 +633,29 @@ begin
   Invalidate;
 end;
 
+function TAuMenuList.HoverLetter(ACh: Char): Boolean;
+var
+  K, I, N: Integer;
+  S1: string;
+begin
+  Result := False;
+  N := FMenu.Count;
+  if (ACh = #0) or (N = 0) then Exit;
+  for K := 1 to N do
+  begin
+    I := (Math.Max(FHoverIdx, -1) + K) mod N;
+    if FMenu.Item(I).Separator or not FMenu.Item(I).Enabled then Continue;
+    S1 := TrimLeft(FMenu.Item(I).Caption);
+    if (S1 <> '') and (UpCase(S1[1]) = ACh) then
+    begin
+      FHoverIdx := I;
+      EnsureVisible(I);
+      Invalidate;
+      Exit(True);
+    end;
+  end;
+end;
+
 { ---- TAuMenuPopup ---- }
 
 constructor TAuMenuPopup.CreateMenu(AMenu: TAuMenu; AParent: TAuMenuPopup);
@@ -659,7 +685,8 @@ begin
     VK_RETURN, VK_SPACE: FList.Activate(FList.FHoverIdx, True);
     VK_TAB: Root.CloseTree;
   else
-    Exit;
+    { a letter or digit: the next entry that begins with it }
+    if not FList.HoverLetter(LetterOfKey(Key, Shift)) then Exit;
   end;
   Key := 0;
 end;

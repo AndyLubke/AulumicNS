@@ -41,6 +41,10 @@ function LibraryCheckFilter(AForm: TAuForm; const AKindName: string): Boolean;
 { a click on the heading of column ACol (0 Kind, 1 Finding, 2 Note), and the text of a cell }
 procedure LibraryCheckSort(AForm: TAuForm; ACol: Integer);
 function LibraryCheckCell(AForm: TAuForm; ARow, ACol: Integer): string;
+{ these lines selected as a click would do it (the last one has the focus),
+  and the lines that are selected: kind and finding, joined by ' | ' }
+procedure LibraryCheckSelect(AForm: TAuForm; const ARows: array of Integer);
+function LibraryCheckSelection(AForm: TAuForm): string;
 
 implementation
 
@@ -71,6 +75,11 @@ type
     FList: TAuListView;
     FBtnAgain, FBtnFolder, FBtnOpen, FBtnClose: TAuButton;
     FRowMenu: TAuMenu;                // the menu of a right-clicked finding (kept until its entry ran)
+    FSelKeys: TStringList;            // the selected findings by kind and text, to find them in a list filled again
+    FFocusKey: string;                // ... and the focused one
+    FRestoring: Boolean;              // the list is being filled: its selection is not what was chosen
+    function FindingKey(AFinding: Integer): string;
+    procedure NoteSelection;
     procedure Layout;
     procedure TakeTracks(ATracks: TTrackList);
     procedure UpdateState;
@@ -89,6 +98,7 @@ type
     procedure OpenRows(const ARows: TIntegerArray);
     procedure FolderClick(Sender: TObject);
     procedure ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+    procedure SortItemClick(Sender: TObject);
   protected
     procedure Resize; override;
   public
@@ -169,6 +179,37 @@ begin
   if AForm is TLibraryCheckForm then Result := TLibraryCheckForm(AForm).FList.RowCount else Result := -1;
 end;
 
+procedure LibraryCheckSelect(AForm: TAuForm; const ARows: array of Integer);
+var
+  F: TLibraryCheckForm;
+  Rows: TIntegerArray;
+  I: Integer;
+begin
+  if not (AForm is TLibraryCheckForm) or (Length(ARows) = 0) then Exit;
+  F := TLibraryCheckForm(AForm);
+  Rows := nil;
+  SetLength(Rows, Length(ARows));
+  for I := 0 to High(ARows) do Rows[I] := ARows[I];
+  F.FList.RestoreSelection(Rows, ARows[High(ARows)], -1);
+end;
+
+function LibraryCheckSelection(AForm: TAuForm): string;
+var
+  F: TLibraryCheckForm;
+  Sel: TIntegerArray;
+  I: Integer;
+begin
+  Result := '';
+  if not (AForm is TLibraryCheckForm) then Exit;
+  F := TLibraryCheckForm(AForm);
+  Sel := F.FList.SelectedRows;
+  for I := 0 to High(Sel) do
+  begin
+    if I > 0 then Result := Result + ' | ';
+    Result := Result + LibraryCheckCell(AForm, Sel[I], 0) + ': ' + LibraryCheckCell(AForm, Sel[I], 1);
+  end;
+end;
+
 constructor TLibraryCheckForm.CreateCheck(AOwner: TComponent; const AScope: string);
 begin
   CreateAu(AOwner, 'Tag consistency', DLG_W, DLG_H);
@@ -229,6 +270,7 @@ end;
 
 destructor TLibraryCheckForm.Destroy;
 begin
+  FSelKeys.Free;
   FRowMenu.Free;
   inherited Destroy;
 end;
@@ -304,7 +346,9 @@ end;
 { the findings of the chosen kind into the list }
 procedure TLibraryCheckForm.ApplyFilter;
 var
-  Kind, I, N: Integer;
+  Kind, I, N, NSel, Focus, At, OldTop, OldFocus, OldCount: Integer;
+  Rows: TIntegerArray;
+  Key: string;
 begin
   Kind := -1;
   if (FFilter.ItemIndex >= 0) and (FFilter.ItemIndex < Length(FFilterKinds)) then Kind := FFilterKinds[FFilter.ItemIndex];
@@ -318,11 +362,73 @@ begin
     end;
   SetLength(FShown, N);
   SortShown;
-  FList.ClearSelection;
-  FList.RowCount := N;
-  if N > 0 then FList.SelectOnly(0);
+  { the findings that were selected are selected again, wherever they are
+    now; the same list in the same order stays where it was scrolled to }
+  OldTop := FList.TopRow;
+  OldFocus := FList.FocusedRow;
+  OldCount := FList.RowCount;
+  FRestoring := True;
+  try
+    FList.ClearSelection;
+    FList.RowCount := N;
+    Rows := nil;
+    SetLength(Rows, N);
+    NSel := 0;
+    Focus := -1;
+    if FSelKeys <> nil then
+      for I := 0 to N - 1 do
+      begin
+        Key := FindingKey(FShown[I]);
+        if FSelKeys.Find(Key, At) then
+        begin
+          Rows[NSel] := I;
+          Inc(NSel);
+        end;
+        if Key = FFocusKey then Focus := I;
+      end;
+    SetLength(Rows, NSel);
+    if NSel = 0 then
+    begin
+      if N > 0 then FList.SelectOnly(0);
+    end
+    else
+    begin
+      if Focus < 0 then Focus := Rows[0];
+      if (N = OldCount) and (Focus = OldFocus) then FList.RestoreSelection(Rows, Focus, OldTop)
+      else FList.RestoreSelection(Rows, Focus, -1);
+    end;
+  finally
+    FRestoring := False;
+  end;
+  NoteSelection;
   FList.Changed;
   UpdateState;
+end;
+
+function TLibraryCheckForm.FindingKey(AFinding: Integer): string;
+begin
+  if (AFinding < 0) or (AFinding > High(FFound)) then Exit('');
+  Result := IntToStr(Ord(FFound[AFinding].Kind)) + #1 + FFound[AFinding].Text;
+end;
+
+{ which findings are selected, in a form that outlives the list's rows }
+procedure TLibraryCheckForm.NoteSelection;
+var
+  Sel: TIntegerArray;
+  I: Integer;
+begin
+  if FSelKeys = nil then
+  begin
+    FSelKeys := TStringList.Create;
+    FSelKeys.UseLocale := False;
+    FSelKeys.CaseSensitive := True;
+    FSelKeys.Sorted := True;
+    FSelKeys.Duplicates := dupIgnore;
+  end;
+  FSelKeys.Clear;
+  Sel := FList.SelectedRows;
+  for I := 0 to High(Sel) do FSelKeys.Add(FindingKey(ShownFinding(Sel[I])));
+  FFocusKey := FindingKey(ShownFinding(FList.FocusedRow));
 end;
 
 { A click on a column heading sorts by it, a second one backwards. Kind: by
@@ -438,6 +544,7 @@ end;
 
 procedure TLibraryCheckForm.ListSel(Sender: TObject);
 begin
+  if not FRestoring then NoteSelection;
   UpdateState;
 end;
 
@@ -508,13 +615,31 @@ begin
   OpenFolderWithWindow(Self, FolderOfFile(FFound[F].Paths[0]));
 end;
 
+procedure TLibraryCheckForm.SortItemClick(Sender: TObject);
+begin
+  if Sender is TAuMenuItem then HeaderClick(nil, TAuMenuItem(Sender).Tag);
+end;
+
 procedure TLibraryCheckForm.ListContext(Sender: TObject; Row: Integer; ScreenPt: TPoint);
+const
+  SORT_NAMES: array[0..2] of string = ('Kind', 'Finding', 'Note');
+var
+  Sub: TAuMenu;
+  It: TAuMenuItem;
+  I: Integer;
 begin
   if FList.SelCount = 0 then Exit;
   FRowMenu.Free;
   FRowMenu := TAuMenu.Create;
   FRowMenu.Add('Open in Properties', @OpenClick, icTag);
   FRowMenu.Add('Open folder...', @FolderClick, icFolder);
+  { what a click on a column heading does, for the keyboard }
+  Sub := FRowMenu.AddSub('Sort by', icSortAsc);
+  for I := 0 to High(SORT_NAMES) do
+  begin
+    It := Sub.Add(SORT_NAMES[I], @SortItemClick, icNone, '', I);
+    It.Checked := I = FSortCol;
+  end;
   FRowMenu.Popup(ScreenPt.X, ScreenPt.Y);
 end;
 

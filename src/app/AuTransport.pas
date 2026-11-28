@@ -50,7 +50,7 @@ type
 
   TStatusStrip = class(TAuControl)
   private
-    FStatus, FEngine, FRgText: string;
+    FStatus, FEngine, FRgText, FIdle, FWarn: string;
     FProgress: Single;            // < 0: no background task
     FRgRect: TRect;
     FRgHot: Boolean;
@@ -58,6 +58,8 @@ type
     procedure SetStatus(const V: string);
     procedure SetEngine(const V: string);
     procedure SetRgText(const V: string);
+    procedure SetIdle(const V: string);
+    procedure SetWarn(const V: string);
     procedure SetProgress(V: Single);
   protected
     procedure DoPaint(G: TGfx); override;
@@ -67,7 +69,12 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     property StatusText: string read FStatus write SetStatus;
+    { at the right end }
     property EngineText: string read FEngine write SetEngine;
+    { at the left while there is no status text: what the playlist holds }
+    property IdleText: string read FIdle write SetIdle;
+    { a warning, left of the engine text, with a dot in front }
+    property WarnText: string read FWarn write SetWarn;
     { "[ ReplayGain scanning... Click here to view ]" while a hidden scan runs }
     property RgText: string read FRgText write SetRgText;
     property Progress: Single read FProgress write SetProgress;
@@ -277,6 +284,20 @@ begin
   Invalidate;
 end;
 
+procedure TStatusStrip.SetIdle(const V: string);
+begin
+  if V = FIdle then Exit;
+  FIdle := V;
+  Invalidate;
+end;
+
+procedure TStatusStrip.SetWarn(const V: string);
+begin
+  if V = FWarn then Exit;
+  FWarn := V;
+  Invalidate;
+end;
+
 procedure TStatusStrip.SetProgress(V: Single);
 begin
   if V = FProgress then Exit;
@@ -287,8 +308,9 @@ end;
 procedure TStatusStrip.DoPaint(G: TGfx);
 var
   F: TGfxFont;
-  X, W: Integer;
+  X, W, R: Integer;
   Fg: TARGB;
+  LeftText: string;
 begin
   G.FillRect(0, 0, Width, Height, EffBack);
   G.FillRect(0, 0, Width, 1, clBorder);
@@ -296,10 +318,11 @@ begin
     G.FillRect(S(10), 0, Math.Max(0, (Width - S(20)) * Math.Min(1, FProgress)), SF(2), clAccent);
   F := UIFont(12);
   X := S(12);
-  if FStatus <> '' then
+  if FStatus <> '' then LeftText := FStatus else LeftText := FIdle;
+  if LeftText <> '' then
   begin
-    W := Ceil(TextWidth(FStatus, F));
-    G.Text(FStatus, X, 0, Math.Min(W + S(4), Width - X), Height, F, clTextDim, 0, 1);
+    W := Ceil(TextWidth(LeftText, F));
+    G.Text(LeftText, X, 0, Math.Min(W + S(4), Width - X), Height, F, clTextDim, 0, 1);
     Inc(X, W + S(16));
   end;
   FRgRect := Rect(0, 0, 0, 0);
@@ -311,8 +334,23 @@ begin
     G.Text(FRgText, X, 0, W + S(4), Height, F, Fg, 0, 1);
     Inc(X, W + S(16));
   end;
-  if (FEngine <> '') and (X < Width - S(20)) then
-    G.Text(FEngine, X, 0, Width - X - S(12), Height, F, clTextFaint, 0, 1);
+  { from the right end: the engine text, then the warning }
+  R := Width - S(12);
+  if FEngine <> '' then
+  begin
+    W := Ceil(TextWidth(FEngine, F)) + S(4);
+    if R - W > X then G.Text(FEngine, R - W, 0, W, Height, F, clTextFaint, 2, 1);
+    R := R - W - S(16);
+  end;
+  if FWarn <> '' then
+  begin
+    W := Ceil(TextWidth(FWarn, F)) + S(4);
+    if R - W - S(12) > X then
+    begin
+      G.FillCircle(R - W - S(7), Height / 2, SF(3), clWarn);
+      G.Text(FWarn, R - W, 0, W, Height, F, clWarn, 2, 1);
+    end;
+  end;
 end;
 
 procedure TStatusStrip.MouseMove(Shift: TShiftState; X, Y: Integer);

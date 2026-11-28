@@ -54,6 +54,7 @@ type
     function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     function PanBy(DX, DY: Integer): Boolean; override;
   public
+    constructor Create(AOwner: TComponent); override;
     function ScrollOffset: Integer; override;
   protected
     function GesturePan: Integer; override;
@@ -155,6 +156,12 @@ begin
 end;
 
 { ---- TAuPdfView ---- }
+
+constructor TAuPdfView.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FocusEdge := True;
+end;
 
 procedure TAuPdfView.DoPaint(G: TGfx);
 var

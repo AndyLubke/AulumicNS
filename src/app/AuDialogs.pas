@@ -124,6 +124,8 @@ begin
         F.ActiveControl := B;
       end;
     end;
+    { the buttons were made from the right: Tab goes from the left }
+    F.TabOrderLeftToRight(F.Body);
     Result := F.ShowModal;
   finally
     F.Free;

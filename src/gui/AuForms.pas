@@ -43,6 +43,12 @@ type
     procedure CreateWnd; override;
     procedure RealSetText(const AValue: TCaption); override;
     procedure WndProc(var TheMessage: TLMessage); override;
+    { the window has been painted and is on the screen (every time it is shown) }
+    procedure NowOnScreen; virtual;
+    { two moments before that: the window is about to be shown (its handles
+      exist), and it is about to be painted for the first time }
+    procedure AboutToShow; virtual;
+    procedure AboutToPaint; virtual;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure ThemeUpdated; virtual;
     procedure DpiUpdated; virtual;
@@ -73,6 +79,10 @@ type
       follows its size (a sizable one, scrolling pages): a small screen at a
       large scaling (1920 x 1080 at 150 % leaves 1280 x 688). }
     procedure FitToWorkArea;
+    { the Tab key goes through the controls of AParent that take the focus
+      from left to right, whatever the order they were created in (a row of
+      buttons that is built from its right end) }
+    procedure TabOrderLeftToRight(AParent: TWinControl);
     { renders the client area into a PNG file: every control paints itself
       (TAuControl.RenderTo), so it works without a composited desktop
       (screenshot mode, the help screenshots) }
@@ -369,6 +379,7 @@ begin
   if TheMessage.Msg = AUM_UNCLOAK then
   begin
     FCloakPending := False;
+    AboutToPaint;
     if FFadeIn then
     begin
       if FFade = nil then FFade := TAuWindowFade.Create(Self);
@@ -376,6 +387,7 @@ begin
     end
     else
       PaintAndUncloak(Handle);
+    NowOnScreen;
     TheMessage.Result := 0;
     Exit;
   end;
@@ -390,9 +402,22 @@ begin
   begin
     SetWindowCloak(Handle, True);
     FCloakPending := True;
+    AboutToShow;
     PostMessage(Handle, AUM_UNCLOAK, 0, 0);
   end;
   inherited WndProc(TheMessage);
+end;
+
+procedure TAuForm.NowOnScreen;
+begin
+end;
+
+procedure TAuForm.AboutToShow;
+begin
+end;
+
+procedure TAuForm.AboutToPaint;
+begin
 end;
 
 procedure TAuForm.WMDpiChangedAu(var Msg: TLMessage);
@@ -688,10 +713,35 @@ begin
           F.DefaultButton := Btn('Yes', mrYes, True);
         end;
     end;
+    F.TabOrderLeftToRight(F.Body);
     F.ActiveControl := F.DefaultButton;
   except
     F.Free;
     raise;
+  end;
+end;
+
+procedure TAuForm.TabOrderLeftToRight(AParent: TWinControl);
+var
+  L: TFPList;
+  I, J: Integer;
+  C: TWinControl;
+begin
+  if AParent = nil then Exit;
+  L := TFPList.Create;
+  try
+    for I := 0 to AParent.ControlCount - 1 do
+      if (AParent.Controls[I] is TWinControl) and TWinControl(AParent.Controls[I]).TabStop then
+      begin
+        C := TWinControl(AParent.Controls[I]);
+        { kept sorted by the left edge (a handful of controls) }
+        J := 0;
+        while (J < L.Count) and (TWinControl(L[J]).Left <= C.Left) do Inc(J);
+        L.Insert(J, C);
+      end;
+    for I := 0 to L.Count - 1 do TWinControl(L[I]).TabOrder := I;
+  finally
+    L.Free;
   end;
 end;
 

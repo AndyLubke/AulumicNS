@@ -405,9 +405,9 @@ begin
   clText := $FFE8EAED;
   clTextDim := $FF9AA2AD;
   clTextFaint := $FF646C78;
-  clGood := $FF3FB950;
+  clGood := $FF4FD1C5;
   clBad := $FFF0524A;
-  clWarn := $FFD9A23A;
+  clWarn := $FFF2A02E;
   clShadow := $60000000;
   clThumb := $FF353B45;
   clThumbHi := $FF4C5360;
@@ -429,9 +429,9 @@ begin
   clText := $FF16191D;
   clTextDim := $FF5A6270;
   clTextFaint := $FF969DA8;
-  clGood := $FF1A8F36;
+  clGood := $FF0A8578;
   clBad := $FFD93A32;
-  clWarn := $FFB7791F;
+  clWarn := $FFB56E00;
   clShadow := $30000000;
   clThumb := $FFCDD1D8;
   clThumbHi := $FFAEB4BE;

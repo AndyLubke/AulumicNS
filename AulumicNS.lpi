@@ -26,8 +26,8 @@
       <UseVersionInfo Value="True"/>
       <MajorVersionNr Value="1"/>
       <MinorVersionNr Value="1"/>
-      <BuildNr Value="20"/>
-      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.20"/>
+      <BuildNr Value="21"/>
+      <StringTable FileDescription="Aulumic bit-perfect music player" LegalCopyright="Copyright (c) 2026 André Lubke" ProductName="Aulumic" ProductVersion="1.1.0.21"/>
     </VersionInfo>
     <BuildModes Count="2">
       <Item1 Name="Debug" Default="True"/>
@@ -80,7 +80,7 @@
         <PackageName Value="LCL"/>
       </Item1>
     </RequiredPackages>
-    <Units Count="133">
+    <Units Count="135">
       <Unit0>
         <Filename Value="AulumicNS.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -613,6 +613,14 @@
         <Filename Value="src/tags/file_m4a.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit132>
+      <Unit133>
+        <Filename Value="src/app/uInspectorSummary.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit133>
+      <Unit134>
+        <Filename Value="src/app/uStartTimes.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit134>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

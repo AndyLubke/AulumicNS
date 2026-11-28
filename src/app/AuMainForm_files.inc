@@ -232,12 +232,29 @@ end;
 
 { switches to the playlist that plays, opens the track's group }
 procedure TMainForm.JumpToNowPlaying;
+
+  procedure GoToTrack;
+  begin
+    if FPl.PlayingEntry < 0 then Exit;
+    FPl.SelectEntry(FPl.PlayingEntry, True, True);
+    if FPl.List.CanFocus then FPl.List.SetFocus;
+  end;
+
 begin
   if FPlayingPath = '' then Exit;
-  if (FPlayingPl <> '') and not SameText(FShownPl, FPlayingPl) then ShowPlaylist(FPlayingPl);
-  if FPl.PlayingEntry < 0 then Exit;
-  FPl.SelectEntry(FPl.PlayingEntry, True, True);
-  if FPl.List.CanFocus then FPl.List.SetFocus;
+  if (FPlayingPl = '') or SameText(FShownPl, FPlayingPl) then
+  begin
+    GoToTrack;
+    Exit;
+  end;
+  { another playlist has to be loaded first, which takes a moment when it is long }
+  BeginBusy;
+  try
+    ShowPlaylist(FPlayingPl);
+    GoToTrack;
+  finally
+    EndBusy;
+  end;
 end;
 
 { ---- menu items ---- }

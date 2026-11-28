@@ -13,8 +13,8 @@ unit AuPropertiesForm;
                 Load..., Search the Web and Remove (Ctrl+V pastes an image, an
                 image file can be dropped on the window)
     Inspector   the audio format, the file, the play statistics and every tag
-  With several files selected a field that differs shows "Multiple Values";
-  Title and Track stay unique per track. Only the fields the user changes
+  With several files selected a field that differs shows "Varies";
+  Title and Track show "Unique" and are set per track. Only the fields the user changes
   are written. Save hands the changed files to the metadata custodian
   (background thread) and closes.
   The dialog is sizable (Layout); it opens at the size it had.
@@ -47,13 +47,16 @@ function PropertiesFieldEnabled(AForm: TAuForm; const ACaption: string): Boolean
 procedure PropertiesTypeField(AForm: TAuForm; const ACaption, AText: string);
 { the record of a file (owned by the form) }
 function PropertiesRecord(AForm: TAuForm; AIndex: Integer): PTagEditNodeData;
+{ what the Inspector shows for the selection }
+function PropertiesInspectorText(AForm: TAuForm): string;
 
 implementation
 
 uses
   AuAudioTypes, Graphics, LCLIntf, DateUtils, ALMetadata, uMetaUtils, uAppConsts, uAppStrings, uOSUtils,
   uMetadataPayloads, uEngineStateManager, uUserStatsManager, uLibraryTypes, AuLog,
-  uSettingsManager, AuDialogs, AudioTag, baseTag, tag_id3v2, uMetadataCustodian, AuMenus, uAudioUtils;
+  uSettingsManager, AuDialogs, AudioTag, baseTag, tag_id3v2, uMetadataCustodian, AuMenus, uAudioUtils,
+  uPlaylistRows, uInspectorSummary;
 
 type
   TTagField = (tfTitle, tfArtist, tfAlbumArtist, tfAlbum, tfGenre, tfYear, tfTrack, tfDisc,
@@ -109,7 +112,9 @@ type
     procedure RefreshInspector;
     procedure InspectorSingle(D: PTagEditNodeData);
     procedure InspectorMulti;
+    function StatsOf(D: PTagEditNodeData; AInLib: Boolean; const ALib: TTrackInfo): PUserTrackStats;
     procedure InvalidateThumb(const Artist, AlbumArtist, Album, FolderPath: string);
+    function ListRowName(Sender: TObject; Row: Integer): string;
     procedure ListDraw(Sender: TObject; G: TGfx; Row, Col: Integer; X, Y, W, H: Single; var Handled: Boolean);
     procedure ListSel(Sender: TObject);
     procedure TabChange(Sender: TObject);
@@ -144,7 +149,9 @@ const
   LIST_W = 260;
   FOLDER_BTN_W = 150;              // Open folder, at the left of the bottom row
   PX = LIST_W + 44;                // the right part
-  COVER_W = 204;                   // the cover column (at the right of the Tags page)
+  SHORT_FIELD_MIN_W = 65;          // Track, Disc: room for "Unique" / "Varies"
+  YEAR_FIELD_MIN_W = 96;           // room for a full date (2026-05-01)
+  COVER_W = 204;                  // the cover column (at the right of the Tags page)
   { the Tags page at its smallest: five rows of fields, the Comment with its
     smallest memo, the note under it; a lower page scrolls }
   TAGS_MIN_H = 5 * 66 + 22 + COMMENT_H + 10 + 40;
@@ -288,6 +295,14 @@ begin
   if (AForm is TPropertiesForm) and FieldByCaption(ACaption, F) then Result := TPropertiesForm(AForm).FieldText(F);
 end;
 
+function PropertiesInspectorText(AForm: TAuForm): string;
+begin
+  Result := '';
+  if not (AForm is TPropertiesForm) then Exit;
+  SelectPropertiesTab(AForm, 1);
+  Result := TPropertiesForm(AForm).FInsMemo.Text;
+end;
+
 function PropertiesFieldHint(AForm: TAuForm; const ACaption: string): string;
 var
   F: TTagField;
@@ -390,6 +405,7 @@ begin
   FList.AddColumn('File', 200, 0, True);
   FList.BackRole := crCard;
   FList.OnDrawCell := @ListDraw;
+  FList.OnTypeText := @ListRowName;
   FList.OnSelChange := @ListSel;
   FList.OnRowContext := @ListContext;
   FList.TabOrder := 0;
@@ -581,14 +597,18 @@ begin
   PlaceField(tfAlbum, 0, Y, Half);
   PlaceField(tfGenre, Half + 16, Y, FW - Half - 16);
   Inc(Y, 66);
-  { the composer, and the three short fields in the other half (the year
-    the widest of them) }
-  PlaceField(tfComposer, 0, Y, Half);
+  { the composer, and the three short fields in the other half, equally
+    wide: each has room for the text a field shows when the selected files
+    differ in it }
   RH := FW - Half - 16;
-  Small := Math.Max(44, (RH - 16) * 23 div 100);
-  PlaceField(tfYear, Half + 16, Y, RH - 16 - 2 * Small);
-  PlaceField(tfTrack, Half + 16 + RH - 2 * Small - 8, Y, Small);
-  PlaceField(tfDisc, Half + 16 + RH - Small, Y, Small);
+  { in a narrow window the short fields keep the width their texts need (a
+    full date in the year) and the composer gives way }
+  Small := Math.Max(SHORT_FIELD_MIN_W, (RH - 16) div 3);
+  RH := Math.Max(YEAR_FIELD_MIN_W, RH - 16 - 2 * Small) + 2 * Small + 16;
+  PlaceField(tfComposer, 0, Y, FW - RH - 16);
+  PlaceField(tfYear, FW - RH, Y, RH - 16 - 2 * Small);
+  PlaceField(tfTrack, FW - 2 * Small - 8, Y, Small);
+  PlaceField(tfDisc, FW - Small, Y, Small);
   Inc(Y, 66);
   PlaceField(tfWork, 0, Y, Half);
   PlaceField(tfPerformer, Half + 16, Y, FW - Half - 16);
@@ -691,6 +711,15 @@ begin
   else if D^.IsModified or D^.CoverModified then G.FillCircle(X + S(12), Y + H / 2, SF(3.5), clAccentText);
   if D^.ReadFailed then C := clTextDim else C := clText;
   G.Text(ExtractFileName(D^.FilePath), X + S(24), Y, W - S(28), H, UIFont(12.5), C, 0, 1);
+end;
+
+{ what typing the first letters is matched against: the file's name }
+function TPropertiesForm.ListRowName(Sender: TObject; Row: Integer): string;
+var
+  D: PTagEditNodeData;
+begin
+  D := Item(Row);
+  if D = nil then Result := '' else Result := ExtractFileName(D^.FilePath);
 end;
 
 procedure TPropertiesForm.MarkRows;
@@ -1312,7 +1341,7 @@ var
   Lib: TTrackInfo;
   InLib, NeedCover: Boolean;
   SR: TSearchRec;
-  S, Art, FP: string;
+  S: string;
 begin
   if D = nil then Exit;
   NeedCover := D^.HasCover and (Length(D^.CoverData) = 0);
@@ -1347,18 +1376,7 @@ begin
   if UserStatsManager <> nil then
   begin
     S := S + INS_HDR_USER_STATS + sLineBreak;
-    Art := Trim(D^.Current.AlbumArtist);
-    if Art = '' then Art := Trim(D^.Current.Artist);
-    FP := UserStatsManager.GenerateFingerprint(Art, D^.Current.Album, D^.Current.Title);
-    St := UserStatsManager.PeekStats(FP);
-    if (St = nil) and (Trim(D^.Current.Artist) <> '') and not SameText(Art, Trim(D^.Current.Artist)) then
-      St := UserStatsManager.PeekStats(UserStatsManager.GenerateFingerprint(D^.Current.Artist, D^.Current.Album,
-        D^.Current.Title));
-    if (St = nil) and InLib then
-    begin
-      St := UserStatsManager.PeekStats(Lib.PrimaryFingerprint);
-      if (St = nil) and (Lib.FallbackFingerprint <> '') then St := UserStatsManager.PeekStats(Lib.FallbackFingerprint);
-    end;
+    St := StatsOf(D, InLib, Lib);
     if St <> nil then
     begin
       S := S + INS_LBL_PLAY_COUNT + IntToStr(St^.PlayCount) + sLineBreak;
@@ -1378,23 +1396,77 @@ begin
   FInsTitle.Caption := Trim(LBL_INSPECTOR_FILE_PREFIX) + ' ' + ExtractFileName(D^.FilePath);
 end;
 
+{ the play statistics of a file: by its tags as they stand in the editor,
+  else by the fingerprints of its library record; nil = none }
+function TPropertiesForm.StatsOf(D: PTagEditNodeData; AInLib: Boolean; const ALib: TTrackInfo): PUserTrackStats;
+var
+  Art: string;
+begin
+  Result := nil;
+  if (D = nil) or (UserStatsManager = nil) then Exit;
+  Art := Trim(D^.Current.AlbumArtist);
+  if Art = '' then Art := Trim(D^.Current.Artist);
+  Result := UserStatsManager.PeekStats(UserStatsManager.GenerateFingerprint(Art, D^.Current.Album, D^.Current.Title));
+  if (Result = nil) and (Trim(D^.Current.Artist) <> '') and not SameText(Art, Trim(D^.Current.Artist)) then
+    Result := UserStatsManager.PeekStats(UserStatsManager.GenerateFingerprint(D^.Current.Artist, D^.Current.Album,
+      D^.Current.Title));
+  if (Result = nil) and AInLib then
+  begin
+    Result := UserStatsManager.PeekStats(ALib.PrimaryFingerprint);
+    if (Result = nil) and (ALib.FallbackFingerprint <> '') then
+      Result := UserStatsManager.PeekStats(ALib.FallbackFingerprint);
+  end;
+end;
+
+{ Several files: what they have in common, from the library's records, the
+  values in the editor and the play statistics. No file is read. }
 procedure TPropertiesForm.InspectorMulti;
 var
   Sel: TIntegerArray;
-  I: Integer;
-  Total: Int64;
+  Items: TInspectorItems;
+  I, N: Integer;
   Lib: TTrackInfo;
   D: PTagEditNodeData;
+  St: PUserTrackStats;
 begin
   Sel := FList.SelectedRows;
-  Total := 0;
+  Items := nil;
+  SetLength(Items, Length(Sel));
+  N := 0;
   for I := 0 to High(Sel) do
   begin
     D := Item(Sel[I]);
-    if (D <> nil) and (FLibrary <> nil) and FLibrary.TryGetTrack(D^.FilePath, Lib) then Inc(Total, Lib.FileSize);
+    if D = nil then Continue;
+    Items[N] := Default(TInspectorItem);
+    Items[N].FilePath := D^.FilePath;
+    Items[N].FormatName := FormatNameOf(D^.FilePath);
+    Items[N].AlbumArtist := D^.Current.AlbumArtist;
+    Items[N].Album := D^.Current.Album;
+    Items[N].Year := D^.Current.DateStr;
+    Items[N].Genre := D^.Current.Genre;
+    Lib := Default(TTrackInfo);
+    Items[N].InLibrary := (FLibrary <> nil) and FLibrary.TryGetTrack(D^.FilePath, Lib);
+    if Items[N].InLibrary then
+    begin
+      Items[N].FileSize := Lib.FileSize;
+      Items[N].Seconds := TimeStrToSecs(Lib.DurationStr);
+      Items[N].SampleRate := Lib.SampleRate;
+      Items[N].BitDepth := Lib.BitDepth;
+      Items[N].DateAdded := Lib.DateAdded;
+      Items[N].HasReplayGain := Lib.HasReplayGain;
+    end;
+    St := StatsOf(D, Items[N].InLibrary, Lib);
+    if St <> nil then
+    begin
+      Items[N].PlayCount := St^.PlayCount;
+      Items[N].LastPlayed := St^.LastPlayed;
+      Items[N].Rating := St^.Rating;
+      Items[N].Favourite := St^.IsFavorite;
+    end;
+    Inc(N);
   end;
-  FInsMemo.Text := INS_LBL_TRACKS_SELECTED + IntToStr(Length(Sel)) + LineEnding +
-    INS_LBL_TOTAL_FILE_SIZE + SafeFormat(FMT_SIZE_MB, [Total / BYTES_PER_MB]);
+  SetLength(Items, N);
+  FInsMemo.Text := InspectorSummary(Items, UserStatsManager <> nil);
   FInsTitle.Caption := LBL_INSPECTOR_MULTI_SELECTION;
 end;
 

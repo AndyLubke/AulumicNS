@@ -38,7 +38,7 @@ uses
   TestPlaylistStore, TestReplayGainScan, TestReplayGainThread, TestMetadataCustodian, TestDemoLibrary,
   TestOutputRing, TestDsdToPcm, TestHangWatch, TestVolumePopup, TestLongPaths, TestToneControl, TestPlaylistPane, TestLibraryTiles,
   TestImageLimit, TestImageFormats, TestHeadroom, TestTextTags, TestTagRoundTrip, TestInputBlock, TestSettings, TestMetaNames, TestTonePresets,
-  TestLibraryCheck, TestProperties, TestUpdateCheck, TestPlaylistFormat, TestThemeColours, TestArtistSource, TestDownmix, TestDsdMix, TestAiff, TestAlac, TestDamagedFiles;
+  TestLibraryCheck, TestProperties, TestUpdateCheck, TestPlaylistFormat, TestThemeColours, TestArtistSource, TestDownmix, TestDsdMix, TestAiff, TestAlac, TestDamagedFiles, TestInspectorSummary, TestMemoScroll, TestLibraryPane, TestTabOrder, TestKeyboardLinks, TestStartTimes;
 
 var
   Runner: TTestRunner;

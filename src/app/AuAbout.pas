@@ -203,7 +203,7 @@ begin
   L := Row(2, 'Data folder', DataDir);
   if not ADemo then FDataDir := DataDir;
   L.TextRole := crAccent;
-  L.Cursor := crHandPoint;
+  L.Link := True;
   L.Hint := 'Open the data folder in Explorer.';
   L.ShowHint := True;
   L.OnClick := @DataClick;
@@ -212,7 +212,7 @@ begin
   { the project's page as a link }
   L := Row(4, 'Website', PROJECT_PAGE_TEXT);
   L.TextRole := crAccent;
-  L.Cursor := crHandPoint;
+  L.Link := True;
   L.Hint := 'Open the project page in the browser.';
   L.ShowHint := True;
   L.OnClick := @WebClick;

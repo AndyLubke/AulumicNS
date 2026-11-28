@@ -9,7 +9,7 @@ unit TestProperties;
 
   The Tags page of the Properties window with made-up records (no file is
   read or written): one file shows its values; several files show a value
-  they share and "<< Multiple Values >>" where they differ; Title and Track
+  they share and "Varies" where they differ; Title and Track
   cannot be set for several files at once; a text typed into a field goes to
   every selected file and to no other, and marks only those as changed; a
   field left alone changes nothing. The Work field among them.
@@ -36,6 +36,7 @@ type
     procedure AFieldLeftAloneChangesNothing;
     procedure AnEmptiedFieldClearsTheValue;
     procedure TheFolderOfAFileEndsWithADelimiter;
+    procedure TheInspectorSumsUpSeveralFiles;
   end;
 
 implementation
@@ -194,6 +195,29 @@ begin
   AssertEquals('m:\music\album\', FolderOfFile('m:\music\album\01 - Track.flac'));
   AssertEquals('A file in a drive''s root', 'm:\', FolderOfFile('m:\track.flac'));
   AssertEquals('No folder', '', FolderOfFile('track.flac'));
+end;
+
+{ the test's files are in no library: the summary names them as such and
+  shows what the editor holds, also a value typed a moment ago }
+procedure TTestProperties.TheInspectorSumsUpSeveralFiles;
+var
+  S: string;
+begin
+  PropertiesSelectRows(FForm, [0, 1, 2]);
+  S := PropertiesInspectorText(FForm);
+  AssertTrue('The number of tracks: ' + S, Pos(INS_LBL_TRACKS_SELECTED + '3', S) > 0);
+  AssertTrue('None is in a library', Pos(INS_LBL_NOT_IN_LIBRARY + '3', S) > 0);
+  AssertTrue('The format', Pos(INS_LBL_FORMAT + 'FLAC', S) > 0);
+  AssertTrue('One folder', Pos(INS_LBL_FOLDER_PATH + 'C:\No Such Folder', S) > 0);
+  AssertTrue('The album all share', Pos(INS_LBL_ALBUM + 'The Album', S) > 0);
+  AssertTrue('The year', Pos(INS_LBL_YEAR + '1977', S) > 0);
+  AssertTrue('No size without a library record', Pos(INS_LBL_TOTAL_FILE_SIZE, S) = 0);
+
+  PropertiesSelectRows(FForm, [2]);
+  PropertiesTypeField(FForm, 'Genre', 'Overtures');
+  PropertiesSelectRows(FForm, [0, 1, 2]);
+  S := PropertiesInspectorText(FForm);
+  AssertTrue('Two genres with their counts: ' + S, Pos(INS_LBL_GENRE + 'Classical (2), Overtures (1)', S) > 0);
 end;
 
 initialization

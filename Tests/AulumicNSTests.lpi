@@ -241,6 +241,36 @@
         <UnitName Value="TestDamagedFiles"/>
       </Unit>
       <Unit>
+        <Filename Value="TestInspectorSummary.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestInspectorSummary"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestMemoScroll.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestMemoScroll"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestLibraryPane.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestLibraryPane"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestTabOrder.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestTabOrder"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestKeyboardLinks.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestKeyboardLinks"/>
+      </Unit>
+      <Unit>
+        <Filename Value="TestStartTimes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="TestStartTimes"/>
+      </Unit>
+      <Unit>
         <Filename Value="TestUpdateCheck.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="TestUpdateCheck"/>

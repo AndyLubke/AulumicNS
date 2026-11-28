@@ -32,6 +32,8 @@ uses
 type
   TBannerHot = (bhNone, bhCover, bhAlbum, bhArtist, bhMoreArtists,
     bhRate, bhBadge, bhBooklet, bhHeart);
+  { the badge has one title; its colour and its mark (a tick or a dot) say whether the samples reach the
+    device unchanged }
   TBannerBadge = (bbNone, bbBitPerfect, bbProcessed);
   TBannerPointEvent = procedure(Sender: TObject; ScreenPt: TPoint) of object;
   TBannerArtistEvent = procedure(Sender: TObject; const AName: string) of object;
@@ -49,8 +51,7 @@ type
     FShowRoles: Boolean;
     FCodec, FResolution, FChannels, FRate, FNotice: string;
     FBadge: TBannerBadge;
-    FBadgeText: string;
-    FFavorite, FHasBooklet, FShowMeter: Boolean;
+   FFavorite, FHasBooklet, FShowMeter: Boolean;
     FHot: TBannerHot;
     FHotArtist: Integer;
     FDown: TBannerHot;
@@ -95,6 +96,10 @@ type
     procedure SetArtists(const Names: array of string);
     { the people behind "+n more": those the line has no room for }
     function OverflowPeople: TPersonArray;
+    { the first of the people shown ('': none) }
+    function FirstPerson: string;
+    { where the popup of the badge opens (screen), as a click on it gives it }
+    function BadgePopupPoint: TPoint;
     procedure Clear;
     procedure Changed;
     { the colour at the top of the banner gradient (the title bar above it) }
@@ -112,7 +117,6 @@ type
     { "Opening..." / "Waiting for drive...": shown in place of the codec }
     property Notice: string read FNotice write FNotice;
     property Badge: TBannerBadge read FBadge write FBadge;
-    property BadgeText: string read FBadgeText write FBadgeText;
     property Favorite: Boolean read FFavorite write FFavorite;
     property HasBooklet: Boolean read FHasBooklet write FHasBooklet;
     property AmbientColor: TARGB read FAmbient write FAmbient;
@@ -130,6 +134,7 @@ type
   end;
 
 const
+  BADGE_TITLE = 'Signal path';  // names the popup a click on the badge opens
   BannerDefaultHeight = 200;    // unscaled
   BannerMinHeight = 60;
   BannerMaxHeight = 400;
@@ -230,7 +235,6 @@ begin
   FRate := '';
   FNotice := '';
   FBadge := bbNone;
-  FBadgeText := '';
   FFavorite := False;
   FHasBooklet := False;
   FAmbient := 0;
@@ -258,6 +262,16 @@ var
 begin
   FPeople := nil;
   for I := 0 to High(Names) do AddPeople(FPeople, Names[I], False);
+end;
+
+function TNowPlayingBanner.FirstPerson: string;
+begin
+  if Length(FPeople) > 0 then Result := FPeople[0].Name else Result := '';
+end;
+
+function TNowPlayingBanner.BadgePopupPoint: TPoint;
+begin
+  Result := ClientToScreen(Point(FRects[bhBadge].Left, FRects[bhBadge].Bottom + S(4)));
 end;
 
 function TNowPlayingBanner.OverflowPeople: TPersonArray;
@@ -460,7 +474,7 @@ begin
     if FBadge <> bbNone then
     begin
       F := UIFont(11.5, True);
-      W := Ceil(TextWidth(FBadgeText, F)) + S(26);
+      W := Ceil(TextWidth(BADGE_TITLE, F)) + S(26);
       FRects[bhBadge] := Rect(X - W, BotY - S(24), X, BotY - S(4));
     end;
   end;
@@ -667,8 +681,10 @@ begin
     if FBadge = bbBitPerfect then C := clGood else C := clWarn;
     G.FillRound(Rc.Left, Rc.Top, Rc.Right - Rc.Left, Rc.Bottom - Rc.Top, (Rc.Bottom - Rc.Top) / 2,
       Blend(GradBottom, C, IfThen(FHot = bhBadge, 0.30, 0.18)));
-    G.FillCircle(Rc.Left + S(11), (Rc.Top + Rc.Bottom) / 2, SF(3.2), C);
-    G.Text(FBadgeText, Rc.Left + S(19), Rc.Top, Rc.Right - Rc.Left - S(22), Rc.Bottom - Rc.Top, UIFont(11.5, True), C, 0, 1);
+    { a tick or a dot: the state does not rest on the colour alone }
+    if FBadge = bbBitPerfect then DrawIcon(G, icCheck, Rc.Left + S(11), (Rc.Top + Rc.Bottom) / 2, S(11), C)
+    else G.FillCircle(Rc.Left + S(11), (Rc.Top + Rc.Bottom) / 2, SF(3.2), C);
+    G.Text(BADGE_TITLE, Rc.Left + S(19), Rc.Top, Rc.Right - Rc.Left - S(22), Rc.Bottom - Rc.Top, UIFont(11.5, True), C, 0, 1);
   end;
   Rc := FRects[bhBooklet];
   if Rc.Right > Rc.Left then

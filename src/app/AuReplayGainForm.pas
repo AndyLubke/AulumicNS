@@ -181,6 +181,12 @@ var
   Force: Boolean;
 begin
   Result := False;
+  { a scan is running, its window perhaps hidden: the window, not a second scan }
+  if GRgForm <> nil then
+  begin
+    ShowReplayGainWindow;
+    Exit;
+  end;
   if (AManager = nil) or Busy then Exit;
   Groups := LibraryAlbumGroups(AManager, Missing);
   try

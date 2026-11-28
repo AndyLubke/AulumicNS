@@ -89,7 +89,7 @@ type
     DoubleClickAction   : integer;
     LibraryTiles        : boolean;   // the library pane shows tiles, not the tree
     LibraryTileSize     : integer;   // 0 = a list .. 3 = large tiles
-    LibraryTileSort     : integer;   // artist, album, year, added, composer
+    LibraryTileSort     : integer;   // artist, album, year, added, composer, folder
     LibraryTileSortRev  : boolean;   // that order backwards
     AutoRescanLibrary   : boolean;
     DarkMode            : boolean;
@@ -1066,7 +1066,7 @@ begin
   Data.DefaultGroupingMode          := SettingsAdjust(Data.DefaultGroupingMode,          0, High(GROUPING_MODE_OPTIONS));
   Data.DoubleClickAction            := SettingsAdjust(Data.DoubleClickAction,            0, High(DBLCLICK_OPTIONS));
   Data.LibraryTileSize              := SettingsAdjust(Data.LibraryTileSize,              0, 3);
-  Data.LibraryTileSort              := SettingsAdjust(Data.LibraryTileSort,              0, 4);
+  Data.LibraryTileSort              := SettingsAdjust(Data.LibraryTileSort,              0, 5);
 end;
 
 procedure TAppSettings.Save(AForm: TForm);
